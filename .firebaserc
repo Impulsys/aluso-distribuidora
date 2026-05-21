@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "distribuidora-los-amigos-noa"
+  },
+  "targets": {
+    "distribuidora-los-amigos-noa": {
+      "hosting": {
+        "main": [
+          "distribuidora-los-amigos-noa"
+        ],
+        "construccion": [
+          "losamigos-construccion"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

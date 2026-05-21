@@ -1,0 +1,53 @@
+{
+  "name": "Distribuidora Los Amigos NOA",
+  "short_name": "Los Amigos NOA",
+  "description": "Distribuidora mayorista del NOA — Doncella & Nonisec. Catálogo, pedidos por WhatsApp y panel B2B.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#006081",
+  "theme_color": "#006081",
+  "lang": "es-AR",
+  "categories": ["business", "shopping"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Catálogo",
+      "short_name": "Catálogo",
+      "url": "/catalogo",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Carrito",
+      "short_name": "Carrito",
+      "url": "/carrito",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Ingresar",
+      "short_name": "Ingresar",
+      "url": "/login",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ]
+}

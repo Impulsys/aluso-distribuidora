@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Sitio en construcción · Distribuidora Los Amigos NOA</title>
+  <meta name="description" content="Estamos preparando nuestro nuevo sitio. Mientras tanto, escribinos por WhatsApp para consultas mayoristas de Nonisec y Doncella." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --navy: #0a1530;
+      --navy-deep: #050a1f;
+      --coral: #ff7e87;
+      --gold: #e6c89f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #fff;
+      background: var(--navy-deep);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+
+    .wrap {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 24px;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 80% at 80% 0%, #3a2566 0%, #1a1a4b 35%, #0a1530 70%, #050a1f 100%);
+    }
+    .glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-coral {
+      right: -120px; top: 40px;
+      width: 420px; height: 420px;
+      background: radial-gradient(closest-side, var(--coral), transparent);
+      opacity: 0.5;
+    }
+    .glow-violet {
+      left: -120px; bottom: 0;
+      width: 400px; height: 400px;
+      background: radial-gradient(closest-side, #8c5aff, transparent);
+      opacity: 0.4;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 32px;
+    }
+    .eyebrow .line {
+      display: inline-block;
+      width: 32px;
+      height: 1px;
+      background: var(--coral);
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-weight: 300;
+      font-size: clamp(44px, 8vw, 76px);
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--coral);
+    }
+
+    .lead {
+      margin-top: 28px;
+      font-size: clamp(15px, 2vw, 18px);
+      line-height: 1.7;
+      color: rgba(255,255,255,0.8);
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .lead strong { color: #fff; font-weight: 600; }
+
+    .sub {
+      margin-top: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(255,255,255,0.6);
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 40px;
+      padding: 16px 32px;
+      border-radius: 999px;
+      background: var(--coral);
+      color: var(--navy);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 12px 30px -8px rgba(255, 126, 135, 0.5);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 40px -8px rgba(255, 126, 135, 0.7);
+    }
+    .cta svg { width: 18px; height: 18px; }
+
+    .brands {
+      margin-top: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+    }
+    .brands strong {
+      color: rgba(255,255,255,0.85);
+      font-weight: 600;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.35);
+      z-index: 1;
+    }
+    .footer a { color: rgba(255,255,255,0.6); text-decoration: none; }
+    .footer a:hover { color: var(--coral); }
+
+    @media (max-width: 520px) {
+      .brands { flex-direction: column; gap: 8px; }
+      .eyebrow { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="glow glow-coral"></div>
+    <div class="glow glow-violet"></div>
+
+    <div class="content">
+      <div class="eyebrow">
+        <span class="line"></span>
+        Distribución mayorista · NOA Argentina
+        <span class="line"></span>
+      </div>
+
+      <h1>Sitio en <em>construcción</em></h1>
+
+      <p class="lead">
+        Estamos preparando nuestro nuevo catálogo online de las marcas
+        <strong>Nonisec</strong> y <strong>Doncella</strong>. Muy pronto vas a
+        poder ver toda la línea y hacer tu pedido desde acá.
+      </p>
+
+      <p class="sub">
+        Mientras tanto, escribinos directo por WhatsApp. Te respondemos en el día
+        con precios mayoristas y disponibilidad.
+      </p>
+
+      <a
+        class="cta"
+        href="https://wa.me/5491127597572?text=Hola%21%20Vi%20el%20sitio%20en%20construcci%C3%B3n%20y%20quiero%20contactarme%20con%20ustedes%20por%20el%20cat%C3%A1logo%20mayorista."
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+        </svg>
+        Consultar por WhatsApp
+      </a>
+
+      <div class="brands">
+        <span><strong>Nonisec</strong> · Cuidado adulto</span>
+        <span><strong>Doncella</strong> · Higiene femenina</span>
+      </div>
+    </div>
+
+    <footer class="footer">
+      © Distribuidora Los Amigos NOA · Por
+      <a href="https://wa.me/5491127597572" target="_blank" rel="noopener noreferrer">Lenterdit</a>
+    </footer>
+  </main>
+</body>
+</html>

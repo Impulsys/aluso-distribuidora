@@ -1,0 +1,76 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isSuperadmin() {
+      return isSignedIn() && hasUserDoc() && myRole() == 'superadmin';
+    }
+
+    function isSocioOrUp() {
+      return isSignedIn() && hasUserDoc() && myRole() in ['socio', 'superadmin'];
+    }
+
+    function isVendedorOrUp() {
+      return isSignedIn() && hasUserDoc() && myRole() in ['vendedor', 'socio', 'superadmin'];
+    }
+
+    // ===== users =====
+    match /users/{uid} {
+      // Cada uno lee su doc; socio/superadmin pueden ver todos.
+      allow read: if isSignedIn() && (request.auth.uid == uid || isSocioOrUp());
+
+      // Primer ingreso: el usuario crea SU propio doc, solo con rol 'cliente'.
+      // (El bootstrap de superadmin/cambios de rol se hace desde consola
+      //  o por un superadmin existente — ver allow update.)
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'cliente';
+
+      // El propio usuario puede actualizar datos básicos PERO no su rol.
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role;
+
+      // Solo superadmin asigna/cambia roles y administra usuarios.
+      allow write: if isSuperadmin();
+    }
+
+    // ===== products =====
+    // Lectura PÚBLICA (clientes anónimos pueden ver precios/stock/destacados).
+    // Escritura solo superadmin.
+    match /products/{id} {
+      allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
+    // ===== orders ===== (pedidos web/vendedor)
+    match /orders/{id} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isVendedorOrUp();
+    }
+
+    // ===== Reportes: camiones, cheques, gastos, cajas ===== (gestión interna)
+    match /trucks/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /checks/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /expenses/{id}     { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /cashClosings/{id} { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /config/{id}       { allow read: if isSignedIn();   allow write: if isSuperadmin(); }
+
+    // Todo lo demás: denegado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

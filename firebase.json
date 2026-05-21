@@ -1,0 +1,23 @@
+{
+  "hosting": [
+    {
+      "target": "main",
+      "public": "out",
+      "cleanUrls": true,
+      "trailingSlash": false,
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    },
+    {
+      "target": "construccion",
+      "public": "construccion-site",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        { "source": "**", "destination": "/index.html" }
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
