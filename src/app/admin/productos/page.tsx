@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "@/hooks/useProducts";
-import { setProductOverride } from "@/lib/admin";
+import { setProductOverride, setProductCost, subscribeProductCosts } from "@/lib/admin";
 import { formatARS } from "@/lib/format";
 import { MARCAS, type Marca, type Product } from "@/lib/types";
 
@@ -20,6 +20,12 @@ export default function AdminProductosPage() {
   const [marca, setMarca] = useState<MarcaFilter>("todos");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [costs, setCosts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const unsub = subscribeProductCosts(setCosts);
+    return unsub;
+  }, []);
 
   const visible = useMemo(
     () =>
@@ -99,6 +105,8 @@ export default function AdminProductosPage() {
           <ProductRow
             key={p.id}
             p={p}
+            costo={costs[p.id] ?? 0}
+            destacadosCount={destacadosCount}
             editing={editing === p.id}
             onToggleEdit={() => setEditing(editing === p.id ? null : p.id)}
           />
@@ -110,19 +118,28 @@ export default function AdminProductosPage() {
 
 function ProductRow({
   p,
+  costo,
+  destacadosCount,
   editing,
   onToggleEdit,
 }: {
   p: Product;
+  costo: number;
+  destacadosCount: number;
   editing: boolean;
   onToggleEdit: () => void;
 }) {
   const [busy, setBusy] = useState(false);
 
-  const save = async (patch: Partial<Product>) => {
+  const save = async (patch: Partial<Product> & { _costo?: number }) => {
     setBusy(true);
     try {
-      await setProductOverride(p.id, patch);
+      // Separar precioCosto: va a /productCosts (admin-only)
+      const { _costo, ...publicPatch } = patch;
+      await setProductOverride(p.id, publicPatch);
+      if (typeof _costo === "number") {
+        await setProductCost(p.id, _costo);
+      }
     } catch (e) {
       console.error(e);
       alert("No se pudo guardar.");
@@ -171,7 +188,7 @@ function ProductRow({
           )}
         </span>
         <span className="hidden text-right text-brand-dark/70 md:block">
-          {p.precioCosto > 0 ? formatARS(p.precioCosto) : "—"}
+          {costo > 0 ? formatARS(costo) : "—"}
         </span>
         <span
           className={`hidden text-right md:block ${
@@ -203,7 +220,13 @@ function ProductRow({
       {/* Form de edición */}
       {editing && (
         <div className="border-t border-brand-border bg-primary-light/40 px-4 py-4">
-          <EditForm p={p} busy={busy} onSave={save} />
+          <EditForm
+            p={p}
+            costo={costo}
+            busy={busy}
+            destacadosCount={destacadosCount}
+            onSave={save}
+          />
         </div>
       )}
     </div>
@@ -212,28 +235,61 @@ function ProductRow({
 
 function EditForm({
   p,
+  costo,
   busy,
+  destacadosCount,
   onSave,
 }: {
   p: Product;
+  costo: number;
   busy: boolean;
-  onSave: (patch: Partial<Product>) => Promise<void>;
+  destacadosCount: number;
+  onSave: (patch: Partial<Product> & { _costo?: number }) => Promise<void>;
 }) {
   const [precioVenta, setPrecioVenta] = useState(p.precioVenta);
-  const [precioCosto, setPrecioCosto] = useState(p.precioCosto);
+  const [precioCosto, setPrecioCosto] = useState(costo);
   const [stock, setStock] = useState(p.stock);
   const [destacado, setDestacado] = useState(p.destacado ?? false);
   const [precioOferta, setPrecioOferta] = useState(p.precioOferta ?? 0);
   const [activo, setActivo] = useState(p.activo);
+  const [error, setError] = useState<string | null>(null);
+
+  // Si este producto NO es destacado y ya hay 3+ destacados → no puede marcarlo
+  const destacadoBloqueado = !p.destacado && destacadosCount >= 3;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    // Validaciones
+    const pv = Number(precioVenta) || 0;
+    const pc = Number(precioCosto) || 0;
+    const st = Number(stock) || 0;
+    const po = Number(precioOferta) || 0;
+
+    if (pv < 0 || pc < 0 || st < 0 || po < 0) {
+      setError("Los valores no pueden ser negativos.");
+      return;
+    }
+    if (po > 0 && pv > 0 && po >= pv) {
+      setError(
+        "El precio de oferta debe ser MENOR que el precio de venta (sino no es oferta)."
+      );
+      return;
+    }
+    if (destacado && !p.destacado && destacadosCount >= 3) {
+      setError(
+        "Ya hay 3 productos destacados. Desmarcá uno antes de agregar éste."
+      );
+      return;
+    }
+
     onSave({
-      precioVenta: Number(precioVenta) || 0,
-      precioCosto: Number(precioCosto) || 0,
-      stock: Number(stock) || 0,
+      precioVenta: pv,
+      _costo: pc, // precio costo va a colección admin-only
+      stock: st,
       destacado,
-      precioOferta: Number(precioOferta) || 0,
+      precioOferta: po,
       activo,
     });
   };
@@ -294,17 +350,32 @@ function EditForm({
         </label>
       </Field>
       <Field label="Banner destacado">
-        <label className="flex items-center gap-2 text-sm">
+        <label
+          className={`flex items-center gap-2 text-sm ${
+            destacadoBloqueado ? "opacity-60" : ""
+          }`}
+        >
           <input
             type="checkbox"
             checked={destacado}
+            disabled={destacadoBloqueado}
             onChange={(e) => setDestacado(e.target.checked)}
           />
           ⭐ Mostrar en el banner de destacados
         </label>
+        {destacadoBloqueado && (
+          <p className="mt-1 text-[11px] text-amber-700">
+            Ya hay 3 destacados (máx). Desmarcá uno primero.
+          </p>
+        )}
       </Field>
 
       <div className="sm:col-span-2 lg:col-span-3">
+        {error && (
+          <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            {error}
+          </p>
+        )}
         <button
           type="submit"
           disabled={busy}

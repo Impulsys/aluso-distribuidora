@@ -63,6 +63,8 @@ export interface Order {
   clienteNombre?: string;
   clienteTelefono?: string;
   notas?: string;
+  formaPago?: FormaPago; // efectivo / cheque / transferencia
+  truckId?: string; // asignación al camión activo del día
   createdAt: number;
 }
 

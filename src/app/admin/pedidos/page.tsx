@@ -37,6 +37,8 @@ const FILTERS: { id: "todos" | OrderStatus; label: string }[] = [
 export default function AdminPedidosPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<"todos" | OrderStatus>("todos");
+  const [origen, setOrigen] = useState<"todos" | "web" | "vendedor">("todos");
+  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,11 +69,22 @@ export default function AdminPedidosPage() {
     return c;
   }, [orders]);
 
-  const visible = useMemo(
-    () =>
-      filter === "todos" ? orders : orders.filter((o) => o.status === filter),
-    [orders, filter]
-  );
+  const visible = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return orders
+      .filter((o) => (filter === "todos" ? true : o.status === filter))
+      .filter((o) => (origen === "todos" ? true : o.origin === origen))
+      .filter((o) => {
+        if (!t) return true;
+        return (
+          o.id.toLowerCase().includes(t) ||
+          (o.clienteNombre ?? "").toLowerCase().includes(t) ||
+          (o.clienteTelefono ?? "").toLowerCase().includes(t) ||
+          (o.createdByName ?? "").toLowerCase().includes(t) ||
+          o.items.some((i) => i.nombre.toLowerCase().includes(t))
+        );
+      });
+  }, [orders, filter, origen, q]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
     setBusy(id);
@@ -90,13 +103,64 @@ export default function AdminPedidosPage() {
 
   return (
     <div>
-      {/* Filtros */}
+      {/* Buscador */}
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark/40">
+            🔎
+          </span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por cliente, teléfono, vendedor, producto o nº pedido…"
+            className="w-full rounded-full border border-brand-border bg-surface py-2 pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+          />
+          {q && (
+            <button
+              onClick={() => setQ("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-dark/40 hover:text-brand-dark"
+              aria-label="Limpiar"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <div className="inline-flex overflow-hidden rounded-full border border-brand-border bg-surface text-xs">
+          {(
+            [
+              { id: "todos", label: "Todos" },
+              { id: "vendedor", label: "👤 Vendedor" },
+              { id: "web", label: "🌐 Web" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.id}
+              onClick={() => setOrigen(o.id)}
+              className={`px-3 py-1.5 font-medium transition ${
+                origen === o.id
+                  ? "bg-primary text-white"
+                  : "text-brand-dark/70 hover:bg-primary-light"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={refresh}
+          className="rounded-full border border-brand-border bg-surface px-4 py-1.5 text-xs font-medium hover:bg-primary-light"
+        >
+          🔄 Refrescar
+        </button>
+      </div>
+
+      {/* Filtros por estado */}
       <div className="mb-5 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+            className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
               filter === f.id
                 ? "bg-primary text-white shadow-sm"
                 : "border border-brand-border bg-surface text-brand-dark hover:border-primary"
@@ -114,12 +178,6 @@ export default function AdminPedidosPage() {
             </span>
           </button>
         ))}
-        <button
-          onClick={refresh}
-          className="ml-auto rounded-full border border-brand-border bg-surface px-4 py-1.5 text-xs font-medium hover:bg-primary-light"
-        >
-          🔄 Refrescar
-        </button>
       </div>
 
       {loading && (

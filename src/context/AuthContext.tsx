@@ -11,6 +11,7 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   type User as FirebaseUser,
 } from "firebase/auth";
@@ -24,6 +25,7 @@ interface AuthState {
   loading: boolean;
   signInGoogle: () => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -82,13 +84,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email.trim(), password);
   };
 
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email.trim());
+  };
+
   const signOut = async () => {
     await fbSignOut(auth);
   };
 
   return (
     <AuthContext.Provider
-      value={{ fbUser, user, loading, signInGoogle, signInEmail, signOut }}
+      value={{
+        fbUser,
+        user,
+        loading,
+        signInGoogle,
+        signInEmail,
+        resetPassword,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

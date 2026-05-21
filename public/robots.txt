@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /vendedor
+Disallow: /reportes
+Disallow: /carrito
+Disallow: /login
+
+Sitemap: https://distribuidora-los-amigos-noa.web.app/sitemap.xml

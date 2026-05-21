@@ -18,5 +18,6 @@ export function formatDate(ts: number): string {
 }
 
 export function daysBetween(from: number, to: number): number {
-  return Math.max(0, Math.round((to - from) / 86_400_000));
+  // Días redondeados HACIA ARRIBA — si faltan unas horas, cuenta como 1 día.
+  return Math.max(0, Math.ceil((to - from) / 86_400_000));
 }

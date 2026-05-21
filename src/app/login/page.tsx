@@ -6,12 +6,13 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
-  const { signInEmail, signInGoogle, user } = useAuth();
+  const { signInEmail, signInGoogle, resetPassword, user } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
 
   if (user) {
     return (
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setResetMsg(null);
     setBusy(true);
     try {
       await signInEmail(email, password);
@@ -40,6 +42,23 @@ export default function LoginPage() {
       setError("Email o contraseña incorrectos.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setError("");
+    setResetMsg(null);
+    if (!email.trim()) {
+      setError("Ingresá tu email arriba primero y volvé a tocar el link.");
+      return;
+    }
+    try {
+      await resetPassword(email);
+      setResetMsg(
+        `Te enviamos un email a ${email.trim()} con el link para resetear la contraseña.`
+      );
+    } catch {
+      setError("No pudimos enviar el email. Verificá la dirección.");
     }
   };
 
@@ -64,7 +83,16 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium">Contraseña</label>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium">Contraseña</label>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Olvidé mi contraseña
+              </button>
+            </div>
             <input
               type="password"
               required
@@ -74,7 +102,16 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-accent">{error}</p>}
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+              {error}
+            </p>
+          )}
+          {resetMsg && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              ✓ {resetMsg}
+            </p>
+          )}
 
           <button
             type="submit"
@@ -97,11 +134,10 @@ export default function LoginPage() {
         </button>
 
         <p className="mt-6 text-center text-sm text-brand-dark/60">
-          ¿Sos cliente?{" "}
-          <Link href="/" className="font-medium text-primary underline">
-            Ver el catálogo
-          </Link>{" "}
-          (no necesitás cuenta)
+          No necesitás cuenta para hacer un pedido —{" "}
+          <Link href="/catalogo" className="font-medium text-primary underline">
+            ver el catálogo
+          </Link>
         </p>
       </div>
     </div>

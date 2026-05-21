@@ -17,15 +17,56 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Distribuidora Los Amigos NOA · Mayorista del NOA",
+  metadataBase: new URL("https://distribuidora-los-amigos-noa.web.app"),
+  title: {
+    default: "Distribuidora Los Amigos NOA · Mayorista del NOA",
+    template: "%s · Distribuidora Los Amigos NOA",
+  },
   description:
-    "Distribuidora mayorista — Doncella y Nonisec, cuidado e higiene + despensa para farmacias, geriátricos y comercios del NOA.",
+    "Distribuidora mayorista del Noroeste argentino. Doncella y Nonisec (Lenterdit): cuidado adulto, incontinencia, higiene femenina y bebé para farmacias, geriátricos y comercios.",
+  keywords: [
+    "distribuidora mayorista",
+    "NOA",
+    "Doncella",
+    "Nonisec",
+    "Lenterdit",
+    "pañales adulto",
+    "incontinencia",
+    "toallas femeninas",
+    "protectores diarios",
+    "babylook",
+    "farmacia",
+    "geriátrico",
+  ],
   manifest: "/manifest.json",
   applicationName: "Los Amigos NOA",
   appleWebApp: {
     capable: true,
     title: "Los Amigos NOA",
     statusBarStyle: "default",
+  },
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    siteName: "Distribuidora Los Amigos NOA",
+    title: "Distribuidora Los Amigos NOA · Mayorista del NOA",
+    description:
+      "Doncella y Nonisec al mejor precio mayorista del NOA. Pedidos por WhatsApp en segundos.",
+    images: [
+      {
+        url: "/icons/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "Distribuidora Los Amigos NOA",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Distribuidora Los Amigos NOA",
+    description:
+      "Doncella y Nonisec al mejor precio mayorista del NOA.",
+    images: ["/icons/icon-512.png"],
   },
   icons: {
     icon: [

@@ -37,9 +37,6 @@ yarn-error.log*
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
 
-# Material crudo del cliente (fotos originales, Excel, PDFs) — solo local
-_cliente/
-
 # vercel
 .vercel
 

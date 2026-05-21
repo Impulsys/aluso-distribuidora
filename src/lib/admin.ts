@@ -31,14 +31,14 @@ export async function updateOrderStatus(
   await updateDoc(doc(db, "orders", id), { status });
 }
 
-// ==================== PRODUCTOS (overrides) ====================
-// Solo guardamos los campos editables — el resto (id, ean, marca, nombre,
-// descripcion, imagen, categoria) viene del seed estático.
+// ==================== PRODUCTOS (overrides públicos) ====================
+// Solo guardamos los campos editables que pueden ser PÚBLICOS — el resto
+// (id, ean, marca, nombre, descripcion, imagen, categoria) viene del seed.
+// IMPORTANTE: precioCosto NO va acá — va en productCosts/ (admin-only).
 export type ProductOverride = Partial<
   Pick<
     Product,
     | "precioVenta"
-    | "precioCosto"
     | "stock"
     | "activo"
     | "destacado"
@@ -53,7 +53,7 @@ export async function setProductOverride(
   await setDoc(doc(db, "products", id), patch, { merge: true });
 }
 
-// Suscripción en tiempo real (admin y catálogo público lo usan).
+// Suscripción en tiempo real al override público.
 export function subscribeProductOverrides(
   cb: (overrides: Record<string, ProductOverride>) => void
 ): () => void {
@@ -61,6 +61,32 @@ export function subscribeProductOverrides(
     const map: Record<string, ProductOverride> = {};
     snap.docs.forEach((d) => {
       map[d.id] = d.data() as ProductOverride;
+    });
+    cb(map);
+  });
+}
+
+// ==================== PRODUCT COSTS (admin-only) ====================
+// Precio costo separado para que no sea legible por clientes anónimos.
+export async function setProductCost(
+  id: string,
+  precioCosto: number
+): Promise<void> {
+  await setDoc(
+    doc(db, "productCosts", id),
+    { precioCosto, updatedAt: Date.now() },
+    { merge: true }
+  );
+}
+
+export function subscribeProductCosts(
+  cb: (costs: Record<string, number>) => void
+): () => void {
+  return onSnapshot(collection(db, "productCosts"), (snap) => {
+    const map: Record<string, number> = {};
+    snap.docs.forEach((d) => {
+      const data = d.data() as { precioCosto?: number };
+      if (typeof data.precioCosto === "number") map[d.id] = data.precioCosto;
     });
     cb(map);
   });

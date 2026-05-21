@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { findTruckForDay } from "@/lib/trucks";
 import { getExpensesForDay } from "@/lib/cashflow";
 import { formatARS } from "@/lib/format";
+import { useAuth } from "@/context/AuthContext";
+import {
+  DEFAULT_REPORTES_CONFIG,
+  subscribeReportesConfig,
+  type ReportesConfig,
+} from "@/lib/config";
+import {
+  dayKey,
+  setCashInitial,
+  subscribeCashInitialRange,
+} from "@/lib/cash-initial";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
@@ -52,8 +63,41 @@ export default function DayReportModal({
   orders,
   trucks,
 }: Props) {
+  const { user } = useAuth();
   const [expenses, setExpenses] = useState<DailyExpense[]>([]);
   const [loadingExp, setLoadingExp] = useState(false);
+  const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
+  const [cajaInicial, setCajaInicialState] = useState(0);
+  const [editingCaja, setEditingCaja] = useState(false);
+  const [cajaInput, setCajaInput] = useState("");
+
+  useEffect(() => {
+    const unsub = subscribeReportesConfig(setConfig);
+    return unsub;
+  }, []);
+
+  // Subscribirse a la caja inicial del día
+  useEffect(() => {
+    if (dayTs === null) return;
+    const d = new Date(dayTs);
+    d.setHours(0, 0, 0, 0);
+    const start = d.getTime();
+    const end = start + 86_400_000;
+    const unsub = subscribeCashInitialRange(start, end, (map) => {
+      const k = dayKey(dayTs);
+      const v = map[k] ?? 0;
+      setCajaInicialState(v);
+      if (!editingCaja) setCajaInput(String(v));
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayTs]);
+
+  // ¿El que mira es superadmin? Si sí, no aplicamos los toggles
+  const isSuperadmin = user?.role === "superadmin";
+  const showGanancia = isSuperadmin || config.mostrarGananciaASocios;
+  const showGastos = isSuperadmin || config.mostrarGastosASocios;
+  const showCajaFisica = isSuperadmin || config.mostrarCajaFisicaASocios;
 
   // ESC cierra + bloquear scroll
   useEffect(() => {
@@ -67,15 +111,26 @@ export default function DayReportModal({
     };
   }, [dayTs, onClose]);
 
-  // Cargar gastos del día al abrir
+  // Cargar gastos del día al abrir — con guard isMounted contra race conditions
+  // si el user cambia rápido de un día a otro.
   useEffect(() => {
     if (dayTs === null) return;
+    let alive = true;
     const { start, end } = dayBounds(dayTs);
     setLoadingExp(true);
     getExpensesForDay(start, end)
-      .then(setExpenses)
-      .catch(() => setExpenses([]))
-      .finally(() => setLoadingExp(false));
+      .then((exp) => {
+        if (alive) setExpenses(exp);
+      })
+      .catch(() => {
+        if (alive) setExpenses([]);
+      })
+      .finally(() => {
+        if (alive) setLoadingExp(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [dayTs]);
 
   const data = useMemo(() => {
@@ -89,6 +144,12 @@ export default function DayReportModal({
         o.status !== "cancelado"
     );
     const totalVentas = dayOrders.reduce((s, o) => s + (o.total || 0), 0);
+    // Ingresos cobrados en efectivo del día (usamos formaPago si vino,
+    // si no asumimos efectivo por defecto)
+    const ingresosEfectivo = dayOrders.reduce((s, o) => {
+      const fp = o.formaPago ?? "efectivo";
+      return fp === "efectivo" ? s + (o.total || 0) : s;
+    }, 0);
     const itemsMap = new Map<
       string,
       { nombre: string; cantidad: number; total: number }
@@ -129,8 +190,14 @@ export default function DayReportModal({
     // Como hoy todavía no capturamos formaPago en cada venta, asumimos
     // 100% en efectivo para el cálculo de la caja física (estimado).
     const cajaFidel = totalVentas;
-    const cajaFisica = Math.max(0, cajaFidel - gastosEfectivo);
-    const banco = Math.max(0, cajaFidel - cajaFisica);
+    // Caja física = efectivo que va quedando en mano
+    // = caja inicial + ingresos en efectivo del día − gastos pagados en efectivo
+    const cajaFisica = Math.max(
+      0,
+      cajaInicial + ingresosEfectivo - gastosEfectivo
+    );
+    // A depositar = caja física − caja inicial (lo que sobra del día sobre el efectivo de arranque)
+    const banco = Math.max(0, cajaFisica - cajaInicial);
     const gananciaEstimada =
       truck && truck.porcentajeGanancia
         ? (totalVentas * truck.porcentajeGanancia) / 100
@@ -209,14 +276,16 @@ export default function DayReportModal({
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs uppercase text-brand-dark/55">
-                    % Ganancia
-                  </p>
-                  <p className="font-serif text-2xl text-primary">
-                    {data.truck.porcentajeGanancia}%
-                  </p>
-                </div>
+                {showGanancia && (
+                  <div className="text-right">
+                    <p className="text-xs uppercase text-brand-dark/55">
+                      % Ganancia
+                    </p>
+                    <p className="font-serif text-2xl text-primary">
+                      {data.truck.porcentajeGanancia}%
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-brand-dark/55">
@@ -283,6 +352,7 @@ export default function DayReportModal({
           </section>
 
           {/* Gastos */}
+          {showGastos && (
           <section className="mt-4">
             <h3 className="mb-2 font-serif text-lg text-brand-dark">
               Gastos del día
@@ -326,13 +396,46 @@ export default function DayReportModal({
               </>
             )}
           </section>
+          )}
 
           {/* Caja Fidel — cierre del día */}
+          {showCajaFisica && (
           <section className="mt-4 rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary-light/40 to-surface p-4">
             <h3 className="mb-3 flex items-center gap-2 font-serif text-lg text-primary">
               🏦 Cierre Caja Fidel
             </h3>
             <div className="space-y-1.5 text-sm">
+              {/* Caja inicial editable por superadmin, readonly para socio */}
+              {isSuperadmin ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-brand-dark/70">Caja inicial del día</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-brand-dark/50">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={editingCaja ? cajaInput : cajaInicial || ""}
+                      onFocus={() => {
+                        setEditingCaja(true);
+                        setCajaInput(String(cajaInicial || ""));
+                      }}
+                      onChange={(e) => setCajaInput(e.target.value)}
+                      onBlur={async () => {
+                        const v = Number(cajaInput) || 0;
+                        if (v !== cajaInicial) {
+                          await setCashInitial(dayTs, v, user?.uid);
+                        }
+                        setEditingCaja(false);
+                      }}
+                      placeholder="0"
+                      className="w-28 rounded-md border border-brand-border bg-white px-2 py-1 text-right text-sm focus:border-primary outline-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Row label="Caja inicial del día" value={cajaInicial} />
+              )}
               <Row label="Caja Fidel (ingresos)" value={data.cajaFidel} tone="emerald" />
               <Row label="Gastos en efectivo" value={-data.gastosEfectivo} tone="rose" />
               <div className="my-1 h-px bg-brand-border" />
@@ -348,10 +451,11 @@ export default function DayReportModal({
               )}
             </div>
             <p className="mt-3 text-[10px] text-brand-dark/45">
-              * El cálculo asume que las ventas se cobran en efectivo. Cuando
-              capturemos forma de pago por venta el cierre será exacto.
+              * Caja física calculada con las ventas marcadas como efectivo
+              menos los gastos en efectivo del día.
             </p>
           </section>
+          )}
         </div>
       </div>
     </div>

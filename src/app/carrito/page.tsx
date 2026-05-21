@@ -8,6 +8,13 @@ import { useAuth } from "@/context/AuthContext";
 import { formatARS } from "@/lib/format";
 import { pedidoCarritoLink } from "@/lib/order";
 import { createOrder } from "@/lib/orders";
+import type { FormaPago } from "@/lib/types";
+
+const FORMAS: { id: FormaPago; label: string; emoji: string }[] = [
+  { id: "efectivo", label: "Efectivo", emoji: "💵" },
+  { id: "cheque", label: "Cheque", emoji: "🧾" },
+  { id: "transferencia", label: "Transferencia", emoji: "🏦" },
+];
 
 export default function CarritoPage() {
   const { items, total, count, setQty, remove, clear } = useCart();
@@ -16,6 +23,7 @@ export default function CarritoPage() {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [nota, setNota] = useState("");
+  const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +64,7 @@ export default function CarritoPage() {
         clienteNombre: nombre.trim() || undefined,
         clienteTelefono: telefono.trim() || undefined,
         notas: nota.trim() || undefined,
+        formaPago,
       });
       // Abrimos WhatsApp aparte (popup) y luego limpiamos
       window.open(link, "_blank", "noopener,noreferrer");
@@ -95,23 +104,32 @@ export default function CarritoPage() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setQty(i.productId, i.cantidad - 1)}
-                className="grid h-8 w-8 place-items-center rounded border border-brand-border hover:bg-primary-light"
+                className="grid h-10 w-10 place-items-center rounded border border-brand-border hover:bg-primary-light sm:h-9 sm:w-9"
                 aria-label="Restar"
               >
                 −
               </button>
               <input
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 min={1}
+                max={999}
                 value={i.cantidad}
-                onChange={(e) =>
-                  setQty(i.productId, Math.max(1, Number(e.target.value) || 1))
-                }
-                className="h-8 w-12 rounded border border-brand-border text-center"
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setQty(
+                    i.productId,
+                    Math.max(1, Math.min(999, Number.isFinite(n) ? n : 1))
+                  );
+                }}
+                className="h-10 w-14 rounded border border-brand-border text-center sm:h-9"
               />
               <button
-                onClick={() => setQty(i.productId, i.cantidad + 1)}
-                className="grid h-8 w-8 place-items-center rounded border border-brand-border hover:bg-primary-light"
+                onClick={() =>
+                  setQty(i.productId, Math.min(999, i.cantidad + 1))
+                }
+                className="grid h-10 w-10 place-items-center rounded border border-brand-border hover:bg-primary-light sm:h-9 sm:w-9"
                 aria-label="Sumar"
               >
                 +
@@ -162,6 +180,29 @@ export default function CarritoPage() {
             />
           </label>
         )}
+        <div>
+          <span className="block text-sm font-medium">
+            Forma de pago{isVendedor && " del cliente"}
+          </span>
+          <div className="mt-1 grid grid-cols-3 gap-2">
+            {FORMAS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFormaPago(f.id)}
+                className={`rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                  formaPago === f.id
+                    ? "border-primary bg-primary text-white shadow-sm"
+                    : "border-brand-border bg-surface hover:border-primary"
+                }`}
+              >
+                <div className="text-lg">{f.emoji}</div>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <label className="text-sm font-medium">
           Nota / dirección (opcional)
           <textarea

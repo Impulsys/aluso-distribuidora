@@ -48,10 +48,17 @@ service cloud.firestore {
     }
 
     // ===== products =====
-    // Lectura PÚBLICA (clientes anónimos pueden ver precios/stock/destacados).
-    // Escritura solo superadmin.
+    // Lectura PÚBLICA (precios de venta, stock, destacados).
+    // Escritura solo superadmin. precioCosto NO se guarda acá — va en productCosts/{id}
     match /products/{id} {
       allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
+    // ===== productCosts (info sensible: precio costo) =====
+    // Solo socio/superadmin pueden leerlo. Vendedor y público no ven precio costo.
+    match /productCosts/{id} {
+      allow read: if isSocioOrUp();
       allow write: if isSuperadmin();
     }
 

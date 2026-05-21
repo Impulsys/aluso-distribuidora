@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PRODUCTOS_SEED } from "@/data/productos";
+import { useProducts } from "@/hooks/useProducts";
 import { getAllOrders } from "@/lib/orders";
 import { getAllUsers } from "@/lib/admin";
 import { subscribeChecks, chequesProximos, chequesVencidos } from "@/lib/cashflow";
@@ -37,6 +37,7 @@ const Card = ({ k }: { k: KPI }) => {
 };
 
 export default function AdminDashboard() {
+  const productos = useProducts();
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [checks, setChecks] = useState<Check[]>([]);
@@ -66,7 +67,7 @@ export default function AdminDashboard() {
   const todayTs = today.getTime();
   const pedidosHoy = orders.filter((o) => o.createdAt >= todayTs);
   const pedidosNuevos = orders.filter((o) => o.status === "nuevo");
-  const totalProductos = PRODUCTOS_SEED.filter((p) => p.activo).length;
+  const totalProductos = productos.filter((p) => p.activo).length;
   const totalUsuarios = users.length;
   const vendedores = users.filter((u) => u.role === "vendedor").length;
   const totalFacturado = orders

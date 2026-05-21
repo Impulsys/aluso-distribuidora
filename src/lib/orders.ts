@@ -7,7 +7,14 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { CartItem, Order, OrderOrigin } from "./types";
+import { findTruckForDay } from "./trucks";
+import type {
+  CartItem,
+  FormaPago,
+  Order,
+  OrderOrigin,
+  Truck,
+} from "./types";
 
 export interface CreateOrderInput {
   origin: OrderOrigin;
@@ -18,13 +25,27 @@ export interface CreateOrderInput {
   clienteNombre?: string;
   clienteTelefono?: string;
   notas?: string;
+  formaPago?: FormaPago;
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<string> {
+  // Auto-asignar al camión activo del momento (si hay)
+  const trucksSnap = await getDocs(
+    query(collection(db, "trucks"), limit(50))
+  );
+  const trucks = trucksSnap.docs
+    .map((d) => ({ ...(d.data() as Truck), id: d.id }))
+    .sort((a, b) => b.fechaIngreso - a.fechaIngreso);
+  const now = Date.now();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const activeTruck = findTruckForDay(trucks, today.getTime());
+
   const docRef = await addDoc(collection(db, "orders"), {
     ...input,
+    truckId: activeTruck?.id ?? null,
     status: "nuevo",
-    createdAt: Date.now(),
+    createdAt: now,
   });
   return docRef.id;
 }

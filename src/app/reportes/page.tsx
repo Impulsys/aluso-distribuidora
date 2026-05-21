@@ -66,18 +66,9 @@ export default function ReportesPage() {
 
   return (
     <div>
-      {/* Cabecera */}
-      <header className="mb-6">
-        <span className="text-xs uppercase tracking-[0.22em] text-primary">
-          Reportes
-        </span>
-        <h1 className="mt-1 font-serif text-3xl text-brand-dark sm:text-4xl">
-          Calendario anual
-        </h1>
-        <p className="mt-2 text-sm text-brand-dark/65">
-          Movimientos de venta por día. Tocá cualquier día para ver el detalle.
-        </p>
-      </header>
+      <p className="mb-4 text-sm text-brand-dark/65">
+        Movimientos de venta por día. Tocá cualquier día para ver el detalle.
+      </p>
 
       {/* Navegación de año + leyenda */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -1,22 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createTruck, deleteTruck, subscribeTrucks } from "@/lib/trucks";
-import { formatDate } from "@/lib/format";
-import type { Truck } from "@/lib/types";
+import {
+  createTruck,
+  deleteTruck,
+  subscribeTrucks,
+  updateTruckCargo,
+} from "@/lib/trucks";
+import { formatARS, formatDate } from "@/lib/format";
+import {
+  PROVEEDORES,
+  TRANSPORTES,
+  type Truck,
+  type TruckCargoItem,
+} from "@/lib/types";
 
-// Paleta sugerida — clicable para elegir rápido
 const PRESET_COLORS = [
-  "#EF4444", // rojo
-  "#F97316", // naranja
-  "#EAB308", // amarillo
-  "#10B981", // verde
-  "#06B6D4", // cyan
-  "#3B82F6", // azul
-  "#8B5CF6", // violeta
-  "#EC4899", // rosa
-  "#A16207", // marrón
-  "#475569", // gris
+  "#EF4444",
+  "#F97316",
+  "#EAB308",
+  "#10B981",
+  "#06B6D4",
+  "#3B82F6",
+  "#8B5CF6",
+  "#EC4899",
+  "#A16207",
+  "#475569",
 ];
 
 function todayISO() {
@@ -29,12 +38,16 @@ export default function AdminCamionesPage() {
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Formulario
+  // Form
   const [nombre, setNombre] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[5]);
   const [fechaIngreso, setFechaIngreso] = useState(todayISO());
   const [porcentaje, setPorcentaje] = useState(35);
   const [costo, setCosto] = useState(0);
+  const [proveedor, setProveedor] = useState<string>(PROVEEDORES[0]);
+  const [proveedorOtro, setProveedorOtro] = useState("");
+  const [transporte, setTransporte] = useState<string>(TRANSPORTES[0]);
+  const [transporteOtro, setTransporteOtro] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +72,18 @@ export default function AdminCamionesPage() {
         fechaIngreso: new Date(fechaIngreso).getTime(),
         porcentajeGanancia: Number(porcentaje) || 0,
         costoCamion: Number(costo) || 0,
+        proveedor,
+        proveedorOtro: proveedor === "otro" ? proveedorOtro.trim() : undefined,
+        transporte,
+        transporteOtro:
+          transporte === "otro" ? transporteOtro.trim() : undefined,
         descripcion: descripcion.trim(),
       });
-      // limpiar
       setNombre("");
       setDescripcion("");
       setCosto(0);
+      setProveedorOtro("");
+      setTransporteOtro("");
     } catch (e) {
       console.error(e);
       setError("No se pudo crear el camión.");
@@ -135,6 +154,60 @@ export default function AdminCamionesPage() {
             </div>
           </label>
 
+          {/* Proveedor dropdown */}
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
+              Proveedor
+            </span>
+            <select
+              value={proveedor}
+              onChange={(e) => setProveedor(e.target.value)}
+              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+            >
+              {PROVEEDORES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+              <option value="otro">Otro…</option>
+            </select>
+            {proveedor === "otro" && (
+              <input
+                value={proveedorOtro}
+                onChange={(e) => setProveedorOtro(e.target.value)}
+                placeholder="Nombre del proveedor"
+                className="mt-2 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            )}
+          </label>
+
+          {/* Transporte dropdown */}
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
+              Transporte
+            </span>
+            <select
+              value={transporte}
+              onChange={(e) => setTransporte(e.target.value)}
+              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+            >
+              {TRANSPORTES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+              <option value="otro">Otro…</option>
+            </select>
+            {transporte === "otro" && (
+              <input
+                value={transporteOtro}
+                onChange={(e) => setTransporteOtro(e.target.value)}
+                placeholder="Nombre del transportista"
+                className="mt-2 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            )}
+          </label>
+
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-brand-dark/70">
               Fecha de ingreso
@@ -185,7 +258,7 @@ export default function AdminCamionesPage() {
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
               rows={2}
-              placeholder="Proveedor, contenido, etc."
+              placeholder="Notas adicionales del camión"
               className="w-full resize-none rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </label>
@@ -206,7 +279,7 @@ export default function AdminCamionesPage() {
         </form>
       </section>
 
-      {/* === Lista de camiones === */}
+      {/* === Lista === */}
       <section>
         <h2 className="mb-3 font-serif text-xl text-brand-dark">
           Camiones registrados
@@ -218,73 +291,250 @@ export default function AdminCamionesPage() {
             Todavía no hay camiones. Creá el primero en el formulario.
           </div>
         ) : (
-          <div className="space-y-2">
-            {trucks.map((t) => {
-              const activo = !t.fechaCierre;
-              return (
-                <article
-                  key={t.id}
-                  className="overflow-hidden rounded-xl border border-brand-border bg-surface transition hover:shadow-md"
-                >
-                  <div
-                    className="h-2 w-full"
-                    style={{ background: t.color }}
-                    aria-hidden
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="grid h-10 w-10 place-items-center rounded-full text-xl text-white shadow"
-                        style={{ background: t.color }}
-                      >
-                        🚚
-                      </div>
-                      <div>
-                        <p className="font-semibold text-brand-dark">
-                          {t.nombre}
-                          {activo && (
-                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800">
-                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                              Activo
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-brand-dark/55">
-                          Ingreso: {formatDate(t.fechaIngreso)}
-                          {t.fechaCierre && (
-                            <> · Cierre: {formatDate(t.fechaCierre)}</>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right text-sm">
-                      <p className="font-semibold text-primary">
-                        {t.porcentajeGanancia}% ganancia
-                      </p>
-                      {t.costoCamion && t.costoCamion > 0 && (
-                        <p className="text-xs text-brand-dark/55">
-                          Costo: ${t.costoCamion.toLocaleString("es-AR")}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleDelete(t.id, t.nombre)}
-                      className="text-xs text-rose-700 hover:underline"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                  {t.descripcion && (
-                    <p className="border-t border-brand-border bg-primary-light/30 px-4 py-2 text-xs italic text-brand-dark/70">
-                      {t.descripcion}
-                    </p>
-                  )}
-                </article>
-              );
-            })}
+          <div className="space-y-3">
+            {trucks.map((t) => (
+              <TruckCard
+                key={t.id}
+                truck={t}
+                onDelete={() => handleDelete(t.id, t.nombre)}
+              />
+            ))}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+// ====== CARD DEL CAMIÓN (con expander de carga) ======
+function TruckCard({
+  truck,
+  onDelete,
+}: {
+  truck: Truck;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const activo = !truck.fechaCierre;
+  const proveedorLabel =
+    truck.proveedor === "otro"
+      ? truck.proveedorOtro || "(sin nombre)"
+      : truck.proveedor;
+  const transporteLabel =
+    truck.transporte === "otro"
+      ? truck.transporteOtro || "(sin nombre)"
+      : truck.transporte;
+
+  const unidadesTotales = (truck.carga ?? []).reduce(
+    (s, it) => s + it.cantidadUnidades,
+    0
+  );
+
+  return (
+    <article className="overflow-hidden rounded-xl border border-brand-border bg-surface transition hover:shadow-md">
+      <div className="h-2 w-full" style={{ background: truck.color }} />
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="grid h-10 w-10 place-items-center rounded-full text-xl text-white shadow"
+            style={{ background: truck.color }}
+          >
+            🚚
+          </div>
+          <div>
+            <p className="font-semibold text-brand-dark">
+              {truck.nombre}
+              {activo && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                  Activo
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-brand-dark/55">
+              Ingreso: {formatDate(truck.fechaIngreso)}
+              {truck.fechaCierre && <> · Cierre: {formatDate(truck.fechaCierre)}</>}
+            </p>
+            <p className="text-[11px] text-brand-dark/55">
+              📋 {proveedorLabel || "—"} · 🚛 {transporteLabel || "—"}
+            </p>
+          </div>
+        </div>
+        <div className="text-right text-sm">
+          <p className="font-semibold text-primary">
+            {truck.porcentajeGanancia}% ganancia
+          </p>
+          {truck.costoCamion && truck.costoCamion > 0 && (
+            <p className="text-xs text-brand-dark/55">
+              Costo: {formatARS(truck.costoCamion)}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {truck.descripcion && (
+        <p className="border-t border-brand-border bg-primary-light/30 px-4 py-2 text-xs italic text-brand-dark/70">
+          {truck.descripcion}
+        </p>
+      )}
+
+      <div className="border-t border-brand-border bg-slate-50/50 px-4 py-2 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-brand-dark/65">
+            <b className="text-brand-dark">{(truck.carga ?? []).length}</b>{" "}
+            ítem{(truck.carga ?? []).length === 1 ? "" : "s"} cargado
+            {(truck.carga ?? []).length === 1 ? "" : "s"}
+            {unidadesTotales > 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <b className="text-brand-dark">{unidadesTotales}</b> unidades
+              </>
+            )}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOpen((o) => !o)}
+              className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
+            >
+              {open ? "Cerrar carga" : "Editar carga"}
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-xs text-rose-700 hover:underline"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {open && <CargoEditor truck={truck} />}
+    </article>
+  );
+}
+
+// ====== EDITOR DE CARGA (productos + unidades) ======
+function CargoEditor({ truck }: { truck: Truck }) {
+  const [items, setItems] = useState<TruckCargoItem[]>(truck.carga ?? []);
+  const [producto, setProducto] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [cantidad, setCantidad] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  const save = async (next: TruckCargoItem[]) => {
+    setBusy(true);
+    try {
+      await updateTruckCargo(truck.id, next);
+      setItems(next);
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo guardar la carga.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!producto.trim() || cantidad <= 0) return;
+    const next = [
+      ...items,
+      {
+        producto: producto.trim(),
+        descripcion: descripcion.trim(),
+        cantidadUnidades: Number(cantidad),
+      },
+    ];
+    await save(next);
+    setProducto("");
+    setDescripcion("");
+    setCantidad(0);
+  };
+
+  const remove = async (idx: number) => {
+    await save(items.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="border-t border-brand-border bg-primary-light/20 p-4">
+      {/* Lista actual */}
+      {items.length > 0 ? (
+        <div className="mb-3 overflow-hidden rounded-lg border border-brand-border bg-surface">
+          <table className="w-full text-xs">
+            <thead className="bg-primary-light/50 text-[10px] uppercase text-primary">
+              <tr>
+                <th className="px-2 py-1.5 text-left">Producto</th>
+                <th className="px-2 py-1.5 text-left">Descripción</th>
+                <th className="px-2 py-1.5 text-right">Unidades</th>
+                <th className="w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} className="border-t border-brand-border first:border-t-0">
+                  <td className="px-2 py-1.5 font-medium text-brand-dark">
+                    {it.producto}
+                  </td>
+                  <td className="px-2 py-1.5 text-brand-dark/65">
+                    {it.descripcion || "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-semibold">
+                    {it.cantidadUnidades}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => remove(i)}
+                      className="text-rose-600 hover:opacity-70"
+                      title="Quitar"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mb-3 text-xs text-brand-dark/55">
+          Todavía no agregaste productos a la carga.
+        </p>
+      )}
+
+      {/* Form de agregar */}
+      <form onSubmit={add} className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_2fr_80px_auto]">
+        <input
+          required
+          value={producto}
+          onChange={(e) => setProducto(e.target.value)}
+          placeholder="Producto (ej: Doncella toallas)"
+          className="rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+        />
+        <input
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          placeholder="Descripción / talle / variante"
+          className="rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+        />
+        <input
+          required
+          type="number"
+          min={1}
+          step={1}
+          value={cantidad || ""}
+          onChange={(e) => setCantidad(Number(e.target.value))}
+          placeholder="Cant."
+          className="rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
+        >
+          {busy ? "…" : "+ Agregar"}
+        </button>
+      </form>
     </div>
   );
 }
