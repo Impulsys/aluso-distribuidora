@@ -11,7 +11,6 @@ const TABS = [
   { href: "/admin/gastos", label: "💸 Gastos" },
   { href: "/admin/cheques", label: "🧾 Cheques" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },
-  { href: "/admin/configuracion", label: "⚙️ Config socios" },
 ];
 
 export default function AdminTabs() {
