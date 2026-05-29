@@ -9,51 +9,93 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { subscribeTrucks } from "@/lib/trucks";
+import { useAuth } from "@/context/AuthContext";
+import {
+  DEFAULT_REPORTES_CONFIG,
+  subscribeReportesConfig,
+  type ReportesConfig,
+} from "@/lib/config";
 import MonthCalendar from "@/components/MonthCalendar";
 import DayReportModal from "@/components/DayReportModal";
-import type { Order, Truck } from "@/lib/types";
+import { formatARS } from "@/lib/format";
+import type { DailyExpense, Order, Truck } from "@/lib/types";
+
+const MONTH_NAMES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
 
 export default function ReportesPage() {
+  const { user } = useAuth();
   const [year, setYear] = useState(new Date().getFullYear());
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [expenses, setExpenses] = useState<DailyExpense[]>([]);
+  const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dayOpen, setDayOpen] = useState<number | null>(null);
 
-  // Suscripción a camiones (tiempo real)
+  // Suscripciones tiempo real
   useEffect(() => {
-    const unsub = subscribeTrucks(setTrucks);
-    return unsub;
+    const u1 = subscribeTrucks(setTrucks);
+    const u2 = subscribeReportesConfig(setConfig);
+    return () => {
+      u1();
+      u2();
+    };
   }, []);
 
-  // Fetch de pedidos del año
+  // Fetch pedidos + gastos del año
   useEffect(() => {
     const startTs = new Date(year, 0, 1).getTime();
     const endTs = new Date(year + 1, 0, 1).getTime();
     setLoading(true);
-    getDocs(
-      query(
-        collection(db, "orders"),
-        where("createdAt", ">=", startTs),
-        where("createdAt", "<", endTs)
-      )
-    )
-      .then((snap) => {
-        const data = snap.docs.map(
-          (d) => ({ id: d.id, ...d.data() } as Order)
+    Promise.all([
+      getDocs(
+        query(
+          collection(db, "orders"),
+          where("createdAt", ">=", startTs),
+          where("createdAt", "<", endTs)
+        )
+      ),
+      getDocs(
+        query(
+          collection(db, "expenses"),
+          where("fecha", ">=", startTs),
+          where("fecha", "<", endTs)
+        )
+      ),
+    ])
+      .then(([oSnap, eSnap]) => {
+        setOrders(
+          oSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Order))
         );
-        setOrders(data);
+        setExpenses(
+          eSnap.docs.map(
+            (d) => ({ id: d.id, ...d.data() } as DailyExpense)
+          )
+        );
         setError(null);
       })
       .catch((e) => {
         console.error(e);
-        setError("No se pudieron cargar los pedidos del año.");
+        setError("No se pudieron cargar los datos del año.");
       })
       .finally(() => setLoading(false));
   }, [year]);
 
-  // Activos para la leyenda
+  // Camiones que tocan el año (para la leyenda)
   const trucksConRangos = useMemo(() => {
     const yearStart = new Date(year, 0, 1).getTime();
     const yearEnd = new Date(year + 1, 0, 1).getTime();
@@ -64,11 +106,90 @@ export default function ReportesPage() {
     );
   }, [trucks, year]);
 
+  // ====== TOTALES — año completo + mes actual ======
+  const totales = useMemo(() => {
+    const ventas = orders
+      .filter((o) => o.status !== "cancelado")
+      .reduce((s, o) => s + (o.total || 0), 0);
+    const gastos = expenses.reduce((s, e) => s + (e.monto || 0), 0);
+    const margen = ventas - gastos;
+
+    // Mes actual (si estamos viendo el año actual; sino, último mes con datos)
+    const now = new Date();
+    const isCurrentYear = year === now.getFullYear();
+    const mes = isCurrentYear ? now.getMonth() : 11;
+    const mStart = new Date(year, mes, 1).getTime();
+    const mEnd = new Date(year, mes + 1, 1).getTime();
+    const ventasMes = orders
+      .filter(
+        (o) =>
+          o.status !== "cancelado" &&
+          o.createdAt >= mStart &&
+          o.createdAt < mEnd
+      )
+      .reduce((s, o) => s + (o.total || 0), 0);
+    const gastosMes = expenses
+      .filter((e) => e.fecha >= mStart && e.fecha < mEnd)
+      .reduce((s, e) => s + (e.monto || 0), 0);
+    const margenMes = ventasMes - gastosMes;
+    return { ventas, gastos, margen, ventasMes, gastosMes, margenMes, mes };
+  }, [orders, expenses, year]);
+
+  // Respeta config para socios: ocultar gastos/margen si superadmin lo bloqueó
+  const isSuperadmin = user?.role === "superadmin";
+  const showGastos = isSuperadmin || config.mostrarGastosASocios;
+
   return (
     <div>
       <p className="mb-4 text-sm text-brand-dark/65">
         Movimientos de venta por día. Tocá cualquier día para ver el detalle.
       </p>
+
+      {/* ============ TOTALES DEL AÑO + DEL MES ============ */}
+      {!loading && (
+        <section className="mb-6">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="font-serif text-xl text-brand-dark">
+              Totales {year}
+            </h2>
+            <span className="text-xs text-brand-dark/55">
+              {orders.filter((o) => o.status !== "cancelado").length} pedidos ·{" "}
+              {expenses.length} gastos
+            </span>
+          </div>
+          <div
+            className={`grid gap-3 ${
+              showGastos ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1"
+            }`}
+          >
+            <KpiCard
+              label="Ventas del año"
+              value={totales.ventas}
+              hint={`Mes en curso (${MONTH_NAMES[totales.mes]}): ${formatARS(
+                totales.ventasMes
+              )}`}
+              tone="emerald"
+            />
+            {showGastos && (
+              <KpiCard
+                label="Gastos del año"
+                value={totales.gastos}
+                hint={`Mes en curso: ${formatARS(totales.gastosMes)}`}
+                tone="rose"
+                isNegative
+              />
+            )}
+            {showGastos && (
+              <KpiCard
+                label="Margen del año"
+                value={totales.margen}
+                hint={`Mes en curso: ${formatARS(totales.margenMes)}`}
+                tone={totales.margen >= 0 ? "primary" : "rose"}
+              />
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Navegación de año + leyenda */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -160,6 +281,54 @@ export default function ReportesPage() {
         trucks={trucks}
       />
     </div>
+  );
+}
+
+// ====================
+function KpiCard({
+  label,
+  value,
+  hint,
+  tone,
+  isNegative,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  tone: "emerald" | "rose" | "primary";
+  isNegative?: boolean;
+}) {
+  const color =
+    tone === "emerald"
+      ? "text-emerald-700"
+      : tone === "rose"
+      ? "text-rose-700"
+      : "text-primary";
+  const bg =
+    tone === "emerald"
+      ? "from-emerald-50"
+      : tone === "rose"
+      ? "from-rose-50"
+      : "from-primary-light";
+
+  return (
+    <article
+      className={`rounded-2xl border border-brand-border bg-gradient-to-br ${bg} to-surface p-5 shadow-sm`}
+    >
+      <p className="text-[11px] uppercase tracking-wider text-brand-dark/55">
+        {label}
+      </p>
+      <p className={`mt-2 font-serif text-3xl font-medium leading-tight ${color}`}>
+        {value === 0
+          ? "—"
+          : isNegative
+          ? `-${formatARS(Math.abs(value))}`
+          : formatARS(value)}
+      </p>
+      {hint && (
+        <p className="mt-2 text-[11px] text-brand-dark/55">{hint}</p>
+      )}
+    </article>
   );
 }
 

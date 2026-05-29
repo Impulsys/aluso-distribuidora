@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createTruck,
   deleteTruck,
@@ -8,9 +8,11 @@ import {
   updateTruckCargo,
 } from "@/lib/trucks";
 import { formatARS, formatDate } from "@/lib/format";
+import { useProducts } from "@/hooks/useProducts";
 import {
   PROVEEDORES,
   TRANSPORTES,
+  type Product,
   type Truck,
   type TruckCargoItem,
 } from "@/lib/types";
@@ -49,8 +51,11 @@ export default function AdminCamionesPage() {
   const [transporte, setTransporte] = useState<string>(TRANSPORTES[0]);
   const [transporteOtro, setTransporteOtro] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [numeroRemito, setNumeroRemito] = useState("");
+  const [numeroFactura, setNumeroFactura] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeTrucks((t) => {
@@ -414,13 +419,34 @@ function TruckCard({
   );
 }
 
-// ====== EDITOR DE CARGA (productos + unidades) ======
+// ====== EDITOR DE CARGA (productos del catálogo + costo + precio óptimo) ======
 function CargoEditor({ truck }: { truck: Truck }) {
+  const productos = useProducts();
   const [items, setItems] = useState<TruckCargoItem[]>(truck.carga ?? []);
-  const [producto, setProducto] = useState("");
+
+  // Form state
+  const [productId, setProductId] = useState("");
+  const [busqueda, setBusqueda] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [cantidad, setCantidad] = useState(0);
+  const [costo, setCosto] = useState(0);
+  const [precioVentaOptimo, setPrecioVentaOptimo] = useState(0);
   const [busy, setBusy] = useState(false);
+
+  // Productos del catálogo filtrados por búsqueda
+  const productosFiltrados = useMemo<Product[]>(() => {
+    if (!busqueda.trim()) return productos.slice(0, 30);
+    const t = busqueda.toLowerCase();
+    return productos
+      .filter(
+        (p: Product) =>
+          p.nombre.toLowerCase().includes(t) ||
+          (p.ean ?? "").includes(t)
+      )
+      .slice(0, 30);
+  }, [productos, busqueda]);
+
+  const productoSeleccionado = productos.find((p) => p.id === productId);
 
   const save = async (next: TruckCargoItem[]) => {
     setBusy(true);
@@ -437,50 +463,89 @@ function CargoEditor({ truck }: { truck: Truck }) {
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!producto.trim() || cantidad <= 0) return;
-    const next = [
+    if (!productoSeleccionado || cantidad <= 0 || costo <= 0) return;
+    const next: TruckCargoItem[] = [
       ...items,
       {
-        producto: producto.trim(),
-        descripcion: descripcion.trim(),
+        productId: productoSeleccionado.id,
+        producto: productoSeleccionado.nombre,
+        descripcion: descripcion.trim() || undefined,
         cantidadUnidades: Number(cantidad),
+        costoUnitario: Number(costo),
+        precioVentaOptimo: Number(precioVentaOptimo) || 0,
       },
     ];
     await save(next);
-    setProducto("");
+    // limpiar
+    setProductId("");
+    setBusqueda("");
     setDescripcion("");
     setCantidad(0);
+    setCosto(0);
+    setPrecioVentaOptimo(0);
   };
 
   const remove = async (idx: number) => {
     await save(items.filter((_, i) => i !== idx));
   };
 
+  // Totales del cargo
+  const totalUnidades = items.reduce((s, it) => s + it.cantidadUnidades, 0);
+  const totalCosto = items.reduce(
+    (s, it) => s + it.cantidadUnidades * (it.costoUnitario ?? 0),
+    0
+  );
+  const totalVentaOptima = items.reduce(
+    (s, it) => s + it.cantidadUnidades * (it.precioVentaOptimo ?? 0),
+    0
+  );
+
   return (
     <div className="border-t border-brand-border bg-primary-light/20 p-4">
+      <p className="mb-3 text-[11px] text-brand-dark/60">
+        💡 Seleccioná un producto del catálogo. El precio óptimo es{" "}
+        <b>solo informativo</b> — no modifica el catálogo automáticamente. El
+        precio público lo actualizás desde <code>/admin/productos</code> día a día.
+      </p>
+
       {/* Lista actual */}
       {items.length > 0 ? (
-        <div className="mb-3 overflow-hidden rounded-lg border border-brand-border bg-surface">
+        <div className="mb-3 overflow-x-auto rounded-lg border border-brand-border bg-surface">
           <table className="w-full text-xs">
             <thead className="bg-primary-light/50 text-[10px] uppercase text-primary">
               <tr>
                 <th className="px-2 py-1.5 text-left">Producto</th>
-                <th className="px-2 py-1.5 text-left">Descripción</th>
-                <th className="px-2 py-1.5 text-right">Unidades</th>
+                <th className="px-2 py-1.5 text-right">Cant.</th>
+                <th className="px-2 py-1.5 text-right">Costo u.</th>
+                <th className="px-2 py-1.5 text-right">Venta ópt.</th>
+                <th className="px-2 py-1.5 text-right">Total costo</th>
                 <th className="w-8"></th>
               </tr>
             </thead>
             <tbody>
               {items.map((it, i) => (
                 <tr key={i} className="border-t border-brand-border first:border-t-0">
-                  <td className="px-2 py-1.5 font-medium text-brand-dark">
-                    {it.producto}
-                  </td>
-                  <td className="px-2 py-1.5 text-brand-dark/65">
-                    {it.descripcion || "—"}
+                  <td className="px-2 py-1.5">
+                    <p className="font-medium text-brand-dark">{it.producto}</p>
+                    {it.descripcion && (
+                      <p className="text-[10px] text-brand-dark/55">
+                        {it.descripcion}
+                      </p>
+                    )}
                   </td>
                   <td className="px-2 py-1.5 text-right font-semibold">
                     {it.cantidadUnidades}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatARS(it.costoUnitario ?? 0)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {it.precioVentaOptimo
+                      ? formatARS(it.precioVentaOptimo)
+                      : "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-semibold text-rose-700">
+                    {formatARS(it.cantidadUnidades * (it.costoUnitario ?? 0))}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <button
@@ -493,6 +558,18 @@ function CargoEditor({ truck }: { truck: Truck }) {
                   </td>
                 </tr>
               ))}
+              <tr className="border-t-2 border-brand-border bg-primary-light/30 font-bold">
+                <td className="px-2 py-1.5 text-brand-dark">Totales</td>
+                <td className="px-2 py-1.5 text-right">{totalUnidades}</td>
+                <td className="px-2 py-1.5 text-right text-rose-700">—</td>
+                <td className="px-2 py-1.5 text-right text-emerald-700">
+                  {totalVentaOptima > 0 ? formatARS(totalVentaOptima) : "—"}
+                </td>
+                <td className="px-2 py-1.5 text-right text-rose-700">
+                  {formatARS(totalCosto)}
+                </td>
+                <td></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -503,37 +580,103 @@ function CargoEditor({ truck }: { truck: Truck }) {
       )}
 
       {/* Form de agregar */}
-      <form onSubmit={add} className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_2fr_80px_auto]">
-        <input
-          required
-          value={producto}
-          onChange={(e) => setProducto(e.target.value)}
-          placeholder="Producto (ej: Doncella toallas)"
-          className="rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-        />
-        <input
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          placeholder="Descripción / talle / variante"
-          className="rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-        />
-        <input
-          required
-          type="number"
-          min={1}
-          step={1}
-          value={cantidad || ""}
-          onChange={(e) => setCantidad(Number(e.target.value))}
-          placeholder="Cant."
-          className="rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
-        >
-          {busy ? "…" : "+ Agregar"}
-        </button>
+      <form onSubmit={add} className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {/* Búsqueda + Selector producto */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+              Producto del catálogo
+            </label>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre o EAN…"
+              className="mb-1 w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+            />
+            <select
+              required
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+            >
+              <option value="">— Seleccionar producto —</option>
+              {productosFiltrados.map((p) => (
+                <option key={p.id} value={p.id}>
+                  [{p.marca}] {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+              Descripción / variante (opcional)
+            </label>
+            <input
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="ej: Lote junio, talle G, …"
+              className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[100px_140px_140px_auto]">
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+              Cantidad
+            </label>
+            <input
+              required
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={cantidad || ""}
+              onChange={(e) => setCantidad(Number(e.target.value))}
+              placeholder="50"
+              className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-rose-700">
+              Costo por unidad (ARS)
+            </label>
+            <input
+              required
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={costo || ""}
+              onChange={(e) => setCosto(Number(e.target.value))}
+              placeholder="1000"
+              className="w-full rounded-lg border border-rose-300 bg-white px-2 py-1.5 text-xs"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+              Venta óptima (ARS)
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={precioVentaOptimo || ""}
+              onChange={(e) => setPrecioVentaOptimo(Number(e.target.value))}
+              placeholder="1500"
+              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-xs"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={busy || !productId || cantidad <= 0 || costo <= 0}
+            className="self-end rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
+          >
+            {busy ? "…" : "+ Agregar al cargo"}
+          </button>
+        </div>
       </form>
     </div>
   );

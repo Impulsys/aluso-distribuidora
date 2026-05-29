@@ -27,6 +27,8 @@ export type NewTruckInput = Pick<
       | "proveedorOtro"
       | "transporte"
       | "transporteOtro"
+      | "numeroRemito"
+      | "numeroFactura"
     >
   >;
 
@@ -41,6 +43,15 @@ export class TruckValidationError extends Error {
     super(message);
     this.name = "TruckValidationError";
   }
+}
+
+// Helper: Firestore rechaza valores undefined. Los limpiamos antes de enviar.
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out as Partial<T>;
 }
 
 export async function createTruck(input: NewTruckInput): Promise<string> {
@@ -63,11 +74,11 @@ export async function createTruck(input: NewTruckInput): Promise<string> {
       fechaCierre: input.fechaIngreso,
     });
   }
-  // 3. Crear el nuevo
-  const ref = await addDoc(collection(db, "trucks"), {
-    ...input,
-    createdAt: Date.now(),
-  });
+  // 3. Crear el nuevo (sin undefineds — Firestore los rechaza)
+  const ref = await addDoc(
+    collection(db, "trucks"),
+    stripUndefined({ ...input, createdAt: Date.now() })
+  );
   return ref.id;
 }
 

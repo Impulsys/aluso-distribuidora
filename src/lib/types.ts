@@ -80,9 +80,12 @@ export const PROVEEDORES = [
 export const TRANSPORTES = ["Mafe (propio)"] as const;
 
 export interface TruckCargoItem {
-  producto: string;
-  descripcion: string;
+  productId: string; // referencia al catálogo (Product.id / EAN)
+  producto: string; // snapshot del nombre al cargar
+  descripcion?: string; // notas/variante opcional
   cantidadUnidades: number;
+  costoUnitario: number; // ARS por unidad
+  precioVentaOptimo: number; // ARS sugerido al cargar (informativo, NO modifica catálogo)
 }
 
 export type FormaPago = "efectivo" | "cheque" | "transferencia";
@@ -147,6 +150,8 @@ export interface Truck {
   proveedorOtro?: string;
   transporte?: string; // de TRANSPORTES u "otro"
   transporteOtro?: string;
+  numeroRemito?: string; // nº de remito del proveedor/transporte
+  numeroFactura?: string; // nº de factura del proveedor/transporte
   costoCamion?: number; // cuánto salió el camión
   porcentajeGanancia: number; // %
   carga?: TruckCargoItem[];

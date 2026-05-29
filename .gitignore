@@ -37,6 +37,12 @@ yarn-error.log*
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
 
+# Firebase deploy cache (regenerado en cada deploy)
+.firebase/
+
+# Material crudo del cliente (fotos originales, Excel, PDFs, videos) — solo local
+_cliente/
+
 # vercel
 .vercel
 
