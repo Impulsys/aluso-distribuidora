@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { usernameToEmail } from "@/lib/userAdmin";
 
 export default function LoginPage() {
   const { signInEmail, signInGoogle, resetPassword, user } = useAuth();
@@ -36,10 +37,10 @@ export default function LoginPage() {
     setResetMsg(null);
     setBusy(true);
     try {
-      await signInEmail(email, password);
+      await signInEmail(usernameToEmail(email), password);
       router.push("/");
     } catch {
-      setError("Email o contraseña incorrectos.");
+      setError("Usuario o contraseña incorrectos.");
     } finally {
       setBusy(false);
     }
@@ -49,7 +50,13 @@ export default function LoginPage() {
     setError("");
     setResetMsg(null);
     if (!email.trim()) {
-      setError("Ingresá tu email arriba primero y volvé a tocar el link.");
+      setError("Ingresá tu usuario o email arriba primero y volvé a tocar el link.");
+      return;
+    }
+    if (!email.includes("@")) {
+      setError(
+        "El reseteo por email es solo para cuentas con correo real. Si tu cuenta es de usuario, pedile al administrador que te cambie la contraseña."
+      );
       return;
     }
     try {
@@ -72,13 +79,15 @@ export default function LoginPage() {
 
         <form onSubmit={handleEmail} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium">Email</label>
+            <label className="block text-sm font-medium">Usuario</label>
             <input
-              type="email"
+              type="text"
               required
+              autoCapitalize="none"
+              autoCorrect="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@dlanoa.com"
+              placeholder="usuario"
               className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
             />
           </div>
