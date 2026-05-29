@@ -7,8 +7,11 @@ import { useAuth } from "@/context/AuthContext";
 import { usernameToEmail } from "@/lib/userAdmin";
 
 export default function LoginPage() {
-  const { signInEmail, signInGoogle, resetPassword, user } = useAuth();
+  const { signInEmail, signUpEmail, signInGoogle, resetPassword, user } =
+    useAuth();
   const router = useRouter();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -46,6 +49,32 @@ export default function LoginPage() {
     }
   };
 
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setResetMsg(null);
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await signUpEmail(nombre, email.trim(), password);
+      router.push("/");
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/email-already-in-use") {
+        setError("Ya existe una cuenta con ese email. Probá ingresar.");
+      } else if (code === "auth/invalid-email") {
+        setError("El email no es válido.");
+      } else {
+        setError("No se pudo crear la cuenta. Revisá los datos e intentá de nuevo.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleReset = async () => {
     setError("");
     setResetMsg(null);
@@ -72,64 +101,123 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <div className="rounded-2xl border border-brand-border bg-surface p-6 shadow-sm">
-        <h1 className="text-xl font-bold text-primary">Ingresar</h1>
+        <h1 className="text-xl font-bold text-primary">
+          {mode === "login" ? "Ingresar" : "Crear cuenta"}
+        </h1>
         <p className="mt-1 text-sm text-brand-dark/60">
-          Usá tu usuario y contraseña, o entrá con Google.
+          {mode === "login"
+            ? "Usá tu usuario y contraseña, o entrá con Google."
+            : "Registrate con tu email para hacer pedidos y ver tus precios."}
         </p>
 
-        <form onSubmit={handleEmail} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium">Usuario</label>
-            <input
-              type="text"
-              required
-              autoCapitalize="none"
-              autoCorrect="off"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario"
-              className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium">Contraseña</label>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Olvidé mi contraseña
-              </button>
+        {mode === "login" ? (
+          <form onSubmit={handleEmail} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium">Usuario</label>
+              <input
+                type="text"
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="usuario"
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+              />
             </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
-            />
-          </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium">Contraseña</label>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Olvidé mi contraseña
+                </button>
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+              />
+            </div>
 
-          {error && (
-            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
-              {error}
-            </p>
-          )}
-          {resetMsg && (
-            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-              ✓ {resetMsg}
-            </p>
-          )}
+            {error && (
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                {error}
+              </p>
+            )}
+            {resetMsg && (
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                ✓ {resetMsg}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
-          >
-            {busy ? "Ingresando…" : "Ingresar"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
+            >
+              {busy ? "Ingresando…" : "Ingresar"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSignup} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium">Nombre</label>
+              <input
+                type="text"
+                required
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Tu nombre o el del comercio"
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Email</label>
+              <input
+                type="email"
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tucorreo@ejemplo.com"
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Contraseña</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+              />
+            </div>
+
+            {error && (
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
+            >
+              {busy ? "Creando cuenta…" : "Crear cuenta"}
+            </button>
+          </form>
+        )}
 
         <div className="my-5 flex items-center gap-3 text-xs text-brand-dark/40">
           <span className="h-px flex-1 bg-brand-border" />o<span className="h-px flex-1 bg-brand-border" />
@@ -142,7 +230,40 @@ export default function LoginPage() {
           Continuar con Google
         </button>
 
-        <p className="mt-6 text-center text-sm text-brand-dark/60">
+        <p className="mt-5 text-center text-sm text-brand-dark/70">
+          {mode === "login" ? (
+            <>
+              ¿No tenés cuenta?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setError("");
+                  setResetMsg(null);
+                }}
+                className="font-semibold text-primary hover:underline"
+              >
+                Crear cuenta
+              </button>
+            </>
+          ) : (
+            <>
+              ¿Ya tenés cuenta?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
+                className="font-semibold text-primary hover:underline"
+              >
+                Ingresar
+              </button>
+            </>
+          )}
+        </p>
+
+        <p className="mt-4 text-center text-sm text-brand-dark/60">
           No necesitás cuenta para hacer un pedido —{" "}
           <Link href="/catalogo" className="font-medium text-primary underline">
             ver el catálogo

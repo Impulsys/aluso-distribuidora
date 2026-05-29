@@ -11,6 +11,8 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   sendPasswordResetEmail,
   signOut as fbSignOut,
   type User as FirebaseUser,
@@ -25,6 +27,7 @@ interface AuthState {
   loading: boolean;
   signInGoogle: () => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<void>;
+  signUpEmail: (name: string, email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -84,6 +87,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email.trim(), password);
   };
 
+  // Auto-registro de clientes: crea la cuenta (Auth) + perfil rol "cliente".
+  // Las reglas solo permiten autocrearse como cliente.
+  const signUpEmail = async (name: string, email: string, password: string) => {
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      email.trim(),
+      password
+    );
+    const displayName = name.trim() || "Cliente";
+    await updateProfile(cred.user, { displayName });
+    const newUser: AppUser = {
+      uid: cred.user.uid,
+      email: cred.user.email ?? email.trim(),
+      displayName,
+      role: "cliente",
+      createdAt: Date.now(),
+    };
+    await setDoc(doc(db, "users", cred.user.uid), newUser, { merge: true });
+    setUser(newUser);
+  };
+
   const resetPassword = async (email: string) => {
     await sendPasswordResetEmail(auth, email.trim());
   };
@@ -100,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signInGoogle,
         signInEmail,
+        signUpEmail,
         resetPassword,
         signOut,
       }}
