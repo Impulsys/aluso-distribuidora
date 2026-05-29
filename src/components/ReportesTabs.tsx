@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/reportes", label: "📅 Calendario anual" },
   { href: "/reportes/camiones", label: "🚚 Por camión" },
+  { href: "/reportes/cuentas", label: "💳 Proveedores" },
 ];
 
 export default function ReportesTabs() {

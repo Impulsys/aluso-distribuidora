@@ -10,6 +10,7 @@ const TABS = [
   { href: "/admin/camiones", label: "🚚 Camiones" },
   { href: "/admin/gastos", label: "💸 Gastos" },
   { href: "/admin/cheques", label: "🧾 Cheques" },
+  { href: "/admin/cuentas", label: "💳 Cuentas Ctes" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },
 ];
 

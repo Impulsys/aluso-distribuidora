@@ -69,11 +69,15 @@ service cloud.firestore {
     }
 
     // ===== Reportes: camiones, cheques, gastos, cajas ===== (gestión interna)
-    match /trucks/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /checks/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /expenses/{id}     { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /cashClosings/{id} { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /config/{id}       { allow read: if isSignedIn();   allow write: if isSuperadmin(); }
+    match /trucks/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /checks/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /expenses/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /cashClosings/{id}   { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    // Cuentas corrientes: compras a proveedores (deudas) y pagos
+    match /proveedores/{id}      { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /purchases/{id}        { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /supplierPayments/{id} { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /config/{id}         { allow read: if isSignedIn();   allow write: if isSuperadmin(); }
 
     // Todo lo demás: denegado.
     match /{document=**} {

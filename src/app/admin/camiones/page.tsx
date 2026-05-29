@@ -9,10 +9,16 @@ import {
 } from "@/lib/trucks";
 import { formatARS, formatDate } from "@/lib/format";
 import { useProducts } from "@/hooks/useProducts";
+import { useAuth } from "@/context/AuthContext";
 import {
-  PROVEEDORES,
+  subscribeProveedores,
+  seedProveedoresIfEmpty,
+  createPurchase,
+} from "@/lib/cuentas";
+import {
   TRANSPORTES,
   type Product,
+  type Proveedor,
   type Truck,
   type TruckCargoItem,
 } from "@/lib/types";
@@ -37,7 +43,9 @@ function todayISO() {
 }
 
 export default function AdminCamionesPage() {
+  const { user } = useAuth();
   const [trucks, setTrucks] = useState<Truck[]>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form
@@ -46,16 +54,19 @@ export default function AdminCamionesPage() {
   const [fechaIngreso, setFechaIngreso] = useState(todayISO());
   const [porcentaje, setPorcentaje] = useState(35);
   const [costo, setCosto] = useState(0);
-  const [proveedor, setProveedor] = useState<string>(PROVEEDORES[0]);
+  // proveedorSel = id del proveedor (Firestore) | "otro" | ""
+  const [proveedorSel, setProveedorSel] = useState<string>("");
   const [proveedorOtro, setProveedorOtro] = useState("");
   const [transporte, setTransporte] = useState<string>(TRANSPORTES[0]);
   const [transporteOtro, setTransporteOtro] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [numeroRemito, setNumeroRemito] = useState("");
-  const [numeroFactura, setNumeroFactura] = useState("");
+  // Compra al proveedor (deuda)
+  const [numeroFactura, setNumeroFactura] = useState(""); // A (facturado)
+  const [montoFactura, setMontoFactura] = useState(0);
+  const [numeroRemito, setNumeroRemito] = useState(""); // B (sin facturar)
+  const [montoRemito, setMontoRemito] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdId, setCreatedId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeTrucks((t) => {
@@ -65,30 +76,83 @@ export default function AdminCamionesPage() {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    seedProveedoresIfEmpty().catch(() => {});
+    const unsub = subscribeProveedores(setProveedores);
+    return unsub;
+  }, []);
+
+  const resetForm = () => {
+    setNombre("");
+    setDescripcion("");
+    setCosto(0);
+    setProveedorOtro("");
+    setTransporteOtro("");
+    setNumeroFactura("");
+    setMontoFactura(0);
+    setNumeroRemito("");
+    setMontoRemito(0);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      await createTruck({
+      const prov = proveedores.find((p) => p.id === proveedorSel);
+      const proveedorNombre =
+        proveedorSel === "otro" ? proveedorOtro.trim() : prov?.nombre ?? "";
+      const fechaTs = new Date(fechaIngreso).getTime();
+
+      const truckId = await createTruck({
         nombre: nombre.trim(),
         color,
-        fechaIngreso: new Date(fechaIngreso).getTime(),
+        fechaIngreso: fechaTs,
         porcentajeGanancia: Number(porcentaje) || 0,
         costoCamion: Number(costo) || 0,
-        proveedor,
-        proveedorOtro: proveedor === "otro" ? proveedorOtro.trim() : undefined,
+        // Guardamos el nombre para mostrar en la card; "otro" = texto libre.
+        proveedor: proveedorSel === "otro" ? "otro" : proveedorNombre,
+        proveedorOtro:
+          proveedorSel === "otro" ? proveedorOtro.trim() : undefined,
+        proveedorId: prov ? prov.id : undefined,
         transporte,
         transporteOtro:
           transporte === "otro" ? transporteOtro.trim() : undefined,
         descripcion: descripcion.trim(),
+        numeroFactura: numeroFactura.trim() || undefined,
+        numeroRemito: numeroRemito.trim() || undefined,
       });
-      setNombre("");
-      setDescripcion("");
-      setCosto(0);
-      setProveedorOtro("");
-      setTransporteOtro("");
+
+      // Si hay proveedor real vinculado, generamos las compras (deudas).
+      if (prov) {
+        const base = {
+          proveedorId: prov.id,
+          proveedorNombre: prov.nombre,
+          fecha: fechaTs,
+          camionId: truckId,
+          camionNombre: nombre.trim(),
+          createdBy: user?.uid,
+        };
+        if (numeroFactura.trim() && Number(montoFactura) > 0) {
+          await createPurchase({
+            ...base,
+            modalidad: "A",
+            numero: numeroFactura.trim(),
+            monto: Number(montoFactura),
+          });
+        }
+        if (numeroRemito.trim() && Number(montoRemito) > 0) {
+          await createPurchase({
+            ...base,
+            modalidad: "B",
+            numero: numeroRemito.trim(),
+            monto: Number(montoRemito),
+          });
+        }
+      }
+
+      resetForm();
     } catch (e) {
       console.error(e);
       setError("No se pudo crear el camión.");
@@ -159,24 +223,25 @@ export default function AdminCamionesPage() {
             </div>
           </label>
 
-          {/* Proveedor dropdown */}
+          {/* Proveedor dropdown (de la cuenta corriente) */}
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-brand-dark/70">
               Proveedor
             </span>
             <select
-              value={proveedor}
-              onChange={(e) => setProveedor(e.target.value)}
+              value={proveedorSel}
+              onChange={(e) => setProveedorSel(e.target.value)}
               className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
             >
-              {PROVEEDORES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+              <option value="">— Sin proveedor —</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
                 </option>
               ))}
-              <option value="otro">Otro…</option>
+              <option value="otro">Otro… (sin cuenta corriente)</option>
             </select>
-            {proveedor === "otro" && (
+            {proveedorSel === "otro" && (
               <input
                 value={proveedorOtro}
                 onChange={(e) => setProveedorOtro(e.target.value)}
@@ -184,7 +249,73 @@ export default function AdminCamionesPage() {
                 className="mt-2 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
               />
             )}
+            <p className="mt-1 text-[10px] text-brand-dark/45">
+              Los proveedores se administran en{" "}
+              <span className="font-medium">Cuentas Ctes</span>. Si elegís uno,
+              las compras de abajo se cargan a su cuenta.
+            </p>
           </label>
+
+          {/* Compra al proveedor (genera deuda en la cuenta corriente) */}
+          {proveedorSel && proveedorSel !== "otro" && (
+            <div className="rounded-lg border border-brand-border bg-primary-light/20 p-3">
+              <p className="mb-2 text-xs font-semibold text-brand-dark">
+                Compra al proveedor (deuda)
+              </p>
+              <div className="grid grid-cols-[1fr_120px] gap-2">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+                    Nº Factura (A · facturado)
+                  </span>
+                  <input
+                    value={numeroFactura}
+                    onChange={(e) => setNumeroFactura(e.target.value)}
+                    placeholder="0001-00001234"
+                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+                    Monto
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={montoFactura || ""}
+                    onChange={(e) => setMontoFactura(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+                    Nº Remito (B · sin facturar)
+                  </span>
+                  <input
+                    value={numeroRemito}
+                    onChange={(e) => setNumeroRemito(e.target.value)}
+                    placeholder="R-0001"
+                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+                    Monto
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={montoRemito || ""}
+                    onChange={(e) => setMontoRemito(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
 
           {/* Transporte dropdown */}
           <label className="block">

@@ -39,6 +39,11 @@ const setPasswordFn = httpsCallable<
   { ok: boolean }
 >(functions, "adminSetPassword");
 
+const deleteUserFn = httpsCallable<{ uid: string }, { ok: boolean }>(
+  functions,
+  "adminDeleteUser"
+);
+
 /** Crea un usuario (Auth + perfil). Devuelve el uid. Lanza Error con mensaje legible. */
 export async function adminCreateUser(input: CreateUserInput): Promise<string> {
   const res = await createUserFn(input);
@@ -51,4 +56,9 @@ export async function adminSetPassword(
   newPassword: string
 ): Promise<void> {
   await setPasswordFn({ uid, newPassword });
+}
+
+/** Elimina un usuario (cuenta de Auth + perfil en Firestore). */
+export async function adminDeleteUser(uid: string): Promise<void> {
+  await deleteUserFn({ uid });
 }

@@ -25,6 +25,7 @@ export type NewTruckInput = Pick<
       | "costoCamion"
       | "proveedor"
       | "proveedorOtro"
+      | "proveedorId"
       | "transporte"
       | "transporteOtro"
       | "numeroRemito"

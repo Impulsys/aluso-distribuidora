@@ -82,21 +82,34 @@ export const adminCreateUser = onCall(async (request) => {
     });
     uid = record.uid;
   } catch (e) {
-    const code = (e as { code?: string }).code;
-    if (code === "auth/email-already-exists") {
+    const err = e as { code?: string; message?: string };
+    if (err.code === "auth/email-already-exists") {
       throw new HttpsError("already-exists", "Ya existe un usuario con ese nombre.");
     }
-    throw new HttpsError("internal", "No se pudo crear el usuario.");
+    console.error("createUser falló:", err.code, err.message);
+    throw new HttpsError(
+      "internal",
+      `No se pudo crear la cuenta: ${err.code ?? err.message ?? "error desconocido"}`
+    );
   }
 
   // Perfil en Firestore (mismo shape que AppUser en el front).
-  await getFirestore().collection("users").doc(uid).set({
-    uid,
-    email,
-    displayName,
-    role,
-    createdAt: Date.now(),
-  });
+  try {
+    await getFirestore().collection("users").doc(uid).set({
+      uid,
+      email,
+      displayName,
+      role,
+      createdAt: Date.now(),
+    });
+  } catch (e) {
+    const err = e as { message?: string };
+    console.error("Firestore set falló:", err.message);
+    throw new HttpsError(
+      "internal",
+      `Cuenta creada pero falló el perfil: ${err.message ?? "error"}`
+    );
+  }
 
   return { uid };
 });
@@ -117,8 +130,58 @@ export const adminSetPassword = onCall(async (request) => {
 
   try {
     await getAuth().updateUser(uid, { password: data.newPassword });
-  } catch {
-    throw new HttpsError("internal", "No se pudo cambiar la contraseña.");
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    throw new HttpsError(
+      "internal",
+      `No se pudo cambiar la contraseña: ${err.code ?? err.message ?? "error"}`
+    );
+  }
+
+  return { ok: true };
+});
+
+/**
+ * Elimina un usuario (cuenta de Auth + perfil en Firestore).
+ * data: { uid }
+ */
+export const adminDeleteUser = onCall(async (request) => {
+  await assertSuperadmin(request);
+
+  const data = request.data ?? {};
+  const uid = data.uid;
+  if (typeof uid !== "string" || !uid) {
+    throw new HttpsError("invalid-argument", "Falta el identificador del usuario.");
+  }
+  if (uid === request.auth?.uid) {
+    throw new HttpsError(
+      "failed-precondition",
+      "No podés eliminar tu propia cuenta."
+    );
+  }
+
+  // Borrar de Auth (si no existe, seguimos para limpiar el perfil igual).
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    if (err.code !== "auth/user-not-found") {
+      throw new HttpsError(
+        "internal",
+        `No se pudo eliminar la cuenta: ${err.code ?? err.message ?? "error"}`
+      );
+    }
+  }
+
+  // Borrar el perfil de Firestore.
+  try {
+    await getFirestore().collection("users").doc(uid).delete();
+  } catch (e) {
+    const err = e as { message?: string };
+    throw new HttpsError(
+      "internal",
+      `Cuenta borrada pero falló al borrar el perfil: ${err.message ?? "error"}`
+    );
   }
 
   return { ok: true };

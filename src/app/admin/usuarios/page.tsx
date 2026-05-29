@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { getAllUsers, updateUserRole } from "@/lib/admin";
-import { adminCreateUser, adminSetPassword, emailToUsername } from "@/lib/userAdmin";
+import {
+  adminCreateUser,
+  adminSetPassword,
+  adminDeleteUser,
+  emailToUsername,
+} from "@/lib/userAdmin";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/format";
 import { ROLE_LABELS, type AppUser, type Role } from "@/lib/types";
@@ -124,6 +129,29 @@ export default function AdminUsuariosPage() {
     } catch (e) {
       console.error(e);
       alert(fnErrorMessage(e, "No se pudo cambiar la contraseña."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDelete = async (u: AppUser) => {
+    if (u.uid === me?.uid) {
+      alert("No podés eliminar tu propia cuenta.");
+      return;
+    }
+    if (
+      !confirm(
+        `¿Eliminar al usuario "${u.displayName || emailToUsername(u.email)}"? Esta acción no se puede deshacer.`
+      )
+    )
+      return;
+    setBusy(u.uid);
+    try {
+      await adminDeleteUser(u.uid);
+      setUsers((prev) => prev.filter((x) => x.uid !== u.uid));
+    } catch (e) {
+      console.error(e);
+      alert(fnErrorMessage(e, "No se pudo eliminar el usuario."));
     } finally {
       setBusy(null);
     }
@@ -269,6 +297,15 @@ export default function AdminUsuariosPage() {
                 >
                   Cambiar contraseña
                 </button>
+                {u.uid !== me?.uid && (
+                  <button
+                    disabled={busy === u.uid}
+                    onClick={() => handleDelete(u)}
+                    className="rounded-full px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    Eliminar
+                  </button>
+                )}
               </div>
             </div>
 

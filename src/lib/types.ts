@@ -79,6 +79,51 @@ export const PROVEEDORES = [
 
 export const TRANSPORTES = ["Mafe (propio)"] as const;
 
+// ===== Cuentas Corrientes — compras a proveedores (deudas) =====
+
+export interface Proveedor {
+  id: string;
+  nombre: string;
+  cuit?: string;
+  contacto?: string; // teléfono / email / referente
+  notas?: string;
+  createdAt: number;
+}
+
+// A = facturado (con IVA) · B = sin facturar (remito, sin IVA)
+export type PurchaseModalidad = "A" | "B";
+
+export const MODALIDAD_LABELS: Record<PurchaseModalidad, string> = {
+  A: "A (facturado)",
+  B: "B (sin facturar)",
+};
+
+export interface Purchase {
+  id: string;
+  proveedorId: string;
+  proveedorNombre: string; // snapshot al crear
+  modalidad: PurchaseModalidad;
+  numero: string; // nº de factura (A) o remito (B)
+  monto: number; // ARS — la deuda generada
+  fecha: number;
+  camionId?: string; // si la compra vino con un camión
+  camionNombre?: string; // snapshot
+  createdBy?: string;
+  createdAt: number;
+}
+
+export interface SupplierPayment {
+  id: string;
+  proveedorId: string;
+  monto: number;
+  fecha: number;
+  formaPago?: FormaPago;
+  purchaseId?: string; // imputado a una compra puntual; ausente = pago general a cuenta
+  notas?: string;
+  createdBy?: string;
+  createdAt: number;
+}
+
 export interface TruckCargoItem {
   productId: string; // referencia al catálogo (Product.id / EAN)
   producto: string; // snapshot del nombre al cargar
@@ -150,8 +195,9 @@ export interface Truck {
   proveedorOtro?: string;
   transporte?: string; // de TRANSPORTES u "otro"
   transporteOtro?: string;
-  numeroRemito?: string; // nº de remito del proveedor/transporte
-  numeroFactura?: string; // nº de factura del proveedor/transporte
+  proveedorId?: string; // vínculo al proveedor de la cuenta corriente (si aplica)
+  numeroRemito?: string; // nº de remito del proveedor/transporte (compra B, sin facturar)
+  numeroFactura?: string; // nº de factura del proveedor/transporte (compra A, facturado)
   costoCamion?: number; // cuánto salió el camión
   porcentajeGanancia: number; // %
   carga?: TruckCargoItem[];

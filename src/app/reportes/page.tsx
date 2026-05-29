@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   collection,
   query,
@@ -15,10 +16,21 @@ import {
   subscribeReportesConfig,
   type ReportesConfig,
 } from "@/lib/config";
+import {
+  subscribePurchases,
+  subscribeSupplierPayments,
+  deudaGlobal,
+} from "@/lib/cuentas";
 import MonthCalendar from "@/components/MonthCalendar";
 import DayReportModal from "@/components/DayReportModal";
 import { formatARS } from "@/lib/format";
-import type { DailyExpense, Order, Truck } from "@/lib/types";
+import type {
+  DailyExpense,
+  Order,
+  Purchase,
+  SupplierPayment,
+  Truck,
+} from "@/lib/types";
 
 const MONTH_NAMES = [
   "Enero",
@@ -42,6 +54,8 @@ export default function ReportesPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<DailyExpense[]>([]);
   const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dayOpen, setDayOpen] = useState<number | null>(null);
@@ -50,11 +64,17 @@ export default function ReportesPage() {
   useEffect(() => {
     const u1 = subscribeTrucks(setTrucks);
     const u2 = subscribeReportesConfig(setConfig);
+    const u3 = subscribePurchases(setPurchases);
+    const u4 = subscribeSupplierPayments(setSupplierPayments);
     return () => {
       u1();
       u2();
+      u3();
+      u4();
     };
   }, []);
+
+  const deudaProveedores = deudaGlobal(purchases, supplierPayments);
 
   // Fetch pedidos + gastos del año
   useEffect(() => {
@@ -190,6 +210,26 @@ export default function ReportesPage() {
           </div>
         </section>
       )}
+
+      {/* Deuda a proveedores (cuentas corrientes) */}
+      <section className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-surface p-5 shadow-sm">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-brand-dark/55">
+              Deuda a proveedores
+            </p>
+            <p className="mt-1 font-serif text-3xl font-medium text-rose-700">
+              {deudaProveedores > 0 ? formatARS(deudaProveedores) : "Al día"}
+            </p>
+          </div>
+          <Link
+            href="/reportes/cuentas"
+            className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-primary-dark"
+          >
+            Ver cuentas corrientes →
+          </Link>
+        </div>
+      </section>
 
       {/* Navegación de año + leyenda */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
