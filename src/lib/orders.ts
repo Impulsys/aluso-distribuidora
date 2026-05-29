@@ -29,24 +29,37 @@ export interface CreateOrderInput {
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<string> {
-  // Auto-asignar al camión activo del momento (si hay)
-  const trucksSnap = await getDocs(
-    query(collection(db, "trucks"), limit(50))
-  );
-  const trucks = trucksSnap.docs
-    .map((d) => ({ ...(d.data() as Truck), id: d.id }))
-    .sort((a, b) => b.fechaIngreso - a.fechaIngreso);
   const now = Date.now();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const activeTruck = findTruckForDay(trucks, today.getTime());
 
-  const docRef = await addDoc(collection(db, "orders"), {
+  // Auto-asignar al camión activo del momento (si hay y si tenemos permiso).
+  // Las reglas solo dejan leer 'trucks' a socio/superadmin; un vendedor no
+  // puede. Si la lectura falla, seguimos sin asignar camión en lugar de
+  // romper el alta del pedido.
+  let truckId: string | null = null;
+  try {
+    const trucksSnap = await getDocs(query(collection(db, "trucks"), limit(50)));
+    const trucks = trucksSnap.docs
+      .map((d) => ({ ...(d.data() as Truck), id: d.id }))
+      .sort((a, b) => b.fechaIngreso - a.fechaIngreso);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    truckId = findTruckForDay(trucks, today.getTime())?.id ?? null;
+  } catch (e) {
+    console.warn("No se pudo asignar camión al pedido:", e);
+  }
+
+  // Firestore rechaza valores undefined → quitamos los opcionales vacíos.
+  const payload: Record<string, unknown> = {
     ...input,
-    truckId: activeTruck?.id ?? null,
+    truckId,
     status: "nuevo",
     createdAt: now,
-  });
+  };
+  for (const k of Object.keys(payload)) {
+    if (payload[k] === undefined) delete payload[k];
+  }
+
+  const docRef = await addDoc(collection(db, "orders"), payload);
   return docRef.id;
 }
 
