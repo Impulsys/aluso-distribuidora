@@ -13,7 +13,7 @@ const StatPill = ({
   label: string;
   iconBg: string;
 }) => (
-  <div className="group inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 py-1.5 pl-1.5 pr-4 text-sm font-medium text-white shadow-sm backdrop-blur-md transition hover:border-white/30 hover:bg-white/15">
+  <div className="group inline-flex items-center gap-2.5 rounded-full border border-brand-border bg-white py-1.5 pl-1.5 pr-4 text-sm font-medium text-brand-dark shadow-sm transition hover:border-primary/40 hover:bg-primary-light/30">
     <span
       className={`grid h-7 w-7 place-items-center rounded-full text-base shadow-inner ${iconBg}`}
     >
@@ -27,27 +27,20 @@ export default function CatalogoPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       {/* === HERO con productos pasando como FONDO === */}
-      <section
-        className="relative mb-8 min-h-[300px] overflow-hidden rounded-2xl text-white"
-        style={{
-          background:
-            "linear-gradient(135deg, #1ca5c8 0%, #0a8db5 45%, #006081 100%)",
-        }}
-      >
+      <section className="relative mb-8 min-h-[300px] overflow-hidden rounded-2xl border border-brand-border bg-white text-brand-dark">
         {/* Capa 1: carrusel de productos como fondo */}
         <div className="absolute inset-0 z-0">
           <MarqueeProducts variant="background" />
         </div>
 
-        {/* Capa 2: overlay degradado para legibilidad del texto */}
+        {/* Capa 2: overlay BLANCO para legibilidad del texto (deja ver el carrusel a la derecha) */}
         <div
           className="absolute inset-0 z-10"
           style={{
             background:
-              "linear-gradient(to right, rgba(10,141,181,0.95) 0%, rgba(10,141,181,0.75) 35%, rgba(10,141,181,0.1) 75%, transparent 100%)",
+              "linear-gradient(to right, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.9) 38%, rgba(255,255,255,0.25) 75%, rgba(255,255,255,0) 100%)",
           }}
         />
-        <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/15 to-transparent" />
 
         {/* Capa 3: contenido */}
         <div className="relative z-20 grid gap-6 px-6 py-10 sm:grid-cols-[1fr_auto] sm:items-start">
@@ -55,7 +48,7 @@ export default function CatalogoPage() {
             <h1 className="text-2xl font-bold sm:text-3xl">
               Distribuidora mayorista — Doncella & Nonisec
             </h1>
-            <p className="mt-2 text-secondary">
+            <p className="mt-2 text-brand-dark/70">
               Línea femenina, bebé y de incontinencia adulta. Productos
               Lenterdit al mejor precio mayorista del NOA. Armá tu pedido y
               enviálo por WhatsApp en segundos.
@@ -66,7 +59,7 @@ export default function CatalogoPage() {
               <StatPill icon="💬" label="Pedido por WhatsApp" iconBg="bg-[#25D366]/90" />
             </div>
           </div>
-          <div className="hidden gap-3 self-start rounded-xl bg-white/95 p-3 shadow-lg sm:flex">
+          <div className="hidden gap-3 self-start rounded-xl border border-brand-border bg-white p-3 shadow-md sm:flex">
             <div className="grid place-items-center">
               <Image
                 src="/brand/doncella.png"
