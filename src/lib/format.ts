@@ -21,3 +21,9 @@ export function daysBetween(from: number, to: number): number {
   // Días redondeados HACIA ARRIBA — si faltan unas horas, cuenta como 1 día.
   return Math.max(0, Math.ceil((to - from) / 86_400_000));
 }
+
+// Parsea "YYYY-MM-DD" como fecha LOCAL (evita el corrimiento de día por UTC).
+export function tsFromISO(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}

@@ -20,6 +20,15 @@ import type {
   FormaPago,
 } from "./types";
 
+// Firestore rechaza valores undefined → los quitamos antes de escribir.
+function clean<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out as Partial<T>;
+}
+
 // ==================== GASTOS DIARIOS ====================
 export interface NewExpenseInput {
   fecha: number; // ts del día (start-of-day)
@@ -33,15 +42,34 @@ export interface NewExpenseInput {
 export async function createExpense(
   input: NewExpenseInput
 ): Promise<string> {
-  const ref = await addDoc(collection(db, "expenses"), {
-    ...input,
-    createdAt: Date.now(),
-  });
+  const ref = await addDoc(
+    collection(db, "expenses"),
+    clean({ ...input, createdAt: Date.now() })
+  );
   return ref.id;
+}
+
+export async function updateExpense(
+  id: string,
+  patch: Partial<NewExpenseInput>
+): Promise<void> {
+  await updateDoc(doc(db, "expenses", id), clean(patch));
 }
 
 export async function deleteExpense(id: string): Promise<void> {
   await deleteDoc(doc(db, "expenses", id));
+}
+
+/** Fecha (ts del día) del egreso más reciente, o null si no hay ninguno. */
+export async function getLastExpenseDate(): Promise<number | null> {
+  const q = query(
+    collection(db, "expenses"),
+    orderBy("fecha", "desc"),
+    limit(1)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return (snap.docs[0].data() as DailyExpense).fecha ?? null;
 }
 
 /**
@@ -92,11 +120,10 @@ export interface NewCheckInput {
 }
 
 export async function createCheck(input: NewCheckInput): Promise<string> {
-  const ref = await addDoc(collection(db, "checks"), {
-    ...input,
-    status: "pendiente" as CheckStatus,
-    createdAt: Date.now(),
-  });
+  const ref = await addDoc(
+    collection(db, "checks"),
+    clean({ ...input, status: "pendiente" as CheckStatus, createdAt: Date.now() })
+  );
   return ref.id;
 }
 

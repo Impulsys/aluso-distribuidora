@@ -9,20 +9,34 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { subscribeTrucks } from "@/lib/trucks";
+import { useAuth } from "@/context/AuthContext";
+import {
+  DEFAULT_REPORTES_CONFIG,
+  subscribeReportesConfig,
+  type ReportesConfig,
+} from "@/lib/config";
 import { formatARS, formatDate, daysBetween } from "@/lib/format";
-import type { DailyExpense, Order, Truck } from "@/lib/types";
+import type { Remito, Truck } from "@/lib/types";
 
 export default function ReportesCamionesPage() {
+  const { user } = useAuth();
   const [year, setYear] = useState(new Date().getFullYear());
   const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [expenses, setExpenses] = useState<DailyExpense[]>([]);
+  const [remitos, setRemitos] = useState<Remito[]>([]);
+  const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const showCarga =
+    user?.role === "superadmin" || config.mostrarCargaCamionASocios;
+
   useEffect(() => {
-    const unsub = subscribeTrucks(setTrucks);
-    return unsub;
+    const u1 = subscribeTrucks(setTrucks);
+    const u2 = subscribeReportesConfig(setConfig);
+    return () => {
+      u1();
+      u2();
+    };
   }, []);
 
   useEffect(() => {
@@ -30,30 +44,16 @@ export default function ReportesCamionesPage() {
     const startTs = new Date(year - 1, 0, 1).getTime();
     const endTs = new Date(year + 1, 0, 1).getTime();
     setLoading(true);
-    Promise.all([
-      getDocs(
-        query(
-          collection(db, "orders"),
-          where("createdAt", ">=", startTs),
-          where("createdAt", "<", endTs)
-        )
-      ),
-      getDocs(
-        query(
-          collection(db, "expenses"),
-          where("fecha", ">=", startTs),
-          where("fecha", "<", endTs)
-        )
-      ),
-    ])
-      .then(([oSnap, eSnap]) => {
-        setOrders(
-          oSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Order))
-        );
-        setExpenses(
-          eSnap.docs.map(
-            (d) => ({ id: d.id, ...d.data() } as DailyExpense)
-          )
+    getDocs(
+      query(
+        collection(db, "remitos"),
+        where("fecha", ">=", startTs),
+        where("fecha", "<", endTs)
+      )
+    )
+      .then((rSnap) => {
+        setRemitos(
+          rSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Remito))
         );
         setError(null);
       })
@@ -80,16 +80,11 @@ export default function ReportesCamionesPage() {
       trucksAnio.map((t) => {
         const start = t.fechaIngreso;
         const end = t.fechaCierre ?? Date.now();
-        const orderMatches = orders.filter(
-          (o) =>
-            o.status !== "cancelado" &&
-            (o.truckId === t.id ||
-              (!o.truckId && o.createdAt >= start && o.createdAt <= end))
+        // venta = remito: imputamos por fecha dentro del rango del camión
+        // (los remitos no llevan truckId). Excluimos las ventas anuladas.
+        const remitoMatches = remitos.filter(
+          (r) => !r.anulado && r.fecha >= start && r.fecha <= end
         );
-        const expenseMatches = expenses.filter(
-          (e) => e.fecha >= start && e.fecha <= end
-        );
-        const totalGastos = expenseMatches.reduce((s, e) => s + e.monto, 0);
         const costoCamion = t.costoCamion ?? 0;
         const dias = daysBetween(start, end);
 
@@ -99,8 +94,8 @@ export default function ReportesCamionesPage() {
           // Sumar unidades vendidas del producto en orders del rango
           let vendidas = 0;
           let ingresoReal = 0;
-          orderMatches.forEach((o) => {
-            o.items.forEach((it) => {
+          remitoMatches.forEach((r) => {
+            r.items.forEach((it) => {
               if (it.productId === c.productId) {
                 vendidas += it.cantidad;
                 ingresoReal += it.cantidad * (it.precioVenta || 0);
@@ -136,15 +131,15 @@ export default function ReportesCamionesPage() {
         const totalRestante = totalCargadas - totalVendidas;
         const todoLiquidado = cargo.length > 0 && totalRestante === 0;
 
-        // Ganancia real DEL CAMIÓN = margen del cargo − gastos imputados − costo camión adicional
-        // (el costoCamion del header es independiente de los costos unitarios del cargo)
-        const gananciaReal = margenRealCargo - totalGastos - costoCamion;
+        // Ganancia real DEL CAMIÓN = margen del cargo − logística del camión.
+        // Los gastos generales NO se imputan al camión (son gastos del negocio).
+        const gananciaReal = margenRealCargo - costoCamion;
         const gananciaEstimada =
           (costoTotalCargo * (t.porcentajeGanancia ?? 0)) / 100;
 
         return {
           truck: t,
-          orderCount: orderMatches.length,
+          ventaCount: remitoMatches.length,
           dias,
           activo: !t.fechaCierre,
           // Items
@@ -157,13 +152,12 @@ export default function ReportesCamionesPage() {
           costoTotalCargo,
           ingresoRealCargo,
           margenRealCargo,
-          totalGastos,
           costoCamion,
           gananciaEstimada,
           gananciaReal,
         };
       }),
-    [trucksAnio, orders, expenses]
+    [trucksAnio, remitos]
   );
 
   return (
@@ -210,7 +204,7 @@ export default function ReportesCamionesPage() {
 
       <div className="space-y-4">
         {reports.map((r) => (
-          <TruckReportCard key={r.truck.id} r={r} />
+          <TruckReportCard key={r.truck.id} r={r} showCarga={showCarga} />
         ))}
       </div>
     </div>
@@ -220,7 +214,7 @@ export default function ReportesCamionesPage() {
 // ===================
 interface TruckReport {
   truck: Truck;
-  orderCount: number;
+  ventaCount: number;
   dias: number;
   activo: boolean;
   items: {
@@ -243,13 +237,18 @@ interface TruckReport {
   costoTotalCargo: number;
   ingresoRealCargo: number;
   margenRealCargo: number;
-  totalGastos: number;
   costoCamion: number;
   gananciaEstimada: number;
   gananciaReal: number;
 }
 
-function TruckReportCard({ r }: { r: TruckReport }) {
+function TruckReportCard({
+  r,
+  showCarga,
+}: {
+  r: TruckReport;
+  showCarga: boolean;
+}) {
   const { truck: t } = r;
   const proveedor =
     t.proveedor === "otro" ? t.proveedorOtro || "(sin nombre)" : t.proveedor;
@@ -311,28 +310,22 @@ function TruckReportCard({ r }: { r: TruckReport }) {
       </div>
 
       {/* KPIs operativos */}
-      <div className="grid grid-cols-2 gap-px bg-brand-border sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px bg-brand-border sm:grid-cols-3">
         <Kpi
           label="Días operando"
           value={`${r.dias} d`}
           hint={r.activo ? "hasta hoy" : "total cerrado"}
         />
         <Kpi
-          label="Pedidos asociados"
-          value={r.orderCount}
-          hint="dentro del rango"
+          label="Ventas asociadas"
+          value={r.ventaCount}
+          hint="remitos del rango"
         />
         <Kpi
           label="Unidades vendidas"
           value={`${r.totalVendidas} / ${r.totalCargadas}`}
           hint={`${r.totalRestante} restante${r.totalRestante === 1 ? "" : "s"}`}
           tone={r.todoLiquidado ? "primary" : undefined}
-        />
-        <Kpi
-          label="Gastos imputados"
-          value={r.totalGastos > 0 ? formatARS(r.totalGastos) : "—"}
-          hint="del rango"
-          tone="rose"
         />
       </div>
 
@@ -361,13 +354,13 @@ function TruckReportCard({ r }: { r: TruckReport }) {
         <Kpi
           label="Ganancia REAL camión"
           value={r.gananciaReal !== 0 ? formatARS(r.gananciaReal) : "—"}
-          hint="margen − gastos − costo extra"
+          hint="margen − logística"
           tone={r.gananciaReal >= 0 ? "emerald" : "rose"}
         />
       </div>
 
-      {/* Carga del camión — breakdown completo por producto */}
-      {r.items.length > 0 && (
+      {/* Carga del camión — breakdown completo por producto (sensible) */}
+      {showCarga && r.items.length > 0 && (
         <details className="border-t border-brand-border" open={r.activo}>
           <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-brand-dark hover:bg-primary-light/40">
             📦 Detalle por producto ({r.items.length} ítem
@@ -441,6 +434,14 @@ function TruckReportCard({ r }: { r: TruckReport }) {
             </table>
           </div>
         </details>
+      )}
+
+      {r.costoCamion > 0 && (
+        <p className="border-t border-brand-border bg-amber-50/60 px-5 py-2 text-xs text-brand-dark/70">
+          🚛 Logística:{" "}
+          <b className="text-brand-dark">{formatARS(r.costoCamion)}</b>
+          {t.logisticaDetalle ? ` · ${t.logisticaDetalle}` : ""}
+        </p>
       )}
 
       {t.descripcion && (

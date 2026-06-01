@@ -8,6 +8,8 @@ import {
   deleteDoc,
   getDocs,
   onSnapshot,
+  query,
+  where,
   limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -128,6 +130,17 @@ export interface NewPaymentInput {
   fecha: number;
   formaPago?: SupplierPayment["formaPago"];
   purchaseId?: string; // imputado a una compra; ausente = a cuenta
+  modalidad?: SupplierPayment["modalidad"];
+  via?: SupplierPayment["via"];
+  comisionPct?: number;
+  comisionMonto?: number;
+  arqueoDeposito?: Record<string, number>;
+  transferNumero?: string;
+  transferBanco?: string;
+  transferTitular?: string;
+  depositoCuenta?: string;
+  depositoTitular?: string;
+  desdeCaja?: boolean;
   notas?: string;
   createdBy?: string;
 }
@@ -139,7 +152,28 @@ export function subscribeSupplierPayments(
     cb(
       snap.docs
         .map((d) => ({ ...(d.data() as SupplierPayment), id: d.id }))
-        .sort((a, b) => b.fecha - a.fecha)
+        // Por fecha (desc) y, dentro del mismo día, por orden de carga.
+        .sort((a, b) => b.fecha - a.fecha || (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    );
+  });
+}
+
+/** Pagos en [start, end). Para vistas acotadas a un día/mes (más liviano). */
+export function subscribeSupplierPaymentsRange(
+  start: number,
+  end: number,
+  cb: (xs: SupplierPayment[]) => void
+): () => void {
+  const q = query(
+    collection(db, "supplierPayments"),
+    where("fecha", ">=", start),
+    where("fecha", "<", end)
+  );
+  return onSnapshot(q, (snap) => {
+    cb(
+      snap.docs
+        .map((d) => ({ ...(d.data() as SupplierPayment), id: d.id }))
+        .sort((a, b) => b.fecha - a.fecha || (b.createdAt ?? 0) - (a.createdAt ?? 0))
     );
   });
 }
@@ -150,6 +184,16 @@ export async function createPayment(input: NewPaymentInput): Promise<string> {
     clean({ ...input, createdAt: Date.now() })
   );
   return ref.id;
+}
+
+export async function updatePayment(
+  id: string,
+  // purchaseId puede ser null para "des-imputar" (pago a cuenta).
+  patch: Partial<Omit<NewPaymentInput, "purchaseId">> & {
+    purchaseId?: string | null;
+  }
+): Promise<void> {
+  await updateDoc(doc(db, "supplierPayments", id), clean(patch));
 }
 
 export async function deletePayment(id: string): Promise<void> {

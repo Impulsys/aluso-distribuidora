@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { findTruckForDay } from "@/lib/trucks";
-import type { Order, Truck } from "@/lib/types";
+import type { Remito, Truck } from "@/lib/types";
 
 const MONTH_NAMES = [
   "Enero",
@@ -35,7 +35,7 @@ export interface MonthCalendarProps {
   year: number;
   month: number; // 0-11
   trucks: Truck[];
-  orders: Order[]; // todos del año
+  remitos: Remito[]; // ventas (remitos) del año
   onDayClick: (ts: number) => void;
 }
 
@@ -43,7 +43,7 @@ export default function MonthCalendar({
   year,
   month,
   trucks,
-  orders,
+  remitos,
   onDayClick,
 }: MonthCalendarProps) {
   const today = useMemo(() => {
@@ -63,19 +63,19 @@ export default function MonthCalendar({
   for (let i = 0; i < offset; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d });
 
-  // Cuenta pedidos por día del mes
-  const ordersByDay = useMemo(() => {
+  // Cuenta ventas (remitos) por día del mes
+  const ventasByDay = useMemo(() => {
     const map = new Map<number, number>();
-    orders.forEach((o) => {
-      if (o.status === "cancelado") return;
-      const d = new Date(o.createdAt);
+    remitos.forEach((r) => {
+      if (r.anulado) return;
+      const d = new Date(r.fecha);
       if (d.getFullYear() === year && d.getMonth() === month) {
         const day = d.getDate();
         map.set(day, (map.get(day) ?? 0) + 1);
       }
     });
     return map;
-  }, [orders, year, month]);
+  }, [remitos, year, month]);
 
   return (
     <div className="rounded-xl border border-brand-border bg-surface p-3 shadow-sm">
@@ -98,14 +98,14 @@ export default function MonthCalendar({
           const dayStart = dayStartTs(year, month, cell.day);
           const dayEnd = dayEndTs(year, month, cell.day);
           const truck = findTruckForDay(trucks, dayStart);
-          const hasOrders = (ordersByDay.get(cell.day) ?? 0) > 0;
+          const hasVentas = (ventasByDay.get(cell.day) ?? 0) > 0;
 
           // Estado del día
           let bg = "bg-slate-100"; // futuro / sin info
           let text = "text-slate-400";
           if (dayStart <= today) {
             // pasado o hoy
-            if (hasOrders) {
+            if (hasVentas) {
               bg = "bg-emerald-200/80 hover:bg-emerald-300";
               text = "text-emerald-900";
             } else {

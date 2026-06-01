@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "@/hooks/useProducts";
 import { setProductOverride, setProductCost, subscribeProductCosts } from "@/lib/admin";
 import { formatARS } from "@/lib/format";
+import { coincide } from "@/lib/search";
 import { MARCAS, type Marca, type Product } from "@/lib/types";
 
 type MarcaFilter = "todos" | Marca;
@@ -32,20 +33,37 @@ export default function AdminProductosPage() {
       productos
         .filter((p) => (marca === "todos" ? true : p.marca === marca))
         .filter((p) => {
-          if (!q.trim()) return true;
-          const t = q.toLowerCase();
-          return (
-            p.nombre.toLowerCase().includes(t) ||
-            (p.ean ?? "").toLowerCase().includes(t)
-          );
+          const t = q.trim();
+          if (!t) return true;
+          return coincide(p.nombre, t) || coincide(p.ean ?? "", t);
         }),
     [productos, marca, q]
   );
 
   const destacadosCount = productos.filter((p) => p.destacado).length;
+  const patrimonio = productos.reduce(
+    (s, p) => s + (p.stock || 0) * (costs[p.id] ?? 0),
+    0
+  );
 
   return (
     <div>
+      {/* Patrimonio en stock */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-surface p-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-brand-dark/55">
+            Patrimonio en stock
+          </p>
+          <p className="mt-1 font-serif text-3xl font-medium text-emerald-700">
+            {patrimonio > 0 ? formatARS(patrimonio) : "—"}
+          </p>
+        </div>
+        <p className="max-w-[16rem] text-right text-[11px] text-brand-dark/45">
+          Valor de la mercadería en depósito (stock × precio de costo de cada
+          producto).
+        </p>
+      </div>
+
       {/* Cabecera con stats */}
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-brand-dark/60">
         <span>
@@ -83,21 +101,22 @@ export default function AdminProductosPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre o EAN…"
+          placeholder="Buscar por nombre o código de barras…"
           className="w-full rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary sm:max-w-xs"
         />
       </div>
 
       {/* Tabla de productos */}
       <div className="overflow-hidden rounded-xl border border-brand-border bg-surface">
-        <div className="hidden grid-cols-[64px_minmax(0,1fr)_120px_110px_90px_90px_80px_60px] gap-3 border-b border-brand-border bg-primary-light px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-primary md:grid">
+        <div className="hidden grid-cols-[64px_minmax(0,1fr)_120px_110px_90px_70px_110px_70px_56px] gap-3 border-b border-brand-border bg-primary-light px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-primary md:grid">
           <span></span>
           <span>Producto</span>
-          <span>EAN</span>
-          <span>P. venta</span>
-          <span>P. costo</span>
-          <span>Stock</span>
-          <span className="text-center">Destacado</span>
+          <span>Cód. barras</span>
+          <span className="text-right">P. venta</span>
+          <span className="text-right">P. costo</span>
+          <span className="text-right">Stock</span>
+          <span className="text-right">Valor stock</span>
+          <span className="text-center">Destac.</span>
           <span className="text-center">Activo</span>
         </div>
 
@@ -111,6 +130,24 @@ export default function AdminProductosPage() {
             onToggleEdit={() => setEditing(editing === p.id ? null : p.id)}
           />
         ))}
+
+        {/* Total valor en stock (de lo mostrado) */}
+        <div className="flex items-center justify-between gap-3 border-t-2 border-brand-border bg-primary-light/40 px-4 py-2.5 text-sm">
+          <span className="font-medium text-brand-dark/70">
+            Total valor en stock{" "}
+            <span className="text-brand-dark/45">
+              ({visible.length} producto{visible.length === 1 ? "" : "s"})
+            </span>
+          </span>
+          <span className="font-serif text-lg font-semibold text-primary">
+            {formatARS(
+              visible.reduce(
+                (s, p) => s + (p.stock || 0) * (costs[p.id] ?? 0),
+                0
+              )
+            )}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -151,7 +188,7 @@ function ProductRow({
   return (
     <div className="border-b border-brand-border last:border-b-0">
       {/* Fila lectura */}
-      <div className="grid grid-cols-[48px_1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[64px_minmax(0,1fr)_120px_110px_90px_90px_80px_60px]">
+      <div className="grid grid-cols-[48px_1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[64px_minmax(0,1fr)_120px_110px_90px_70px_110px_70px_56px]">
         <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-primary-light md:h-14 md:w-14">
           <Image
             src={p.imagen}
@@ -181,7 +218,7 @@ function ProductRow({
         </span>
         <span className="hidden text-right font-semibold text-primary md:block">
           {p.precioVenta > 0 ? formatARS(p.precioVenta) : "—"}
-          {p.precioOferta && p.precioOferta > 0 && (
+          {(p.precioOferta ?? 0) > 0 && (
             <span className="ml-1 rounded bg-accent px-1 text-[9px] text-white">
               OF
             </span>
@@ -200,6 +237,11 @@ function ProductRow({
           }`}
         >
           {p.stock}
+        </span>
+        <span className="hidden text-right text-brand-dark/70 md:block">
+          {(p.stock || 0) * costo > 0
+            ? formatARS((p.stock || 0) * costo)
+            : "—"}
         </span>
         <span className="hidden text-center md:block">
           {p.destacado ? "⭐" : "—"}
@@ -246,12 +288,17 @@ function EditForm({
   destacadosCount: number;
   onSave: (patch: Partial<Product> & { _costo?: number }) => Promise<void>;
 }) {
+  const [nombre, setNombre] = useState(p.nombre);
+  const [imagen, setImagen] = useState(p.imagen);
+  const [categoria, setCategoria] = useState(p.categoria);
+  const [marca, setMarca] = useState<Marca>(p.marca);
   const [precioVenta, setPrecioVenta] = useState(p.precioVenta);
   const [precioCosto, setPrecioCosto] = useState(costo);
   const [stock, setStock] = useState(p.stock);
   const [destacado, setDestacado] = useState(p.destacado ?? false);
   const [precioOferta, setPrecioOferta] = useState(p.precioOferta ?? 0);
   const [activo, setActivo] = useState(p.activo);
+  const [descripcion, setDescripcion] = useState(p.descripcion ?? "");
   const [error, setError] = useState<string | null>(null);
 
   // Si este producto NO es destacado y ya hay 3+ destacados → no puede marcarlo
@@ -283,14 +330,23 @@ function EditForm({
       );
       return;
     }
+    if (!nombre.trim()) {
+      setError("El nombre no puede estar vacío.");
+      return;
+    }
 
     onSave({
+      nombre: nombre.trim(),
+      imagen: imagen.trim(),
+      categoria: categoria.trim() || "General",
+      marca,
       precioVenta: pv,
       _costo: pc, // precio costo va a colección admin-only
       stock: st,
       destacado,
       precioOferta: po,
       activo,
+      descripcion: descripcion.trim(),
     });
   };
 
@@ -299,6 +355,46 @@ function EditForm({
       onSubmit={submit}
       className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
     >
+      <div className="sm:col-span-2 lg:col-span-3">
+        <Field label="Nombre del producto">
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre"
+            className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </Field>
+      </div>
+      <Field label="Categoría">
+        <input
+          value={categoria}
+          onChange={(e) => setCategoria(e.target.value)}
+          placeholder="General"
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+      </Field>
+      <Field label="Marca">
+        <select
+          value={marca}
+          onChange={(e) => setMarca(e.target.value as Marca)}
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+        >
+          {(Object.keys(MARCAS) as Marca[]).map((m) => (
+            <option key={m} value={m}>
+              {MARCAS[m]}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Imagen (URL)">
+        <input
+          value={imagen}
+          onChange={(e) => setImagen(e.target.value)}
+          placeholder="https://…"
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+      </Field>
+
       <Field label="Precio de venta (ARS)">
         <input
           type="number"
@@ -369,6 +465,18 @@ function EditForm({
           </p>
         )}
       </Field>
+
+      <div className="sm:col-span-2 lg:col-span-3">
+        <Field label="Descripción (visible en el catálogo)">
+          <textarea
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            rows={4}
+            placeholder="Descripción del producto…"
+            className="w-full resize-y rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </Field>
+      </div>
 
       <div className="sm:col-span-2 lg:col-span-3">
         {error && (

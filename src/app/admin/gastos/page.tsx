@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   createExpense,
+  updateExpense,
   deleteExpense,
   subscribeExpensesRange,
+  getLastExpenseDate,
 } from "@/lib/cashflow";
-import { formatARS, formatDate } from "@/lib/format";
+import { formatARS, formatDate, tsFromISO } from "@/lib/format";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
@@ -42,25 +44,50 @@ function monthRange(d: Date) {
   return { start, end };
 }
 
+function dayRange(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const start = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+  return { start, end: start + 86_400_000 };
+}
+
+function isoDeTs(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export default function AdminGastosPage() {
   const [fecha, setFecha] = useState(todayISO());
   const [tipo, setTipo] = useState<ExpenseType>("insumos");
   const [monto, setMonto] = useState<number>(0);
   const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
   const [detalle, setDetalle] = useState("");
+  const [editId, setEditId] = useState<string | null>(null); // id del egreso en edición
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Vista del mes actual
+  // Vista: por día (default) o por mes
+  const [vista, setVista] = useState<"dia" | "mes">("dia");
+  const [dia, setDia] = useState(todayISO());
   const [refDate, setRefDate] = useState(new Date());
   const [gastos, setGastos] = useState<DailyExpense[]>([]);
 
+  // Al entrar, posicionar el día en el último que tenga egresos (si hay).
   useEffect(() => {
-    const { start, end } = monthRange(refDate);
+    getLastExpenseDate()
+      .then((ts) => {
+        if (ts) setDia(isoDeTs(ts));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const { start, end } =
+      vista === "mes" ? monthRange(refDate) : dayRange(dia);
     const unsub = subscribeExpensesRange(start, end, setGastos);
     return unsub;
-  }, [refDate]);
+  }, [vista, refDate, dia]);
 
   const totales = useMemo(() => {
     const total = gastos.reduce((s, g) => s + g.monto, 0);
@@ -77,44 +104,77 @@ export default function AdminGastosPage() {
     return { total, porTipo, porForma };
   }, [gastos]);
 
+  // Tipos a mostrar en el resumen: los 7 manuales + cualquier tipo extra
+  // (ej. "comision_agencia", generado automáticamente) que tenga monto.
+  const tiposResumen = useMemo<ExpenseType[]>(() => {
+    const extra = (Object.keys(EXPENSE_LABELS) as ExpenseType[]).filter(
+      (t) => !EXPENSE_TYPES.includes(t) && (totales.porTipo[t] ?? 0) > 0
+    );
+    return [...EXPENSE_TYPES, ...extra];
+  }, [totales]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (monto <= 0) {
-      setError("El monto debe ser mayor a 0.");
+      setError("El monto del egreso debe ser mayor a 0.");
       return;
     }
     setBusy(true);
     setError(null);
     setSuccess(false);
     try {
-      const dayTs = new Date(fecha).getTime();
-      await createExpense({
+      const dayTs = tsFromISO(fecha);
+      const data = {
         fecha: dayTs,
         tipo,
         monto: Number(monto),
         formaPago,
         detalle: detalle.trim() || undefined,
-      });
+      };
+      if (editId) {
+        await updateExpense(editId, data);
+      } else {
+        await createExpense(data);
+      }
       setMonto(0);
       setDetalle("");
+      setEditId(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (e) {
       console.error(e);
-      setError("No se pudo guardar el gasto.");
+      setError("No se pudo guardar el egreso.");
     } finally {
       setBusy(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este gasto?")) return;
+    if (!confirm("¿Eliminar este egreso?")) return;
     try {
       await deleteExpense(id);
     } catch (e) {
       console.error(e);
       alert("No se pudo eliminar.");
     }
+  };
+
+  const startEdit = (g: DailyExpense) => {
+    setEditId(g.id);
+    setTipo(g.tipo);
+    setMonto(g.monto);
+    setFormaPago(g.formaPago);
+    setDetalle(g.detalle ?? "");
+    setFecha(isoDeTs(g.fecha));
+    setError(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setMonto(0);
+    setDetalle("");
+    setError(null);
   };
 
   const monthLabel = refDate.toLocaleDateString("es-AR", {
@@ -126,9 +186,13 @@ export default function AdminGastosPage() {
     <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
       {/* === Form === */}
       <section className="rounded-2xl border border-brand-border bg-surface p-5">
-        <h2 className="font-serif text-xl text-brand-dark">Nuevo gasto</h2>
+        <h2 className="font-serif text-xl text-brand-dark">
+          {editId ? "Editar egreso" : "Nuevo egreso"}
+        </h2>
         <p className="mt-1 text-xs text-brand-dark/55">
-          Se imputa al día seleccionado y al tipo elegido.
+          {editId
+            ? "Modificá los datos y guardá los cambios."
+            : "Se imputa al día seleccionado y al tipo elegido."}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
@@ -220,53 +284,101 @@ export default function AdminGastosPage() {
           )}
           {success && (
             <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-              ✓ Gasto registrado
+              ✓ Egreso {editId ? "actualizado" : "registrado"}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
-          >
-            {busy ? "Guardando…" : "Registrar gasto"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="flex-1 rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
+            >
+              {busy
+                ? "Guardando…"
+                : editId
+                ? "Guardar cambios"
+                : "Registrar egreso"}
+            </button>
+            {editId && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="rounded-lg border border-brand-border px-4 py-2.5 text-sm font-medium hover:bg-primary-light"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
         </form>
       </section>
 
       {/* === Lista del mes === */}
       <section>
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1 rounded-full border border-brand-border bg-surface p-1">
-            <button
-              onClick={() =>
-                setRefDate(new Date(refDate.getFullYear(), refDate.getMonth() - 1, 1))
-              }
-              className="grid h-8 w-8 place-items-center rounded-full hover:bg-primary-light"
-            >
-              ←
-            </button>
-            <span className="px-3 font-serif text-base font-medium text-brand-dark first-letter:uppercase">
-              {monthLabel}
-            </span>
-            <button
-              onClick={() =>
-                setRefDate(new Date(refDate.getFullYear(), refDate.getMonth() + 1, 1))
-              }
-              className="grid h-8 w-8 place-items-center rounded-full hover:bg-primary-light"
-            >
-              →
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Switch Día / Mes */}
+            <div className="inline-flex rounded-full border border-brand-border bg-surface p-1 text-sm">
+              {(["dia", "mes"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setVista(v)}
+                  className={`rounded-full px-3 py-1 font-medium transition ${
+                    vista === v
+                      ? "bg-primary text-white"
+                      : "text-brand-dark/70 hover:bg-primary-light"
+                  }`}
+                >
+                  {v === "dia" ? "Por día" : "Por mes"}
+                </button>
+              ))}
+            </div>
+
+            {vista === "dia" ? (
+              <input
+                type="date"
+                value={dia}
+                onChange={(e) => setDia(e.target.value)}
+                className="rounded-lg border border-brand-border bg-surface px-3 py-1.5 text-sm outline-none focus:border-primary"
+              />
+            ) : (
+              <div className="inline-flex items-center gap-1 rounded-full border border-brand-border bg-surface p-1">
+                <button
+                  onClick={() =>
+                    setRefDate(
+                      new Date(refDate.getFullYear(), refDate.getMonth() - 1, 1)
+                    )
+                  }
+                  className="grid h-8 w-8 place-items-center rounded-full hover:bg-primary-light"
+                >
+                  ←
+                </button>
+                <span className="px-3 font-serif text-base font-medium text-brand-dark first-letter:uppercase">
+                  {monthLabel}
+                </span>
+                <button
+                  onClick={() =>
+                    setRefDate(
+                      new Date(refDate.getFullYear(), refDate.getMonth() + 1, 1)
+                    )
+                  }
+                  className="grid h-8 w-8 place-items-center rounded-full hover:bg-primary-light"
+                >
+                  →
+                </button>
+              </div>
+            )}
           </div>
           <span className="text-sm font-medium text-brand-dark">
-            Total mes: <b className="text-primary">{formatARS(totales.total)}</b>
+            {vista === "dia" ? "Total del día" : "Total del mes"}:{" "}
+            <b className="text-primary">{formatARS(totales.total)}</b>
           </span>
         </header>
 
         {/* Resumen por tipo */}
         {gastos.length > 0 && (
           <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl border border-brand-border bg-primary-light/30 p-3 sm:grid-cols-4">
-            {EXPENSE_TYPES.map((t) => (
+            {tiposResumen.map((t) => (
               <div key={t} className="text-xs">
                 <p className="text-brand-dark/55">{EXPENSE_LABELS[t]}</p>
                 <p className="font-semibold text-brand-dark">
@@ -280,7 +392,9 @@ export default function AdminGastosPage() {
         {/* Lista */}
         {gastos.length === 0 ? (
           <div className="rounded-xl border border-brand-border bg-surface p-8 text-center text-brand-dark/60">
-            Sin gastos cargados en {monthLabel}.
+            {vista === "dia"
+              ? `Sin egresos el ${formatDate(dayRange(dia).start)}.`
+              : `Sin egresos cargados en ${monthLabel}.`}
           </div>
         ) : (
           <div className="space-y-2">
@@ -308,6 +422,12 @@ export default function AdminGastosPage() {
                   <span className="font-semibold text-rose-700">
                     -{formatARS(g.monto)}
                   </span>
+                  <button
+                    onClick={() => startEdit(g)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Editar
+                  </button>
                   <button
                     onClick={() => handleDelete(g.id)}
                     className="text-xs text-rose-600 hover:underline"

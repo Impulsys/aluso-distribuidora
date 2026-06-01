@@ -3,12 +3,43 @@
 import { useState } from "react";
 import { formatARS, formatDate } from "@/lib/format";
 import { saldoProveedor, saldoCompra, deudaGlobal } from "@/lib/cuentas";
+import { totalArqueo } from "@/lib/caja";
 import {
   MODALIDAD_LABELS,
   type Proveedor,
   type Purchase,
   type SupplierPayment,
 } from "@/lib/types";
+
+/** Detalle según la vía del pago (transferencia / depósito) para mostrar bajo la forma. */
+function detallePago(pg: SupplierPayment): string | null {
+  if (pg.via === "transferencia") {
+    const partes = [
+      pg.transferNumero && `Nº ${pg.transferNumero}`,
+      pg.transferBanco,
+      pg.transferTitular,
+    ].filter(Boolean);
+    return partes.length ? partes.join(" · ") : null;
+  }
+  if (pg.via === "deposito") {
+    const partes: string[] = [];
+    if (pg.depositoCuenta) partes.push(`Cuenta ${pg.depositoCuenta}`);
+    if (pg.depositoTitular) partes.push(pg.depositoTitular);
+    const bil = pg.arqueoDeposito ? totalArqueo(pg.arqueoDeposito) : 0;
+    if (bil > 0) partes.push(`billetes ${formatARS(bil)}`);
+    return partes.length ? partes.join(" · ") : null;
+  }
+  return null;
+}
+
+const VIA_PAGO_LABELS: Record<string, string> = {
+  deposito: "Depósito bancario",
+  transferencia: "Transferencia",
+  agencia: "Agencia de pagos",
+  banco: "Banco",
+  financiera: "Financiera",
+  efectivo: "Efectivo",
+};
 
 interface Props {
   proveedores: Proveedor[];
@@ -17,6 +48,8 @@ interface Props {
   readOnly?: boolean;
   onDeletePurchase?: (id: string) => void;
   onDeletePayment?: (id: string) => void;
+  onEditPayment?: (p: SupplierPayment) => void;
+  onDeleteProveedor?: (id: string) => void;
 }
 
 export default function CuentaCorrienteView({
@@ -26,6 +59,8 @@ export default function CuentaCorrienteView({
   readOnly = false,
   onDeletePurchase,
   onDeletePayment,
+  onEditPayment,
+  onDeleteProveedor,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const total = deudaGlobal(purchases, payments);
@@ -63,36 +98,49 @@ export default function CuentaCorrienteView({
                 key={prov.id}
                 className="overflow-hidden rounded-xl border border-brand-border bg-surface"
               >
-                <button
-                  onClick={() => setOpenId(open ? null : prov.id)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-primary-light/30"
-                >
-                  <div>
-                    <p className="font-semibold text-brand-dark">
-                      {prov.nombre}
-                    </p>
-                    {prov.cuit && (
-                      <p className="text-[11px] text-brand-dark/55">
-                        CUIT {prov.cuit}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-right">
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <button
+                    onClick={() => setOpenId(open ? null : prov.id)}
+                    className="flex flex-1 items-center justify-between gap-3 text-left"
+                  >
                     <div>
-                      <p className="text-[10px] uppercase text-brand-dark/45">
-                        Deuda
+                      <p className="font-semibold text-brand-dark">
+                        {prov.nombre}
                       </p>
-                      <p
-                        className={`font-bold ${
-                          deuda > 0 ? "text-rose-700" : "text-emerald-700"
-                        }`}
-                      >
-                        {deuda > 0 ? formatARS(deuda) : "Al día"}
-                      </p>
+                      {prov.cuit && (
+                        <p className="text-[11px] text-brand-dark/55">
+                          CUIT {prov.cuit}
+                        </p>
+                      )}
                     </div>
-                    <span className="text-brand-dark/40">{open ? "▲" : "▼"}</span>
-                  </div>
-                </button>
+                    <div className="flex items-center gap-4 text-right">
+                      <div>
+                        <p className="text-[10px] uppercase text-brand-dark/45">
+                          Deuda
+                        </p>
+                        <p
+                          className={`font-bold ${
+                            deuda > 0 ? "text-rose-700" : "text-emerald-700"
+                          }`}
+                        >
+                          {deuda > 0 ? formatARS(deuda) : "Al día"}
+                        </p>
+                      </div>
+                      <span className="text-brand-dark/40">
+                        {open ? "▲" : "▼"}
+                      </span>
+                    </div>
+                  </button>
+                  {!readOnly && onDeleteProveedor && (
+                    <button
+                      onClick={() => onDeleteProveedor(prov.id)}
+                      title="Eliminar proveedor"
+                      className="rounded-full px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-50"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
 
                 {open && (
                   <div className="border-t border-brand-border bg-slate-50/60 p-4">
@@ -113,7 +161,7 @@ export default function CuentaCorrienteView({
                       </p>
                     ) : (
                       <div className="mb-3 overflow-x-auto rounded-lg border border-brand-border bg-surface">
-                        <table className="w-full text-xs">
+                        <table className="w-full min-w-[520px] text-xs">
                           <thead className="bg-primary-light/40 text-[10px] uppercase text-primary">
                             <tr>
                               <th className="px-2 py-1.5 text-left">Modalidad</th>
@@ -184,7 +232,7 @@ export default function CuentaCorrienteView({
                       </p>
                     ) : (
                       <div className="overflow-x-auto rounded-lg border border-brand-border bg-surface">
-                        <table className="w-full text-xs">
+                        <table className="w-full min-w-[520px] text-xs">
                           <thead className="bg-emerald-50 text-[10px] uppercase text-emerald-800">
                             <tr>
                               <th className="px-2 py-1.5 text-left">Fecha</th>
@@ -213,13 +261,35 @@ export default function CuentaCorrienteView({
                                       : "A cuenta"}
                                   </td>
                                   <td className="px-2 py-1.5 text-brand-dark/60">
-                                    {pg.formaPago ?? "—"}
+                                    {VIA_PAGO_LABELS[pg.via ?? ""] ??
+                                      pg.via ??
+                                      pg.formaPago ??
+                                      "—"}
+                                    {pg.comisionMonto ? (
+                                      <span className="ml-1 text-[10px] text-amber-700">
+                                        (+{formatARS(pg.comisionMonto)} com.)
+                                      </span>
+                                    ) : null}
+                                    {detallePago(pg) && (
+                                      <span className="block text-[10px] text-brand-dark/45">
+                                        {detallePago(pg)}
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="px-2 py-1.5 text-right font-semibold text-emerald-700">
                                     {formatARS(pg.monto)}
                                   </td>
                                   {!readOnly && (
-                                    <td className="px-2 py-1.5 text-center">
+                                    <td className="whitespace-nowrap px-2 py-1.5 text-center">
+                                      {onEditPayment && (
+                                        <button
+                                          onClick={() => onEditPayment(pg)}
+                                          className="mr-1 text-primary hover:opacity-70"
+                                          title="Editar pago"
+                                        >
+                                          ✎
+                                        </button>
+                                      )}
                                       <button
                                         onClick={() => onDeletePayment?.(pg.id)}
                                         className="text-rose-600 hover:opacity-70"

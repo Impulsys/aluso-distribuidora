@@ -1,15 +1,17 @@
 import {
   collection,
   doc,
+  addDoc,
   getDocs,
   onSnapshot,
   setDoc,
   updateDoc,
+  increment,
   query,
   limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { AppUser, Order, OrderStatus, Product, Role } from "./types";
+import type { AppUser, Marca, Order, OrderStatus, Product, Role } from "./types";
 
 // ==================== USUARIOS ====================
 export async function getAllUsers(): Promise<AppUser[]> {
@@ -32,8 +34,7 @@ export async function updateOrderStatus(
 }
 
 // ==================== PRODUCTOS (overrides públicos) ====================
-// Solo guardamos los campos editables que pueden ser PÚBLICOS — el resto
-// (id, ean, marca, nombre, descripcion, imagen, categoria) viene del seed.
+// Campos editables (públicos) que se guardan como override sobre el seed.
 // IMPORTANTE: precioCosto NO va acá — va en productCosts/ (admin-only).
 export type ProductOverride = Partial<
   Pick<
@@ -43,6 +44,11 @@ export type ProductOverride = Partial<
     | "activo"
     | "destacado"
     | "precioOferta"
+    | "descripcion"
+    | "nombre"
+    | "imagen"
+    | "categoria"
+    | "marca"
   >
 >;
 
@@ -64,6 +70,56 @@ export function subscribeProductOverrides(
     });
     cb(map);
   });
+}
+
+// ==================== ALTA DE PRODUCTOS NUEVOS ====================
+// Los productos del seed viven en código; los NUEVOS viven enteros en
+// Firestore (products/{id}). useProducts mezcla ambos.
+export interface NewProductInput {
+  nombre: string;
+  marca: Marca;
+  ean?: string;
+  categoria?: string;
+  precioVenta?: number;
+  descripcion?: string;
+  imagen?: string;
+  stock?: number;
+}
+
+export async function createProduct(input: NewProductInput): Promise<string> {
+  const data = {
+    nombre: input.nombre,
+    marca: input.marca,
+    ean: input.ean || undefined,
+    categoria: input.categoria || "General",
+    precioVenta: input.precioVenta ?? 0,
+    descripcion: input.descripcion || "",
+    imagen:
+      input.imagen ||
+      "https://placehold.co/600x600/006081/ffffff?text=Producto",
+    stock: input.stock ?? 0,
+    activo: true,
+  };
+  // Quitar undefined (Firestore los rechaza)
+  const clean = Object.fromEntries(
+    Object.entries(data).filter(([, v]) => v !== undefined)
+  );
+  if (input.ean) {
+    // id = EAN para escaneo directo
+    await setDoc(doc(db, "products", input.ean), clean, { merge: true });
+    return input.ean;
+  }
+  const ref = await addDoc(collection(db, "products"), clean);
+  return ref.id;
+}
+
+/** Suma (o resta) unidades al stock de un producto de forma atómica. */
+export async function incrementStock(id: string, delta: number): Promise<void> {
+  await setDoc(
+    doc(db, "products", id),
+    { stock: increment(delta) },
+    { merge: true }
+  );
 }
 
 // ==================== PRODUCT COSTS (admin-only) ====================

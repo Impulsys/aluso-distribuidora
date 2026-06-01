@@ -9,7 +9,7 @@ import {
   subscribeChecks,
   updateCheckStatus,
 } from "@/lib/cashflow";
-import { formatARS, formatDate, daysBetween } from "@/lib/format";
+import { formatARS, formatDate, daysBetween, tsFromISO } from "@/lib/format";
 import type { Check, CheckStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: CheckStatus[] = ["pendiente", "pagado", "rechazado"];
@@ -70,8 +70,8 @@ export default function AdminChequesPage() {
         numero: numero.trim(),
         banco: banco.trim(),
         monto: Number(monto),
-        fechaEmision: new Date(fechaEmision).getTime(),
-        fechaPago: new Date(fechaPago).getTime(),
+        fechaEmision: tsFromISO(fechaEmision),
+        fechaPago: tsFromISO(fechaPago),
         beneficiario: beneficiario.trim(),
         notas: notas.trim() || undefined,
       });

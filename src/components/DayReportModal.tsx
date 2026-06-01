@@ -10,24 +10,21 @@ import {
   subscribeReportesConfig,
   type ReportesConfig,
 } from "@/lib/config";
-import {
-  dayKey,
-  setCashInitial,
-  subscribeCashInitialRange,
-} from "@/lib/cash-initial";
+import { subscribeCierre } from "@/lib/caja";
+import type { DailyCashInitial } from "@/lib/cash-initial";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
   type ExpenseType,
-  type Order,
+  type Remito,
   type Truck,
 } from "@/lib/types";
 
 interface Props {
   dayTs: number | null; // EOD del día seleccionado (null = cerrado)
   onClose: () => void;
-  orders: Order[];
   trucks: Truck[];
+  remitos: Remito[];
 }
 
 function dayBounds(ts: number) {
@@ -60,38 +57,31 @@ const EXPENSE_TYPES: ExpenseType[] = [
 export default function DayReportModal({
   dayTs,
   onClose,
-  orders,
   trucks,
+  remitos,
 }: Props) {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<DailyExpense[]>([]);
   const [loadingExp, setLoadingExp] = useState(false);
   const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
-  const [cajaInicial, setCajaInicialState] = useState(0);
-  const [editingCaja, setEditingCaja] = useState(false);
-  const [cajaInput, setCajaInput] = useState("");
+  const [cierre, setCierre] = useState<DailyCashInitial | null>(null);
 
   useEffect(() => {
     const unsub = subscribeReportesConfig(setConfig);
     return unsub;
   }, []);
 
-  // Subscribirse a la caja inicial del día
+  // Cierre de caja del día (solo lectura; el cierre se hace en Ventas → Caja)
   useEffect(() => {
-    if (dayTs === null) return;
-    const d = new Date(dayTs);
-    d.setHours(0, 0, 0, 0);
-    const start = d.getTime();
-    const end = start + 86_400_000;
-    const unsub = subscribeCashInitialRange(start, end, (map) => {
-      const k = dayKey(dayTs);
-      const v = map[k] ?? 0;
-      setCajaInicialState(v);
-      if (!editingCaja) setCajaInput(String(v));
-    });
+    if (dayTs === null) {
+      setCierre(null);
+      return;
+    }
+    const unsub = subscribeCierre(dayTs, setCierre);
     return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayTs]);
+
+  const cajaInicial = cierre?.cajaInicial ?? 0;
 
   // ¿El que mira es superadmin? Si sí, no aplicamos los toggles
   const isSuperadmin = user?.role === "superadmin";
@@ -137,25 +127,26 @@ export default function DayReportModal({
     if (dayTs === null) return null;
     const { start, end, date } = dayBounds(dayTs);
     const truck = findTruckForDay(trucks, start);
-    const dayOrders = orders.filter(
-      (o) =>
-        o.createdAt >= start &&
-        o.createdAt <= end &&
-        o.status !== "cancelado"
+
+    // La VENTA del día = remitos no anulados (fuente única de verdad)
+    const dayRemitos = remitos.filter(
+      (r) => r.fecha >= start && r.fecha <= end && !r.anulado
     );
-    const totalVentas = dayOrders.reduce((s, o) => s + (o.total || 0), 0);
-    // Ingresos cobrados en efectivo del día (usamos formaPago si vino,
-    // si no asumimos efectivo por defecto)
-    const ingresosEfectivo = dayOrders.reduce((s, o) => {
-      const fp = o.formaPago ?? "efectivo";
-      return fp === "efectivo" ? s + (o.total || 0) : s;
-    }, 0);
+    const ventaRemitos = dayRemitos.reduce((s, r) => s + r.total, 0);
+    const costoRemitos = dayRemitos.reduce(
+      (s, r) =>
+        s + r.items.reduce((a, it) => a + it.cantidad * it.costoUnitario, 0),
+      0
+    );
+    const gananciaRemitos = ventaRemitos - costoRemitos;
+
+    // Detalle de productos vendidos (agrupado) desde los remitos
     const itemsMap = new Map<
       string,
       { nombre: string; cantidad: number; total: number }
     >();
-    dayOrders.forEach((o) =>
-      o.items.forEach((it) => {
+    dayRemitos.forEach((r) =>
+      r.items.forEach((it) => {
         const cur = itemsMap.get(it.productId);
         if (cur) {
           cur.cantidad += it.cantidad;
@@ -182,31 +173,28 @@ export default function DayReportModal({
     });
     const totalGastos = expenses.reduce((s, g) => s + g.monto, 0);
 
-    // === Caja Fidel del día ===
-    // Definición del cliente (confirmada):
-    //  - Caja Fidel = total ingresos / ventas del día
-    //  - Caja física = efectivo que queda = ingresos en efectivo - gastos en efectivo
-    //  - Banco = Caja Fidel - Caja física (lo restante se deposita)
-    // Como hoy todavía no capturamos formaPago en cada venta, asumimos
-    // 100% en efectivo para el cálculo de la caja física (estimado).
-    const cajaFidel = totalVentas;
-    // Caja física = efectivo que va quedando en mano
-    // = caja inicial + ingresos en efectivo del día − gastos pagados en efectivo
-    const cajaFisica = Math.max(
-      0,
-      cajaInicial + ingresosEfectivo - gastosEfectivo
-    );
-    // A depositar = caja física − caja inicial (lo que sobra del día sobre el efectivo de arranque)
+    // === Caja Fidel del día (sobre las ventas = remitos) ===
+    // Desglose por forma de pago (remitos viejos sin forma = efectivo).
+    const ventaEfectivo = dayRemitos
+      .filter((r) => (r.formaPago ?? "efectivo") === "efectivo")
+      .reduce((s, r) => s + r.total, 0);
+    const ventaTransferencia = dayRemitos
+      .filter((r) => r.formaPago === "transferencia")
+      .reduce((s, r) => s + r.total, 0);
+    const ventaCheque = dayRemitos
+      .filter((r) => r.formaPago === "cheque")
+      .reduce((s, r) => s + r.total, 0);
+    // Caja Fidel = total vendido; la caja física solo cuenta el EFECTIVO.
+    const cajaFidel = ventaRemitos;
+    const cajaFisica = Math.max(0, cajaInicial + ventaEfectivo - gastosEfectivo);
     const banco = Math.max(0, cajaFisica - cajaInicial);
     const gananciaEstimada =
       truck && truck.porcentajeGanancia
-        ? (totalVentas * truck.porcentajeGanancia) / 100
+        ? (ventaRemitos * truck.porcentajeGanancia) / 100
         : 0;
 
     return {
       truck,
-      dayOrders,
-      totalVentas,
       items,
       date,
       expenses,
@@ -217,8 +205,15 @@ export default function DayReportModal({
       cajaFisica,
       banco,
       gananciaEstimada,
+      dayRemitos,
+      ventaRemitos,
+      costoRemitos,
+      gananciaRemitos,
+      ventaEfectivo,
+      ventaTransferencia,
+      ventaCheque,
     };
-  }, [dayTs, orders, trucks, expenses]);
+  }, [dayTs, trucks, expenses, remitos, cajaInicial]);
 
   if (dayTs === null || !data) return null;
 
@@ -299,9 +294,9 @@ export default function DayReportModal({
             <h3 className="mb-2 font-serif text-lg text-brand-dark">
               Ventas del día
             </h3>
-            {data.dayOrders.length === 0 ? (
+            {data.dayRemitos.length === 0 ? (
               <p className="rounded-lg border border-brand-border bg-slate-50 p-3 text-sm text-brand-dark/55">
-                No hubo movimientos de venta registrados.
+                No hubo ventas (remitos) registradas este día.
               </p>
             ) : (
               <>
@@ -343,9 +338,9 @@ export default function DayReportModal({
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-brand-dark/45">
-                  {data.dayOrders.length} pedido
-                  {data.dayOrders.length === 1 ? "" : "s"} registrado
-                  {data.dayOrders.length === 1 ? "" : "s"} en la plataforma
+                  {data.dayRemitos.length} venta
+                  {data.dayRemitos.length === 1 ? "" : "s"} (remito
+                  {data.dayRemitos.length === 1 ? "" : "s"}) del día
                 </p>
               </>
             )}
@@ -398,61 +393,123 @@ export default function DayReportModal({
           </section>
           )}
 
-          {/* Caja Fidel — cierre del día */}
+          {/* Ganancia del día — desde los remitos (venta − costo) */}
+          {showGanancia && (
+            <section className="mt-4">
+              <h3 className="mb-2 font-serif text-lg text-brand-dark">
+                💰 Ganancia del día
+              </h3>
+              {data.dayRemitos.length === 0 ? (
+                <p className="rounded-lg border border-brand-border bg-slate-50 p-3 text-sm text-brand-dark/55">
+                  No hubo ventas (remitos) este día.
+                </p>
+              ) : (
+                <>
+                  <div className="overflow-hidden rounded-xl border border-brand-border bg-surface">
+                    <table className="w-full text-sm">
+                      <thead className="bg-primary-light/40 text-[11px] uppercase text-primary">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Venta</th>
+                          <th className="px-3 py-2 text-right">Importe</th>
+                          <th className="px-3 py-2 text-right">Costo</th>
+                          <th className="px-3 py-2 text-right">Ganancia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.dayRemitos.map((r) => {
+                          const costo = r.items.reduce(
+                            (a, it) => a + it.cantidad * it.costoUnitario,
+                            0
+                          );
+                          return (
+                            <tr
+                              key={r.id}
+                              className="border-t border-brand-border first:border-t-0"
+                            >
+                              <td className="px-3 py-2">
+                                {r.numero}
+                                {r.clienteNombre ? ` · ${r.clienteNombre}` : ""}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {formatARS(r.total)}
+                              </td>
+                              <td className="px-3 py-2 text-right text-rose-700">
+                                {formatARS(costo)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold text-emerald-700">
+                                {formatARS(r.total - costo)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2">
+                    <span className="text-sm font-medium text-emerald-900">
+                      Ganancia total del día
+                    </span>
+                    <span className="text-lg font-bold text-emerald-900">
+                      {formatARS(data.gananciaRemitos)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
+          {/* Cierre de caja — resumen de solo lectura (el cierre se hace en Caja) */}
           {showCajaFisica && (
           <section className="mt-4 rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary-light/40 to-surface p-4">
             <h3 className="mb-3 flex items-center gap-2 font-serif text-lg text-primary">
-              🏦 Cierre Caja Fidel
+              🏦 Cierre de caja
+              {cierre?.cerrado && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800">
+                  Cerrada
+                </span>
+              )}
             </h3>
             <div className="space-y-1.5 text-sm">
-              {/* Caja inicial editable por superadmin, readonly para socio */}
-              {isSuperadmin ? (
-                <div className="flex items-center justify-between">
-                  <span className="text-brand-dark/70">Caja inicial del día</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-brand-dark/50">$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={editingCaja ? cajaInput : cajaInicial || ""}
-                      onFocus={() => {
-                        setEditingCaja(true);
-                        setCajaInput(String(cajaInicial || ""));
-                      }}
-                      onChange={(e) => setCajaInput(e.target.value)}
-                      onBlur={async () => {
-                        const v = Number(cajaInput) || 0;
-                        if (v !== cajaInicial) {
-                          await setCashInitial(dayTs, v, user?.uid);
-                        }
-                        setEditingCaja(false);
-                      }}
-                      placeholder="0"
-                      className="w-28 rounded-md border border-brand-border bg-white px-2 py-1 text-right text-sm focus:border-primary outline-none"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <Row label="Caja inicial del día" value={cajaInicial} />
+              <Row label="Caja inicial del día" value={cajaInicial} />
+              <Row label="Ventas del día" value={data.cajaFidel} tone="emerald" />
+              {data.ventaEfectivo > 0 && (
+                <Row label="• Efectivo" value={data.ventaEfectivo} />
               )}
-              <Row label="Caja Fidel (ingresos)" value={data.cajaFidel} tone="emerald" />
+              {data.ventaTransferencia > 0 && (
+                <Row label="• Transferencia (banco)" value={data.ventaTransferencia} />
+              )}
+              {data.ventaCheque > 0 && (
+                <Row label="• Cheque (a cobrar)" value={data.ventaCheque} />
+              )}
               <Row label="Gastos en efectivo" value={-data.gastosEfectivo} tone="rose" />
               <div className="my-1 h-px bg-brand-border" />
-              <Row label="Caja física (efectivo en mano)" value={data.cajaFisica} bold />
-              <Row label="A depositar en banco" value={data.banco} bold tone="primary" />
-              {data.gananciaEstimada > 0 && (
-                <Row
-                  label={`Ganancia estimada (${data.truck?.porcentajeGanancia}%)`}
-                  value={data.gananciaEstimada}
-                  tone="emerald"
-                  bold
-                />
+              <Row label="Efectivo esperado en caja" value={data.cajaFisica} bold />
+              {cierre?.cerrado && (
+                <>
+                  <Row
+                    label="Efectivo contado (arqueo)"
+                    value={cierre.efectivoContado ?? 0}
+                    bold
+                  />
+                  <Row
+                    label="Diferencia"
+                    value={cierre.diferencia ?? 0}
+                    bold
+                    tone={
+                      (cierre.diferencia ?? 0) === 0
+                        ? undefined
+                        : (cierre.diferencia ?? 0) > 0
+                        ? "emerald"
+                        : "rose"
+                    }
+                  />
+                </>
               )}
             </div>
             <p className="mt-3 text-[10px] text-brand-dark/45">
-              * Caja física calculada con las ventas marcadas como efectivo
-              menos los gastos en efectivo del día.
+              {cierre?.cerrado ? "Caja cerrada. " : "Caja abierta. "}
+              El cierre con arqueo (contar billetes) se hace en{" "}
+              <b>Ventas → Caja</b>.
             </p>
           </section>
           )}

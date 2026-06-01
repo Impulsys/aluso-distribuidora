@@ -1,72 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
-  createTruck,
   deleteTruck,
   subscribeTrucks,
+  updateTruck,
   updateTruckCargo,
 } from "@/lib/trucks";
+import { incrementStock, setProductCost } from "@/lib/admin";
+import { subscribePurchases } from "@/lib/cuentas";
 import { formatARS, formatDate } from "@/lib/format";
+import { coincide } from "@/lib/search";
 import { useProducts } from "@/hooks/useProducts";
-import { useAuth } from "@/context/AuthContext";
 import {
-  subscribeProveedores,
-  seedProveedoresIfEmpty,
-  createPurchase,
-} from "@/lib/cuentas";
-import {
-  TRANSPORTES,
-  type Product,
-  type Proveedor,
+  MARCAS,
+  type Marca,
+  type Purchase,
   type Truck,
   type TruckCargoItem,
 } from "@/lib/types";
 
-const PRESET_COLORS = [
-  "#EF4444",
-  "#F97316",
-  "#EAB308",
-  "#10B981",
-  "#06B6D4",
-  "#3B82F6",
-  "#8B5CF6",
-  "#EC4899",
-  "#A16207",
-  "#475569",
-];
-
-function todayISO() {
-  const t = new Date();
-  t.setHours(0, 0, 0, 0);
-  return t.toISOString().slice(0, 10);
-}
-
 export default function AdminCamionesPage() {
-  const { user } = useAuth();
   const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Form
-  const [nombre, setNombre] = useState("");
-  const [color, setColor] = useState(PRESET_COLORS[5]);
-  const [fechaIngreso, setFechaIngreso] = useState(todayISO());
-  const [porcentaje, setPorcentaje] = useState(35);
-  const [costo, setCosto] = useState(0);
-  // proveedorSel = id del proveedor (Firestore) | "otro" | ""
-  const [proveedorSel, setProveedorSel] = useState<string>("");
-  const [proveedorOtro, setProveedorOtro] = useState("");
-  const [transporte, setTransporte] = useState<string>(TRANSPORTES[0]);
-  const [transporteOtro, setTransporteOtro] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  // Compra al proveedor (deuda)
-  const [numeroFactura, setNumeroFactura] = useState(""); // A (facturado)
-  const [montoFactura, setMontoFactura] = useState(0);
-  const [numeroRemito, setNumeroRemito] = useState(""); // B (sin facturar)
-  const [montoRemito, setMontoRemito] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeTrucks((t) => {
@@ -76,90 +34,18 @@ export default function AdminCamionesPage() {
     return unsub;
   }, []);
 
-  useEffect(() => {
-    seedProveedoresIfEmpty().catch(() => {});
-    const unsub = subscribeProveedores(setProveedores);
-    return unsub;
-  }, []);
+  useEffect(() => subscribePurchases(setPurchases), []);
 
-  const resetForm = () => {
-    setNombre("");
-    setDescripcion("");
-    setCosto(0);
-    setProveedorOtro("");
-    setTransporteOtro("");
-    setNumeroFactura("");
-    setMontoFactura(0);
-    setNumeroRemito("");
-    setMontoRemito(0);
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nombre.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const prov = proveedores.find((p) => p.id === proveedorSel);
-      const proveedorNombre =
-        proveedorSel === "otro" ? proveedorOtro.trim() : prov?.nombre ?? "";
-      const fechaTs = new Date(fechaIngreso).getTime();
-
-      const truckId = await createTruck({
-        nombre: nombre.trim(),
-        color,
-        fechaIngreso: fechaTs,
-        porcentajeGanancia: Number(porcentaje) || 0,
-        costoCamion: Number(costo) || 0,
-        // Guardamos el nombre para mostrar en la card; "otro" = texto libre.
-        proveedor: proveedorSel === "otro" ? "otro" : proveedorNombre,
-        proveedorOtro:
-          proveedorSel === "otro" ? proveedorOtro.trim() : undefined,
-        proveedorId: prov ? prov.id : undefined,
-        transporte,
-        transporteOtro:
-          transporte === "otro" ? transporteOtro.trim() : undefined,
-        descripcion: descripcion.trim(),
-        numeroFactura: numeroFactura.trim() || undefined,
-        numeroRemito: numeroRemito.trim() || undefined,
-      });
-
-      // Si hay proveedor real vinculado, generamos las compras (deudas).
-      if (prov) {
-        const base = {
-          proveedorId: prov.id,
-          proveedorNombre: prov.nombre,
-          fecha: fechaTs,
-          camionId: truckId,
-          camionNombre: nombre.trim(),
-          createdBy: user?.uid,
-        };
-        if (numeroFactura.trim() && Number(montoFactura) > 0) {
-          await createPurchase({
-            ...base,
-            modalidad: "A",
-            numero: numeroFactura.trim(),
-            monto: Number(montoFactura),
-          });
-        }
-        if (numeroRemito.trim() && Number(montoRemito) > 0) {
-          await createPurchase({
-            ...base,
-            modalidad: "B",
-            numero: numeroRemito.trim(),
-            monto: Number(montoRemito),
-          });
-        }
-      }
-
-      resetForm();
-    } catch (e) {
-      console.error(e);
-      setError("No se pudo crear el camión.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  // Valor declarado de mercadería por camión (de los comprobantes A/B).
+  const declaradoPorCamion = useMemo(() => {
+    const m: Record<string, { A: number; B: number }> = {};
+    purchases.forEach((p) => {
+      if (!p.camionId) return;
+      const slot = (m[p.camionId] ??= { A: 0, B: 0 });
+      slot[p.modalidad] += p.monto || 0;
+    });
+    return m;
+  }, [purchases]);
 
   const handleDelete = async (id: string, nombre: string) => {
     if (!confirm(`¿Eliminar el camión "${nombre}"?`)) return;
@@ -172,248 +58,22 @@ export default function AdminCamionesPage() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
-      {/* === Form crear camión === */}
-      <section className="rounded-2xl border border-brand-border bg-surface p-5">
-        <h2 className="font-serif text-xl text-brand-dark">Nuevo camión</h2>
-        <p className="mt-1 text-xs text-brand-dark/55">
-          Al crear este camión, el anterior se cierra automáticamente.
+    <div className="space-y-6">
+      {/* Los camiones se registran al cargar una compra en Cuentas Ctes */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-border bg-primary-light/30 p-4">
+        <p className="text-sm text-brand-dark/75">
+          🚚 Los camiones se registran al cargar una compra en{" "}
+          <span className="font-semibold">Cuentas Ctes</span> → “Llegó un
+          camión”. Acá ves la lista y editás la carga de cada uno.
         </p>
-        <form onSubmit={handleCreate} className="mt-4 grid gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-              Nombre
-            </span>
-            <input
-              required
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Camión #12"
-              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-          </label>
+        <Link
+          href="/admin/cuentas"
+          className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+        >
+          Ir a registrar un camión →
+        </Link>
+      </div>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-              Color de referencia
-            </span>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-10 w-12 cursor-pointer rounded-lg border border-brand-border"
-              />
-              <div className="flex flex-wrap gap-1.5">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    className={`h-7 w-7 rounded-full ring-2 transition ${
-                      color === c
-                        ? "ring-brand-dark scale-110"
-                        : "ring-transparent hover:ring-brand-dark/30"
-                    }`}
-                    style={{ background: c }}
-                    aria-label={`Color ${c}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </label>
-
-          {/* Proveedor dropdown (de la cuenta corriente) */}
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-              Proveedor
-            </span>
-            <select
-              value={proveedorSel}
-              onChange={(e) => setProveedorSel(e.target.value)}
-              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-            >
-              <option value="">— Sin proveedor —</option>
-              {proveedores.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-              <option value="otro">Otro… (sin cuenta corriente)</option>
-            </select>
-            {proveedorSel === "otro" && (
-              <input
-                value={proveedorOtro}
-                onChange={(e) => setProveedorOtro(e.target.value)}
-                placeholder="Nombre del proveedor"
-                className="mt-2 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-            )}
-            <p className="mt-1 text-[10px] text-brand-dark/45">
-              Los proveedores se administran en{" "}
-              <span className="font-medium">Cuentas Ctes</span>. Si elegís uno,
-              las compras de abajo se cargan a su cuenta.
-            </p>
-          </label>
-
-          {/* Compra al proveedor (genera deuda en la cuenta corriente) */}
-          {proveedorSel && proveedorSel !== "otro" && (
-            <div className="rounded-lg border border-brand-border bg-primary-light/20 p-3">
-              <p className="mb-2 text-xs font-semibold text-brand-dark">
-                Compra al proveedor (deuda)
-              </p>
-              <div className="grid grid-cols-[1fr_120px] gap-2">
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                    Nº Factura (A · facturado)
-                  </span>
-                  <input
-                    value={numeroFactura}
-                    onChange={(e) => setNumeroFactura(e.target.value)}
-                    placeholder="0001-00001234"
-                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                    Monto
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    value={montoFactura || ""}
-                    onChange={(e) => setMontoFactura(Number(e.target.value))}
-                    placeholder="0"
-                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                    Nº Remito (B · sin facturar)
-                  </span>
-                  <input
-                    value={numeroRemito}
-                    onChange={(e) => setNumeroRemito(e.target.value)}
-                    placeholder="R-0001"
-                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                    Monto
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    value={montoRemito || ""}
-                    onChange={(e) => setMontoRemito(Number(e.target.value))}
-                    placeholder="0"
-                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-                  />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Transporte dropdown */}
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-              Transporte
-            </span>
-            <select
-              value={transporte}
-              onChange={(e) => setTransporte(e.target.value)}
-              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-            >
-              {TRANSPORTES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-              <option value="otro">Otro…</option>
-            </select>
-            {transporte === "otro" && (
-              <input
-                value={transporteOtro}
-                onChange={(e) => setTransporteOtro(e.target.value)}
-                placeholder="Nombre del transportista"
-                className="mt-2 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-            )}
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-              Fecha de ingreso
-            </span>
-            <input
-              required
-              type="date"
-              value={fechaIngreso}
-              onChange={(e) => setFechaIngreso(e.target.value)}
-              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-                % Ganancia
-              </span>
-              <input
-                type="number"
-                min={0}
-                step={1}
-                value={porcentaje}
-                onChange={(e) => setPorcentaje(Number(e.target.value))}
-                className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-                Costo (ARS)
-              </span>
-              <input
-                type="number"
-                min={0}
-                step={1000}
-                value={costo}
-                onChange={(e) => setCosto(Number(e.target.value))}
-                className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
-              />
-            </label>
-          </div>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-brand-dark/70">
-              Descripción (opcional)
-            </span>
-            <textarea
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              rows={2}
-              placeholder="Notas adicionales del camión"
-              className="w-full resize-none rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-          </label>
-
-          {error && (
-            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
-          >
-            {busy ? "Creando…" : "Crear camión"}
-          </button>
-        </form>
-      </section>
 
       {/* === Lista === */}
       <section>
@@ -424,7 +84,8 @@ export default function AdminCamionesPage() {
           <p className="text-brand-dark/60">Cargando…</p>
         ) : trucks.length === 0 ? (
           <div className="rounded-2xl border border-brand-border bg-surface p-8 text-center text-brand-dark/60">
-            Todavía no hay camiones. Creá el primero en el formulario.
+            Todavía no hay camiones. Registrá el primero desde Cuentas Ctes →
+            “Llegó un camión”.
           </div>
         ) : (
           <div className="space-y-3">
@@ -432,6 +93,7 @@ export default function AdminCamionesPage() {
               <TruckCard
                 key={t.id}
                 truck={t}
+                declarado={declaradoPorCamion[t.id] ?? { A: 0, B: 0 }}
                 onDelete={() => handleDelete(t.id, t.nombre)}
               />
             ))}
@@ -445,13 +107,30 @@ export default function AdminCamionesPage() {
 // ====== CARD DEL CAMIÓN (con expander de carga) ======
 function TruckCard({
   truck,
+  declarado,
   onDelete,
 }: {
   truck: Truck;
+  declarado: { A: number; B: number };
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pct, setPct] = useState(truck.porcentajeGanancia);
+  const [savingPct, setSavingPct] = useState(false);
   const activo = !truck.fechaCierre;
+
+  const guardarPct = async (v: number) => {
+    if (v === truck.porcentajeGanancia) return;
+    setSavingPct(true);
+    try {
+      await updateTruck(truck.id, { porcentajeGanancia: v });
+    } catch {
+      alert("No se pudo actualizar el % de ganancia.");
+      setPct(truck.porcentajeGanancia);
+    } finally {
+      setSavingPct(false);
+    }
+  };
   const proveedorLabel =
     truck.proveedor === "otro"
       ? truck.proveedorOtro || "(sin nombre)"
@@ -497,12 +176,22 @@ function TruckCard({
           </div>
         </div>
         <div className="text-right text-sm">
-          <p className="font-semibold text-primary">
-            {truck.porcentajeGanancia}% ganancia
-          </p>
-          {truck.costoCamion && truck.costoCamion > 0 && (
-            <p className="text-xs text-brand-dark/55">
-              Costo: {formatARS(truck.costoCamion)}
+          <label className="flex items-center justify-end gap-1 text-primary">
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={pct}
+              disabled={savingPct}
+              onChange={(e) => setPct(Number(e.target.value))}
+              onBlur={() => guardarPct(Number(pct) || 0)}
+              className="w-14 rounded border border-brand-border bg-white px-1.5 py-0.5 text-right text-sm font-semibold outline-none focus:border-primary disabled:opacity-60"
+            />
+            <span className="font-semibold">% ganancia</span>
+          </label>
+          {(truck.costoCamion ?? 0) > 0 && (
+            <p className="mt-0.5 text-xs text-brand-dark/55">
+              Logística: {formatARS(truck.costoCamion ?? 0)}
             </p>
           )}
         </div>
@@ -545,45 +234,132 @@ function TruckCard({
         </div>
       </div>
 
-      {open && <CargoEditor truck={truck} />}
+      {open && <CargoEditor truck={truck} declarado={declarado} />}
     </article>
   );
 }
 
-// ====== EDITOR DE CARGA (productos del catálogo + costo + precio óptimo) ======
-function CargoEditor({ truck }: { truck: Truck }) {
+// ====== EDITOR DE CARGA — lista del catálogo con cantidad + costo por fila ======
+function CargoEditor({
+  truck,
+  declarado,
+}: {
+  truck: Truck;
+  declarado: { A: number; B: number };
+}) {
   const productos = useProducts();
-  const [items, setItems] = useState<TruckCargoItem[]>(truck.carga ?? []);
 
-  // Form state
-  const [productId, setProductId] = useState("");
+  type Row = { cantidad: number; costo: number; descripcion?: string };
+  const [draft, setDraft] = useState<Record<string, Row>>(() => {
+    const m: Record<string, Row> = {};
+    (truck.carga ?? []).forEach((c) => {
+      m[c.productId] = {
+        cantidad: c.cantidadUnidades,
+        costo: c.costoUnitario ?? 0,
+        descripcion: c.descripcion,
+      };
+    });
+    return m;
+  });
+  // Cantidades ya guardadas (para sumar al stock SOLO la diferencia al re-guardar).
+  const [savedQty, setSavedQty] = useState<Record<string, number>>(() => {
+    const m: Record<string, number> = {};
+    (truck.carga ?? []).forEach((c) => {
+      m[c.productId] = c.cantidadUnidades;
+    });
+    return m;
+  });
   const [busqueda, setBusqueda] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [cantidad, setCantidad] = useState(0);
-  const [costo, setCosto] = useState(0);
-  const [precioVentaOptimo, setPrecioVentaOptimo] = useState(0);
+  const [marca, setMarca] = useState<"todos" | Marca>("todos");
+  const [soloCargados, setSoloCargados] = useState(false);
+  const [verCargados, setVerCargados] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  // Productos del catálogo filtrados por búsqueda
-  const productosFiltrados = useMemo<Product[]>(() => {
-    if (!busqueda.trim()) return productos.slice(0, 30);
-    const t = busqueda.toLowerCase();
+  const filtrados = useMemo(() => {
+    const t = busqueda.trim();
     return productos
-      .filter(
-        (p: Product) =>
-          p.nombre.toLowerCase().includes(t) ||
-          (p.ean ?? "").includes(t)
+      .filter((p) => (marca === "todos" ? true : p.marca === marca))
+      .filter((p) => (soloCargados ? (draft[p.id]?.cantidad ?? 0) > 0 : true))
+      .filter((p) =>
+        !t ? true : coincide(p.nombre, t) || (p.ean ?? "").includes(t)
       )
-      .slice(0, 30);
-  }, [productos, busqueda]);
+      .sort((a, b) => {
+        // Los productos con cantidad cargada van primero (no se pierden de vista).
+        const la = (draft[a.id]?.cantidad ?? 0) > 0 ? 1 : 0;
+        const lb = (draft[b.id]?.cantidad ?? 0) > 0 ? 1 : 0;
+        return lb - la;
+      });
+  }, [productos, marca, busqueda, soloCargados, draft]);
 
-  const productoSeleccionado = productos.find((p) => p.id === productId);
+  const setRow = (id: string, patch: Partial<Row>) => {
+    setDraft((d) => {
+      const prev = d[id] ?? { cantidad: 0, costo: 0 };
+      return { ...d, [id]: { ...prev, ...patch } };
+    });
+    setDirty(true);
+  };
 
-  const save = async (next: TruckCargoItem[]) => {
+  // Detalle de lo cargado (con nombre de producto) para el panel "Ver cargados".
+  const cargados = useMemo(
+    () =>
+      Object.entries(draft)
+        .filter(([, v]) => v.cantidad > 0)
+        .map(([id, v]) => ({
+          id,
+          nombre: productos.find((p) => p.id === id)?.nombre ?? id,
+          marca: productos.find((p) => p.id === id)?.marca,
+          cantidad: v.cantidad,
+          costo: v.costo,
+        }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [draft, productos]
+  );
+  const totalUnidades = cargados.reduce((s, v) => s + v.cantidad, 0);
+  const totalCosto = cargados.reduce((s, v) => s + v.cantidad * (v.costo || 0), 0);
+
+  const guardar = async () => {
     setBusy(true);
     try {
+      const next: TruckCargoItem[] = Object.entries(draft)
+        .filter(([, v]) => v.cantidad > 0 && v.costo > 0)
+        .map(([id, v]) => {
+          const p = productos.find((x) => x.id === id);
+          const item: TruckCargoItem = {
+            productId: id,
+            producto: p?.nombre ?? "",
+            cantidadUnidades: v.cantidad,
+            costoUnitario: v.costo,
+            precioVentaOptimo: 0,
+          };
+          // Firestore rechaza undefined → solo incluimos descripción si tiene texto.
+          const desc = v.descripcion?.trim();
+          if (desc) item.descripcion = desc;
+          return item;
+        });
+
+      // 1) Guardar la carga del camión (alimenta el reporte por camión).
       await updateTruckCargo(truck.id, next);
-      setItems(next);
+
+      // 2) Actualizar STOCK por la diferencia vs lo ya guardado (no duplica al
+      //    re-guardar; si bajás la cantidad, descuenta) + actualizar COSTO.
+      const ids = new Set<string>([
+        ...Object.keys(savedQty),
+        ...next.map((i) => i.productId),
+      ]);
+      const nextMap: Record<string, number> = {};
+      next.forEach((i) => (nextMap[i.productId] = i.cantidadUnidades));
+      for (const id of ids) {
+        const nuevo = nextMap[id] ?? 0;
+        const anterior = savedQty[id] ?? 0;
+        const delta = nuevo - anterior;
+        if (delta !== 0) await incrementStock(id, delta);
+        const costo = draft[id]?.costo ?? 0;
+        if (nuevo > 0 && costo > 0) await setProductCost(id, costo);
+      }
+
+      setSavedQty(nextMap);
+      setDirty(false);
     } catch (e) {
       console.error(e);
       alert("No se pudo guardar la carga.");
@@ -592,223 +368,285 @@ function CargoEditor({ truck }: { truck: Truck }) {
     }
   };
 
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!productoSeleccionado || cantidad <= 0 || costo <= 0) return;
-    const next: TruckCargoItem[] = [
-      ...items,
-      {
-        productId: productoSeleccionado.id,
-        producto: productoSeleccionado.nombre,
-        descripcion: descripcion.trim() || undefined,
-        cantidadUnidades: Number(cantidad),
-        costoUnitario: Number(costo),
-        precioVentaOptimo: Number(precioVentaOptimo) || 0,
-      },
-    ];
-    await save(next);
-    // limpiar
-    setProductId("");
-    setBusqueda("");
-    setDescripcion("");
-    setCantidad(0);
-    setCosto(0);
-    setPrecioVentaOptimo(0);
-  };
+  const MARCA_TABS: ("todos" | Marca)[] = [
+    "todos",
+    "doncella",
+    "nonisec",
+    "lenterdit",
+  ];
 
-  const remove = async (idx: number) => {
-    await save(items.filter((_, i) => i !== idx));
-  };
-
-  // Totales del cargo
-  const totalUnidades = items.reduce((s, it) => s + it.cantidadUnidades, 0);
-  const totalCosto = items.reduce(
-    (s, it) => s + it.cantidadUnidades * (it.costoUnitario ?? 0),
-    0
-  );
-  const totalVentaOptima = items.reduce(
-    (s, it) => s + it.cantidadUnidades * (it.precioVentaOptimo ?? 0),
-    0
-  );
+  const totalDeclarado = declarado.A + declarado.B;
+  const diferencia = totalDeclarado - totalCosto; // >0 falta cargar · <0 cargaste de más
 
   return (
     <div className="border-t border-brand-border bg-primary-light/20 p-4">
-      <p className="mb-3 text-[11px] text-brand-dark/60">
-        💡 Seleccioná un producto del catálogo. El precio óptimo es{" "}
-        <b>solo informativo</b> — no modifica el catálogo automáticamente. El
-        precio público lo actualizás desde <code>/admin/productos</code> día a día.
-      </p>
-
-      {/* Lista actual */}
-      {items.length > 0 ? (
-        <div className="mb-3 overflow-x-auto rounded-lg border border-brand-border bg-surface">
-          <table className="w-full text-xs">
-            <thead className="bg-primary-light/50 text-[10px] uppercase text-primary">
-              <tr>
-                <th className="px-2 py-1.5 text-left">Producto</th>
-                <th className="px-2 py-1.5 text-right">Cant.</th>
-                <th className="px-2 py-1.5 text-right">Costo u.</th>
-                <th className="px-2 py-1.5 text-right">Venta ópt.</th>
-                <th className="px-2 py-1.5 text-right">Total costo</th>
-                <th className="w-8"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it, i) => (
-                <tr key={i} className="border-t border-brand-border first:border-t-0">
-                  <td className="px-2 py-1.5">
-                    <p className="font-medium text-brand-dark">{it.producto}</p>
-                    {it.descripcion && (
-                      <p className="text-[10px] text-brand-dark/55">
-                        {it.descripcion}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-semibold">
-                    {it.cantidadUnidades}
-                  </td>
-                  <td className="px-2 py-1.5 text-right">
-                    {formatARS(it.costoUnitario ?? 0)}
-                  </td>
-                  <td className="px-2 py-1.5 text-right">
-                    {it.precioVentaOptimo
-                      ? formatARS(it.precioVentaOptimo)
-                      : "—"}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-semibold text-rose-700">
-                    {formatARS(it.cantidadUnidades * (it.costoUnitario ?? 0))}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    <button
-                      onClick={() => remove(i)}
-                      className="text-rose-600 hover:opacity-70"
-                      title="Quitar"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              <tr className="border-t-2 border-brand-border bg-primary-light/30 font-bold">
-                <td className="px-2 py-1.5 text-brand-dark">Totales</td>
-                <td className="px-2 py-1.5 text-right">{totalUnidades}</td>
-                <td className="px-2 py-1.5 text-right text-rose-700">—</td>
-                <td className="px-2 py-1.5 text-right text-emerald-700">
-                  {totalVentaOptima > 0 ? formatARS(totalVentaOptima) : "—"}
-                </td>
-                <td className="px-2 py-1.5 text-right text-rose-700">
-                  {formatARS(totalCosto)}
-                </td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
+      {/* Valor declarado de la mercadería (comprobantes A/B) vs lo cargado */}
+      <div className="mb-3 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-brand-border bg-brand-border sm:grid-cols-4">
+        <div className="bg-surface px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+            Declarado A (facturado)
+          </p>
+          <p className="font-serif text-base text-brand-dark">
+            {declarado.A > 0 ? formatARS(declarado.A) : "—"}
+          </p>
         </div>
-      ) : (
-        <p className="mb-3 text-xs text-brand-dark/55">
-          Todavía no agregaste productos a la carga.
-        </p>
+        <div className="bg-surface px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+            Declarado B (sin facturar)
+          </p>
+          <p className="font-serif text-base text-brand-dark">
+            {declarado.B > 0 ? formatARS(declarado.B) : "—"}
+          </p>
+        </div>
+        <div className="bg-surface px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+            Total declarado
+          </p>
+          <p className="font-serif text-base font-semibold text-brand-dark">
+            {totalDeclarado > 0 ? formatARS(totalDeclarado) : "—"}
+          </p>
+        </div>
+        <div className="bg-surface px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+            Cargado / Diferencia
+          </p>
+          <p className="font-serif text-base font-semibold text-rose-700">
+            {formatARS(totalCosto)}
+          </p>
+          {totalDeclarado > 0 && (
+            <p
+              className={`text-[10px] font-medium ${
+                diferencia === 0
+                  ? "text-emerald-700"
+                  : diferencia > 0
+                  ? "text-amber-700"
+                  : "text-rose-700"
+              }`}
+            >
+              {diferencia === 0
+                ? "✓ Coincide con lo declarado"
+                : diferencia > 0
+                ? `Falta cargar ${formatARS(diferencia)}`
+                : `Cargaste ${formatARS(-diferencia)} de más`}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Controles: buscador + filtro por marca + solo cargados */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre o código de barras…"
+          className="min-w-[200px] flex-1 rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+        <div className="flex flex-wrap gap-1">
+          {MARCA_TABS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMarca(m)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                marca === m
+                  ? "bg-primary text-white"
+                  : "bg-white text-brand-dark/70 ring-1 ring-brand-border hover:bg-primary-light/40"
+              }`}
+            >
+              {m === "todos" ? "Todas" : MARCAS[m]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setSoloCargados((s) => !s)}
+          className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            soloCargados
+              ? "bg-emerald-600 text-white"
+              : "bg-white text-brand-dark/70 ring-1 ring-brand-border hover:bg-emerald-50"
+          }`}
+        >
+          {soloCargados ? "Ver todos" : `Solo cargados (${cargados.length})`}
+        </button>
+      </div>
+
+      {/* Resumen + guardar */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-border bg-surface px-3 py-2 text-xs">
+        <button
+          type="button"
+          onClick={() => setVerCargados((v) => !v)}
+          className="flex items-center gap-1 text-left text-brand-dark/70 hover:text-brand-dark"
+          title="Ver el detalle de lo cargado"
+        >
+          <span className="text-brand-dark/45">{verCargados ? "▲" : "▼"}</span>
+          <span>
+            <b className="text-brand-dark">{cargados.length}</b> producto
+            {cargados.length === 1 ? "" : "s"} ·{" "}
+            <b className="text-brand-dark">{totalUnidades}</b> unidades · costo{" "}
+            <b className="text-rose-700">{formatARS(totalCosto)}</b>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={busy || !dirty}
+          className="rounded-lg bg-primary px-4 py-1.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
+        >
+          {busy ? "Guardando…" : dirty ? "Guardar carga" : "Guardado ✓"}
+        </button>
+      </div>
+
+      {/* Panel: lo que está cargado en el camión */}
+      {verCargados && (
+        <div className="mb-3 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/40">
+          {cargados.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-brand-dark/55">
+              Todavía no cargaste productos. Poné cantidad y costo en la lista de
+              abajo.
+            </p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="bg-emerald-100/70 text-[10px] uppercase text-emerald-800">
+                <tr>
+                  <th className="px-2 py-1.5 text-left">Producto cargado</th>
+                  <th className="w-[70px] px-2 py-1.5 text-right">Cant.</th>
+                  <th className="w-[100px] px-2 py-1.5 text-right">Costo u.</th>
+                  <th className="w-[110px] px-2 py-1.5 text-right">Total</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {cargados.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="border-t border-emerald-200/60 first:border-t-0"
+                  >
+                    <td className="px-2 py-1.5">
+                      {c.marca && (
+                        <span className="mr-1 rounded bg-slate-100 px-1 text-[9px] font-bold uppercase text-slate-600">
+                          {c.marca}
+                        </span>
+                      )}
+                      {c.nombre}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-semibold">
+                      {c.cantidad}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {formatARS(c.costo)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-semibold text-rose-700">
+                      {formatARS(c.cantidad * c.costo)}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setRow(c.id, { cantidad: 0 })}
+                        className="text-rose-600 hover:opacity-70"
+                        title="Quitar de la carga"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
-      {/* Form de agregar */}
-      <form onSubmit={add} className="space-y-2">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {/* Búsqueda + Selector producto */}
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-              Producto del catálogo
-            </label>
-            <input
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por nombre o EAN…"
-              className="mb-1 w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
-            />
-            <select
-              required
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
-            >
-              <option value="">— Seleccionar producto —</option>
-              {productosFiltrados.map((p) => (
-                <option key={p.id} value={p.id}>
-                  [{p.marca}] {p.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Lista del catálogo */}
+      <div className="max-h-[420px] overflow-auto rounded-lg border border-brand-border bg-surface">
+        <table className="w-full min-w-[480px] text-xs">
+          <thead className="sticky top-0 bg-primary-light/60 text-[10px] uppercase text-primary">
+            <tr>
+              <th className="px-2 py-2 text-left">Producto</th>
+              <th className="w-[70px] px-2 py-2 text-right">Stock</th>
+              <th className="w-[90px] px-2 py-2 text-right">Cantidad</th>
+              <th className="w-[120px] px-2 py-2 text-right">Costo u. (ARS)</th>
+              <th className="w-[90px] px-2 py-2 text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtrados.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-2 py-6 text-center text-brand-dark/45"
+                >
+                  Sin resultados.
+                </td>
+              </tr>
+            ) : (
+              filtrados.map((p) => {
+                const row = draft[p.id] ?? { cantidad: 0, costo: 0 };
+                const enc = row.cantidad > 0;
+                return (
+                  <tr
+                    key={p.id}
+                    className={`border-t border-brand-border/50 ${
+                      enc ? "bg-emerald-50/60" : ""
+                    }`}
+                  >
+                    <td className="px-2 py-1.5">
+                      <p className="line-clamp-1 text-brand-dark">
+                        <span className="mr-1 rounded bg-slate-100 px-1 text-[9px] font-bold uppercase text-slate-600">
+                          {p.marca}
+                        </span>
+                        {p.nombre}
+                      </p>
+                    </td>
+                    <td className="px-2 py-1.5 text-right text-brand-dark/60">
+                      {p.stock ?? 0}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        step={1}
+                        value={row.cantidad || ""}
+                        placeholder="0"
+                        onChange={(e) =>
+                          setRow(p.id, { cantidad: Number(e.target.value) })
+                        }
+                        className="w-full rounded border border-brand-border bg-white px-1.5 py-1 text-right outline-none focus:border-primary"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        step="any"
+                        value={row.costo || ""}
+                        placeholder="0"
+                        onChange={(e) =>
+                          setRow(p.id, { costo: Number(e.target.value) })
+                        }
+                        className="w-full rounded border border-rose-200 bg-white px-1.5 py-1 text-right outline-none focus:border-rose-400"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-semibold text-rose-700">
+                      {enc && row.costo > 0
+                        ? formatARS(row.cantidad * row.costo)
+                        : "—"}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-              Descripción / variante (opcional)
-            </label>
-            <input
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="ej: Lote junio, talle G, …"
-              className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[100px_140px_140px_auto]">
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-              Cantidad
-            </label>
-            <input
-              required
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              value={cantidad || ""}
-              onChange={(e) => setCantidad(Number(e.target.value))}
-              placeholder="50"
-              className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-rose-700">
-              Costo por unidad (ARS)
-            </label>
-            <input
-              required
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              value={costo || ""}
-              onChange={(e) => setCosto(Number(e.target.value))}
-              placeholder="1000"
-              className="w-full rounded-lg border border-rose-300 bg-white px-2 py-1.5 text-xs"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-              Venta óptima (ARS)
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              value={precioVentaOptimo || ""}
-              onChange={(e) => setPrecioVentaOptimo(Number(e.target.value))}
-              placeholder="1500"
-              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-xs"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={busy || !productId || cantidad <= 0 || costo <= 0}
-            className="self-end rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
-          >
-            {busy ? "…" : "+ Agregar al cargo"}
-          </button>
-        </div>
-      </form>
+      <p className="mt-2 text-[11px] text-brand-dark/55">
+        Poné cantidad y costo a los productos que trae el camión y tocá{" "}
+        <b>Guardar carga</b>: se <b>suma al stock</b> y se actualiza el{" "}
+        <b>costo</b> de cada producto. El precio de venta al público se maneja
+        aparte en <code>/admin/productos</code>.
+      </p>
     </div>
   );
 }

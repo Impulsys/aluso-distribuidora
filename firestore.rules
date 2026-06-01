@@ -39,9 +39,12 @@ service cloud.firestore {
         && request.auth.uid == uid
         && request.resource.data.role == 'cliente';
 
-      // El propio usuario puede actualizar datos básicos PERO no su rol.
+      // El propio usuario puede actualizar SOLO datos básicos (no su rol ni
+      // campos arbitrarios): lista blanca de campos editables.
       allow update: if isSignedIn() && request.auth.uid == uid
-        && request.resource.data.role == resource.data.role;
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['displayName', 'photoURL', 'email']);
 
       // Solo superadmin asigna/cambia roles y administra usuarios.
       allow write: if isSuperadmin();
@@ -64,7 +67,10 @@ service cloud.firestore {
 
     // ===== orders ===== (pedidos web/vendedor)
     match /orders/{id} {
-      allow create: if isSignedIn();
+      // El que crea el pedido debe ser el dueño (createdBy) y el total un número.
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.total is number;
       allow read, update, delete: if isVendedorOrUp();
     }
 
@@ -77,6 +83,9 @@ service cloud.firestore {
     match /proveedores/{id}      { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /purchases/{id}        { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /supplierPayments/{id} { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    // Ventas: remitos (descuentan stock) y facturas
+    match /remitos/{id}          { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /facturas/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /config/{id}         { allow read: if isSignedIn();   allow write: if isSuperadmin(); }
 
     // Todo lo demás: denegado.

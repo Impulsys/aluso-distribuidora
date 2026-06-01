@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
   },
+  // En Windows el caché de disco de webpack se corrompe (ENOENT rename .pack.gz)
+  // y el dev server termina sirviendo versiones viejas. Lo desactivamos SOLO en
+  // desarrollo para que los cambios se reflejen siempre.
+  webpack: (config, { dev }) => {
+    if (dev) config.cache = false;
+    return config;
+  },
 };
 
 export default nextConfig;

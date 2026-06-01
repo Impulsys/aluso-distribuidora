@@ -13,13 +13,28 @@ export default function PWARegister() {
   const [dismissed, setDismissed] = useState(false);
   const [installed, setInstalled] = useState(false);
 
-  // Registrar el service worker en montaje
+  // Service worker: SOLO en producción. En desarrollo lo desregistramos y
+  // limpiamos la caché, porque si no sirve versiones viejas de los archivos
+  // (era la causa de ver pantallas "viejas" pese a recargar).
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker
-      .register("/sw.js")
-      .catch((e) => console.warn("SW register fail:", e));
+    if (process.env.NODE_ENV === "production") {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .catch((e) => console.warn("SW register fail:", e));
+    } else {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => regs.forEach((r) => r.unregister()))
+        .catch(() => {});
+      if ("caches" in window) {
+        caches
+          .keys()
+          .then((keys) => keys.forEach((k) => caches.delete(k)))
+          .catch(() => {});
+      }
+    }
   }, []);
 
   // Capturar el evento "instalable"

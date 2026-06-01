@@ -21,13 +21,16 @@ import {
   subscribeSupplierPayments,
   deudaGlobal,
 } from "@/lib/cuentas";
+import { useProducts } from "@/hooks/useProducts";
+import { subscribeProductCosts } from "@/lib/admin";
+import { subscribeRemitos } from "@/lib/ventas";
 import MonthCalendar from "@/components/MonthCalendar";
 import DayReportModal from "@/components/DayReportModal";
 import { formatARS } from "@/lib/format";
 import type {
   DailyExpense,
-  Order,
   Purchase,
+  Remito,
   SupplierPayment,
   Truck,
 } from "@/lib/types";
@@ -51,11 +54,13 @@ export default function ReportesPage() {
   const { user } = useAuth();
   const [year, setYear] = useState(new Date().getFullYear());
   const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<DailyExpense[]>([]);
   const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
+  const [costs, setCosts] = useState<Record<string, number>>({});
+  const [remitos, setRemitos] = useState<Remito[]>([]);
+  const productos = useProducts();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dayOpen, setDayOpen] = useState<number | null>(null);
@@ -66,45 +71,57 @@ export default function ReportesPage() {
     const u2 = subscribeReportesConfig(setConfig);
     const u3 = subscribePurchases(setPurchases);
     const u4 = subscribeSupplierPayments(setSupplierPayments);
+    const u5 = subscribeProductCosts(setCosts);
+    const u6 = subscribeRemitos(setRemitos);
     return () => {
       u1();
       u2();
       u3();
       u4();
+      u5();
+      u6();
     };
   }, []);
 
   const deudaProveedores = deudaGlobal(purchases, supplierPayments);
+  const patrimonioStock = productos.reduce(
+    (s, p) => s + (p.stock || 0) * (costs[p.id] ?? 0),
+    0
+  );
+  const { ventaHoy, gananciaHoy } = useMemo(() => {
+    const start = new Date().setHours(0, 0, 0, 0);
+    const end = start + 86_400_000;
+    const hoy = remitos.filter(
+      (r) => r.fecha >= start && r.fecha < end && !r.anulado
+    );
+    const venta = hoy.reduce((s, r) => s + r.total, 0);
+    const ganancia = hoy.reduce(
+      (s, r) =>
+        s +
+        r.items.reduce(
+          (a, it) => a + (it.precioVenta - it.costoUnitario) * it.cantidad,
+          0
+        ),
+      0
+    );
+    return { ventaHoy: venta, gananciaHoy: ganancia };
+  }, [remitos]);
 
-  // Fetch pedidos + gastos del año
+  // Fetch de gastos del año (las ventas vienen de remitos en tiempo real)
   useEffect(() => {
     const startTs = new Date(year, 0, 1).getTime();
     const endTs = new Date(year + 1, 0, 1).getTime();
     setLoading(true);
-    Promise.all([
-      getDocs(
-        query(
-          collection(db, "orders"),
-          where("createdAt", ">=", startTs),
-          where("createdAt", "<", endTs)
-        )
-      ),
-      getDocs(
-        query(
-          collection(db, "expenses"),
-          where("fecha", ">=", startTs),
-          where("fecha", "<", endTs)
-        )
-      ),
-    ])
-      .then(([oSnap, eSnap]) => {
-        setOrders(
-          oSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Order))
-        );
+    getDocs(
+      query(
+        collection(db, "expenses"),
+        where("fecha", ">=", startTs),
+        where("fecha", "<", endTs)
+      )
+    )
+      .then((eSnap) => {
         setExpenses(
-          eSnap.docs.map(
-            (d) => ({ id: d.id, ...d.data() } as DailyExpense)
-          )
+          eSnap.docs.map((d) => ({ id: d.id, ...d.data() } as DailyExpense))
         );
         setError(null);
       })
@@ -128,36 +145,45 @@ export default function ReportesPage() {
 
   // ====== TOTALES — año completo + mes actual ======
   const totales = useMemo(() => {
-    const ventas = orders
-      .filter((o) => o.status !== "cancelado")
-      .reduce((s, o) => s + (o.total || 0), 0);
+    const yStart = new Date(year, 0, 1).getTime();
+    const yEnd = new Date(year + 1, 0, 1).getTime();
+    // La venta = remito (fuente única). Los pedidos quedan como solicitudes.
+    const remitosAnio = remitos.filter(
+      (r) => r.fecha >= yStart && r.fecha < yEnd && !r.anulado
+    );
+    const ventas = remitosAnio.reduce((s, r) => s + r.total, 0);
     const gastos = expenses.reduce((s, e) => s + (e.monto || 0), 0);
     const margen = ventas - gastos;
 
-    // Mes actual (si estamos viendo el año actual; sino, último mes con datos)
+    // Mes actual (si estamos viendo el año actual; sino, último mes)
     const now = new Date();
     const isCurrentYear = year === now.getFullYear();
     const mes = isCurrentYear ? now.getMonth() : 11;
     const mStart = new Date(year, mes, 1).getTime();
     const mEnd = new Date(year, mes + 1, 1).getTime();
-    const ventasMes = orders
-      .filter(
-        (o) =>
-          o.status !== "cancelado" &&
-          o.createdAt >= mStart &&
-          o.createdAt < mEnd
-      )
-      .reduce((s, o) => s + (o.total || 0), 0);
+    const ventasMes = remitosAnio
+      .filter((r) => r.fecha >= mStart && r.fecha < mEnd)
+      .reduce((s, r) => s + r.total, 0);
     const gastosMes = expenses
       .filter((e) => e.fecha >= mStart && e.fecha < mEnd)
       .reduce((s, e) => s + (e.monto || 0), 0);
     const margenMes = ventasMes - gastosMes;
-    return { ventas, gastos, margen, ventasMes, gastosMes, margenMes, mes };
-  }, [orders, expenses, year]);
+    return {
+      ventas,
+      gastos,
+      margen,
+      ventasMes,
+      gastosMes,
+      margenMes,
+      mes,
+      cantVentas: remitosAnio.length,
+    };
+  }, [remitos, expenses, year]);
 
-  // Respeta config para socios: ocultar gastos/margen si superadmin lo bloqueó
+  // Respeta config para socios: ocultar info sensible si superadmin lo bloqueó
   const isSuperadmin = user?.role === "superadmin";
   const showGastos = isSuperadmin || config.mostrarGastosASocios;
+  const showGanancia = isSuperadmin || config.mostrarGananciaASocios;
 
   return (
     <div>
@@ -166,6 +192,75 @@ export default function ReportesPage() {
       </p>
 
       {/* ============ TOTALES DEL AÑO + DEL MES ============ */}
+      {/* Recuadros principales (lo más importante, arriba) — 2×2 en el teléfono */}
+      <section className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* Venta del día */}
+        <div className="flex flex-col gap-1 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-surface p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+            Venta del día
+          </p>
+          <p className="font-serif text-2xl font-bold text-sky-700">
+            {ventaHoy > 0 ? formatARS(ventaHoy) : "—"}
+          </p>
+          <Link
+            href="/reportes/ventas"
+            className="mt-auto rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-primary-dark"
+          >
+            Ver caja →
+          </Link>
+        </div>
+
+        {/* Ganancia del día (sensible → según toggle de socios) */}
+        {showGanancia && (
+          <div className="flex flex-col gap-1 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-surface p-4 shadow-sm">
+            <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+              Ganancia del día
+            </p>
+            <p className="font-serif text-2xl font-bold text-emerald-700">
+              {gananciaHoy > 0 ? formatARS(gananciaHoy) : "—"}
+            </p>
+            <Link
+              href="/reportes/ventas"
+              className="mt-auto rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-primary-dark"
+            >
+              Ver detalle →
+            </Link>
+          </div>
+        )}
+
+        {/* Deuda a proveedores */}
+        <div className="flex flex-col gap-1 rounded-2xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-surface p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+            Deuda a proveedores
+          </p>
+          <p className="font-serif text-2xl font-bold text-rose-700">
+            {deudaProveedores > 0 ? formatARS(deudaProveedores) : "Al día"}
+          </p>
+          <Link
+            href="/reportes/cuentas"
+            className="mt-auto rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-primary-dark"
+          >
+            Ver cuentas →
+          </Link>
+        </div>
+
+        {/* Patrimonio en stock (sensible → según toggle de socios) */}
+        {showGanancia && (
+          <div className="flex flex-col gap-1 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-surface p-4 shadow-sm">
+            <p className="text-[10px] uppercase tracking-wider text-brand-dark/55">
+              Patrimonio en stock
+            </p>
+            <p className="font-serif text-2xl font-bold text-emerald-700">
+              {patrimonioStock > 0 ? formatARS(patrimonioStock) : "—"}
+            </p>
+            <p className="mt-auto text-[10px] text-brand-dark/45">
+              Mercadería en depósito (stock × costo).
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Totales del año (Ventas / Gastos) — debajo de los recuadros del día */}
       {!loading && (
         <section className="mb-6">
           <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -173,13 +268,13 @@ export default function ReportesPage() {
               Totales {year}
             </h2>
             <span className="text-xs text-brand-dark/55">
-              {orders.filter((o) => o.status !== "cancelado").length} pedidos ·{" "}
+              {totales.cantVentas} venta{totales.cantVentas === 1 ? "" : "s"} ·{" "}
               {expenses.length} gastos
             </span>
           </div>
           <div
             className={`grid gap-3 ${
-              showGastos ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1"
+              showGastos ? "grid-cols-2" : "grid-cols-1"
             }`}
           >
             <KpiCard
@@ -199,37 +294,9 @@ export default function ReportesPage() {
                 isNegative
               />
             )}
-            {showGastos && (
-              <KpiCard
-                label="Margen del año"
-                value={totales.margen}
-                hint={`Mes en curso: ${formatARS(totales.margenMes)}`}
-                tone={totales.margen >= 0 ? "primary" : "rose"}
-              />
-            )}
           </div>
         </section>
       )}
-
-      {/* Deuda a proveedores (cuentas corrientes) */}
-      <section className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-surface p-5 shadow-sm">
-          <div>
-            <p className="text-[11px] uppercase tracking-wider text-brand-dark/55">
-              Deuda a proveedores
-            </p>
-            <p className="mt-1 font-serif text-3xl font-medium text-rose-700">
-              {deudaProveedores > 0 ? formatARS(deudaProveedores) : "Al día"}
-            </p>
-          </div>
-          <Link
-            href="/reportes/cuentas"
-            className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-primary-dark"
-          >
-            Ver cuentas corrientes →
-          </Link>
-        </div>
-      </section>
 
       {/* Navegación de año + leyenda */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -307,7 +374,7 @@ export default function ReportesPage() {
               year={year}
               month={m}
               trucks={trucks}
-              orders={orders}
+              remitos={remitos}
               onDayClick={(ts) => setDayOpen(ts)}
             />
           ))}
@@ -317,8 +384,8 @@ export default function ReportesPage() {
       <DayReportModal
         dayTs={dayOpen}
         onClose={() => setDayOpen(null)}
-        orders={orders}
         trucks={trucks}
+        remitos={remitos}
       />
     </div>
   );

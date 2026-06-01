@@ -65,7 +65,61 @@ export interface Order {
   notas?: string;
   formaPago?: FormaPago; // efectivo / cheque / transferencia
   truckId?: string; // asignación al camión activo del día
+  remitoId?: string; // si ya se generó el remito de este pedido
   createdAt: number;
+}
+
+// ===== Ventas: Remito (descuenta stock) y Factura (no toca stock) =====
+
+export interface RemitoItem {
+  productId: string;
+  nombre: string;
+  cantidad: number;
+  precioVenta: number; // ARS por unidad al momento de la venta
+  costoUnitario: number; // ARS por unidad (snapshot para COGS)
+}
+
+export interface Remito {
+  id: string;
+  numero: string; // nº de guía, ej "R-000001"
+  orderId?: string; // pedido del que se generó
+  origin?: OrderOrigin;
+  clienteNombre?: string;
+  clienteCuit?: string;
+  formaPago?: FormaPago; // efectivo / transferencia / cheque
+  items: RemitoItem[];
+  total: number; // total de venta
+  facturaId?: string; // si ya se facturó
+  anulado?: boolean; // venta anulada (devolvió stock); no cuenta en reportes/caja
+  anuladoPor?: string;
+  anuladoAt?: number;
+  createdBy?: string;
+  createdAt: number;
+  fecha: number; // fecha de la venta (timestamp)
+}
+
+export type TipoFactura = "A" | "B" | "C";
+
+export interface Factura {
+  id: string;
+  remitoId: string;
+  remitoNumero: string;
+  tipo: TipoFactura;
+  consumidorFinal: boolean;
+  cuit?: string;
+  razonSocial?: string;
+  items: RemitoItem[]; // snapshot
+  neto: number;
+  iva: number;
+  total: number;
+  // AFIP (etapa B): se completan al emitir
+  numero?: string; // nº de comprobante AFIP
+  cae?: string | null;
+  caeVto?: number | null;
+  estado: "interna" | "emitida";
+  createdBy?: string;
+  createdAt: number;
+  fecha: number;
 }
 
 // ===== Módulo Reportes — operación por CAMIÓN =====
@@ -112,6 +166,19 @@ export interface Purchase {
   createdAt: number;
 }
 
+// Operativa del pago a proveedor:
+//  - deposito: depósito bancario en efectivo (con detalle opcional de billetes)
+//  - transferencia: transferencia desde mi cuenta
+//  - agencia: vía agencia de pagos (cobra una comisión % sobre el importe)
+//  - banco/financiera/efectivo: valores antiguos usados por la Caja (CajaView)
+export type PagoVia =
+  | "deposito"
+  | "transferencia"
+  | "agencia"
+  | "banco"
+  | "financiera"
+  | "efectivo";
+
 export interface SupplierPayment {
   id: string;
   proveedorId: string;
@@ -119,6 +186,19 @@ export interface SupplierPayment {
   fecha: number;
   formaPago?: FormaPago;
   purchaseId?: string; // imputado a una compra puntual; ausente = pago general a cuenta
+  modalidad?: PurchaseModalidad; // A (facturado) / B (sin facturar) — a qué deuda va
+  via?: PagoVia;
+  comisionPct?: number; // % que cobra la agencia/financiera
+  comisionMonto?: number; // monto * comisionPct / 100
+  arqueoDeposito?: Record<string, number>; // billetes físicos enviados (denominación → cantidad)
+  // Datos de la transferencia (cuando via = "transferencia")
+  transferNumero?: string; // nº/comprobante de la transferencia
+  transferBanco?: string; // banco emisor
+  transferTitular?: string; // titular de la cuenta que transfiere (puede ser un cliente)
+  // Datos del depósito bancario (cuando via = "deposito")
+  depositoCuenta?: string; // nº de cuenta o CBU destino
+  depositoTitular?: string; // titular de la cuenta donde se deposita
+  desdeCaja?: boolean; // registrado desde la Caja del día (egreso de caja)
   notas?: string;
   createdBy?: string;
   createdAt: number;
@@ -150,7 +230,8 @@ export type ExpenseType =
   | "sueldos"
   | "fletes"
   | "cobertura_cheques"
-  | "adelantos";
+  | "adelantos"
+  | "comision_agencia";
 
 export const EXPENSE_LABELS: Record<ExpenseType, string> = {
   impuestos: "Impuestos",
@@ -160,6 +241,7 @@ export const EXPENSE_LABELS: Record<ExpenseType, string> = {
   fletes: "Fletes",
   cobertura_cheques: "Cobertura de cheques",
   adelantos: "Adelantos de sueldo",
+  comision_agencia: "Comisión agencia de pagos",
 };
 
 export interface TruckExpense {
@@ -198,7 +280,8 @@ export interface Truck {
   proveedorId?: string; // vínculo al proveedor de la cuenta corriente (si aplica)
   numeroRemito?: string; // nº de remito del proveedor/transporte (compra B, sin facturar)
   numeroFactura?: string; // nº de factura del proveedor/transporte (compra A, facturado)
-  costoCamion?: number; // cuánto salió el camión
+  costoCamion?: number; // gastos de LOGÍSTICA del camión (flete/descarga); se descuenta en la ganancia real
+  logisticaDetalle?: string; // nota de qué incluye la logística (ej: "flete Mafe + descarga")
   porcentajeGanancia: number; // %
   carga?: TruckCargoItem[];
   ventas?: TruckSale[];

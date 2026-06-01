@@ -91,6 +91,17 @@ export default function AdminUsuariosPage() {
   };
 
   const handleRole = async (uid: string, role: Role) => {
+    const target = users.find((u) => u.uid === uid);
+    // Blindaje: no dejar el sistema sin ningún superadmin.
+    if (target?.role === "superadmin" && role !== "superadmin") {
+      const superadmins = users.filter((u) => u.role === "superadmin").length;
+      if (superadmins <= 1) {
+        alert(
+          "No podés quitar el último superadmin: el sistema quedaría sin administrador. Asigná superadmin a otro usuario primero."
+        );
+        return;
+      }
+    }
     if (uid === me?.uid && role !== "superadmin") {
       if (
         !confirm(

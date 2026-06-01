@@ -12,6 +12,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { createPurchase } from "./cuentas";
 import type { Truck } from "./types";
 
 export type NewTruckInput = Pick<
@@ -23,6 +24,7 @@ export type NewTruckInput = Pick<
       Truck,
       | "descripcion"
       | "costoCamion"
+      | "logisticaDetalle"
       | "proveedor"
       | "proveedorOtro"
       | "proveedorId"
@@ -81,6 +83,91 @@ export async function createTruck(input: NewTruckInput): Promise<string> {
     stripUndefined({ ...input, createdAt: Date.now() })
   );
   return ref.id;
+}
+
+export interface RecibirCamionInput {
+  // Datos del camión
+  nombre: string;
+  color: string;
+  fechaIngreso: number;
+  porcentajeGanancia: number;
+  transporte?: string;
+  transporteOtro?: string;
+  descripcion?: string;
+  // Proveedor (OBLIGATORIO — toda compra corresponde a un camión)
+  proveedorId: string;
+  proveedorNombre: string;
+  // Comprobantes — al menos UNO con monto > 0
+  facturaA?: { numero: string; monto: number }; // modalidad A (facturado)
+  remitoB?: { numero: string; monto: number }; // modalidad B (sin facturar)
+  // Logística (opcional): gasto del camión que baja la ganancia real
+  logistica?: number;
+  logisticaDetalle?: string;
+  createdBy?: string;
+}
+
+/**
+ * "Llegó un camión": punto de entrada único. Crea el camión (cerrando el activo
+ * previo) y genera la(s) compra(s)/deuda(s) al proveedor (A y/o B), enlazadas al
+ * camión por camionId. La logística se guarda como costoCamion (se descuenta en
+ * la ganancia real del reporte). Reutiliza createTruck + createPurchase.
+ */
+export async function recibirCamion(
+  input: RecibirCamionInput
+): Promise<string> {
+  if (!input.proveedorId || !input.proveedorNombre) {
+    throw new TruckValidationError("Elegí un proveedor para el camión.");
+  }
+  const tieneA = !!input.facturaA && input.facturaA.monto > 0;
+  const tieneB = !!input.remitoB && input.remitoB.monto > 0;
+  if (!tieneA && !tieneB) {
+    throw new TruckValidationError(
+      "Cargá al menos un comprobante (Factura A o Remito B) con su monto."
+    );
+  }
+
+  const truckId = await createTruck({
+    nombre: input.nombre,
+    color: input.color,
+    fechaIngreso: input.fechaIngreso,
+    porcentajeGanancia: input.porcentajeGanancia,
+    transporte: input.transporte,
+    transporteOtro: input.transporteOtro,
+    descripcion: input.descripcion,
+    proveedor: input.proveedorNombre,
+    proveedorId: input.proveedorId,
+    costoCamion: input.logistica && input.logistica > 0 ? input.logistica : undefined,
+    logisticaDetalle: input.logisticaDetalle?.trim() || undefined,
+    numeroFactura: tieneA ? input.facturaA!.numero : undefined,
+    numeroRemito: tieneB ? input.remitoB!.numero : undefined,
+  });
+
+  const base = {
+    proveedorId: input.proveedorId,
+    proveedorNombre: input.proveedorNombre,
+    fecha: input.fechaIngreso,
+    camionId: truckId,
+    camionNombre: input.nombre,
+    createdBy: input.createdBy,
+  };
+  if (tieneA) {
+    await createPurchase({
+      ...base,
+      modalidad: "A",
+      numero: input.facturaA!.numero,
+      monto: input.facturaA!.monto,
+    });
+  }
+  if (tieneB) {
+    await createPurchase({
+      ...base,
+      modalidad: "B",
+      numero: input.remitoB!.numero,
+      monto: input.remitoB!.monto,
+    });
+  }
+
+  return truckId;
 }
 
 export async function updateTruck(

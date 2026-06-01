@@ -18,6 +18,14 @@ export interface DailyCashInitial {
   cajaInicial: number;
   updatedBy?: string;
   updatedAt: number;
+  // Cierre de caja (arqueo) — se completan al cerrar el día
+  arqueo?: Record<string, number>; // denominación → cantidad de billetes
+  efectivoContado?: number;
+  efectivoEsperado?: number;
+  diferencia?: number;
+  cerrado?: boolean;
+  cerradoPor?: string;
+  cerradoAt?: number;
 }
 
 export function dayKey(dayTs: number): string {
@@ -46,6 +54,15 @@ export async function setCashInitial(
     },
     { merge: true }
   );
+}
+
+/** Todos los cierres/cajas (un doc por día) con su detalle completo. */
+export function subscribeCierres(
+  cb: (xs: DailyCashInitial[]) => void
+): () => void {
+  return onSnapshot(collection(db, "cashClosings"), (snap) => {
+    cb(snap.docs.map((d) => d.data() as DailyCashInitial));
+  });
 }
 
 export function subscribeCashInitialRange(

@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "📊 Resumen" },
-  { href: "/admin/pedidos", label: "🛒 Pedidos" },
+  { href: "/admin/pedidos", label: "🧾 Ventas" },
   { href: "/admin/productos", label: "📦 Productos" },
   { href: "/admin/camiones", label: "🚚 Camiones" },
-  { href: "/admin/gastos", label: "💸 Gastos" },
+  { href: "/admin/gastos", label: "💸 Egresos" },
   { href: "/admin/cheques", label: "🧾 Cheques" },
   { href: "/admin/cuentas", label: "💳 Cuentas Ctes" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },

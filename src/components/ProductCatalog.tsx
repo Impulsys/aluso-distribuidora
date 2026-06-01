@@ -7,12 +7,13 @@ import { useProducts } from "@/hooks/useProducts";
 import { formatARS } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 import { consultaProductoLink } from "@/lib/order";
+import { coincide } from "@/lib/search";
 import type { Marca, Product } from "@/lib/types";
 
 type MarcaFilter = "todos" | Marca;
 
 const MARCA_TABS: { id: MarcaFilter; label: string; subtitle: string }[] = [
-  { id: "todos",    label: "Todos",    subtitle: "82 productos" },
+  { id: "todos",    label: "Todos",    subtitle: "Todo el catálogo" },
   { id: "doncella", label: "Doncella", subtitle: "Femenina · bebé · algodón" },
   { id: "nonisec",  label: "Nonisec",  subtitle: "Incontinencia adulta" },
 ];
@@ -61,12 +62,9 @@ export default function ProductCatalog() {
         .filter((p) => (marca === "todos" ? true : p.marca === marca))
         .filter((p) => (cat === "Todas" ? true : p.categoria === cat))
         .filter((p) => {
-          if (!q.trim()) return true;
-          const t = q.toLowerCase();
-          return (
-            p.nombre.toLowerCase().includes(t) ||
-            p.descripcion.toLowerCase().includes(t)
-          );
+          const t = q.trim();
+          if (!t) return true;
+          return coincide(p.nombre, t) || coincide(p.descripcion, t);
         }),
     [marca, cat, q, all]
   );
