@@ -3,7 +3,12 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "@/hooks/useProducts";
-import { setProductOverride, setProductCost, subscribeProductCosts } from "@/lib/admin";
+import {
+  setProductOverride,
+  setProductCost,
+  subscribeProductCosts,
+  deleteProduct,
+} from "@/lib/admin";
 import { formatARS } from "@/lib/format";
 import { coincide } from "@/lib/search";
 import { MARCAS, type Marca, type Product } from "@/lib/types";
@@ -27,6 +32,21 @@ export default function AdminProductosPage() {
     const unsub = subscribeProductCosts(setCosts);
     return unsub;
   }, []);
+
+  const handleDelete = async (p: Product) => {
+    if (
+      !confirm(
+        `¿Eliminar "${p.nombre}"? Se quita del catálogo. (Podés volver a darlo de alta después.)`
+      )
+    )
+      return;
+    try {
+      await deleteProduct(p.id);
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo eliminar el producto.");
+    }
+  };
 
   const visible = useMemo(
     () =>
@@ -108,10 +128,11 @@ export default function AdminProductosPage() {
 
       {/* Tabla de productos */}
       <div className="overflow-hidden rounded-xl border border-brand-border bg-surface">
-        <div className="hidden grid-cols-[64px_minmax(0,1fr)_120px_110px_90px_70px_110px_70px_56px] gap-3 border-b border-brand-border bg-primary-light px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-primary md:grid">
+        <div className="hidden grid-cols-[64px_minmax(0,1fr)_110px_100px_100px_90px_64px_100px_64px_52px] gap-3 border-b border-brand-border bg-primary-light px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-primary md:grid">
           <span></span>
           <span>Producto</span>
           <span>Cód. barras</span>
+          <span>Cód. producto</span>
           <span className="text-right">P. venta</span>
           <span className="text-right">P. costo</span>
           <span className="text-right">Stock</span>
@@ -128,6 +149,7 @@ export default function AdminProductosPage() {
             destacadosCount={destacadosCount}
             editing={editing === p.id}
             onToggleEdit={() => setEditing(editing === p.id ? null : p.id)}
+            onDelete={() => handleDelete(p)}
           />
         ))}
 
@@ -159,12 +181,14 @@ function ProductRow({
   destacadosCount,
   editing,
   onToggleEdit,
+  onDelete,
 }: {
   p: Product;
   costo: number;
   destacadosCount: number;
   editing: boolean;
   onToggleEdit: () => void;
+  onDelete: () => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -188,7 +212,7 @@ function ProductRow({
   return (
     <div className="border-b border-brand-border last:border-b-0">
       {/* Fila lectura */}
-      <div className="grid grid-cols-[48px_1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[64px_minmax(0,1fr)_120px_110px_90px_70px_110px_70px_56px]">
+      <div className="grid grid-cols-[48px_1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[64px_minmax(0,1fr)_110px_100px_100px_90px_64px_100px_64px_52px]">
         <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-primary-light md:h-14 md:w-14">
           <Image
             src={p.imagen}
@@ -215,6 +239,9 @@ function ProductRow({
         </div>
         <span className="hidden font-mono text-xs text-brand-dark/55 md:block">
           {p.ean ?? "—"}
+        </span>
+        <span className="hidden font-mono text-xs text-brand-dark/70 md:block">
+          {p.codigo || "—"}
         </span>
         <span className="hidden text-right font-semibold text-primary md:block">
           {p.precioVenta > 0 ? formatARS(p.precioVenta) : "—"}
@@ -249,14 +276,21 @@ function ProductRow({
         <span className="hidden text-center md:block">
           {p.activo ? "✓" : "✗"}
         </span>
-        <button
-          onClick={onToggleEdit}
-          className="col-start-3 row-span-2 md:col-auto md:row-auto"
-        >
-          <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark">
+        <div className="col-start-3 row-span-2 flex items-center gap-1.5 md:col-auto md:row-auto">
+          <button
+            onClick={onToggleEdit}
+            className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
+          >
             {editing ? "Cerrar" : "Editar"}
-          </span>
-        </button>
+          </button>
+          <button
+            onClick={onDelete}
+            title="Eliminar producto"
+            className="grid h-7 w-7 place-items-center rounded-full text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-50"
+          >
+            🗑️
+          </button>
+        </div>
       </div>
 
       {/* Form de edición */}
@@ -289,6 +323,7 @@ function EditForm({
   onSave: (patch: Partial<Product> & { _costo?: number }) => Promise<void>;
 }) {
   const [nombre, setNombre] = useState(p.nombre);
+  const [codigo, setCodigo] = useState(p.codigo ?? "");
   const [imagen, setImagen] = useState(p.imagen);
   const [categoria, setCategoria] = useState(p.categoria);
   const [marca, setMarca] = useState<Marca>(p.marca);
@@ -337,6 +372,7 @@ function EditForm({
 
     onSave({
       nombre: nombre.trim(),
+      codigo: codigo.trim(),
       imagen: imagen.trim(),
       categoria: categoria.trim() || "General",
       marca,
@@ -365,6 +401,14 @@ function EditForm({
           />
         </Field>
       </div>
+      <Field label="Código de producto">
+        <input
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value)}
+          placeholder="Código interno / SKU"
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+      </Field>
       <Field label="Categoría">
         <input
           value={categoria}

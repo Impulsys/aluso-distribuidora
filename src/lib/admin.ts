@@ -49,6 +49,8 @@ export type ProductOverride = Partial<
     | "imagen"
     | "categoria"
     | "marca"
+    | "codigo"
+    | "eliminado"
   >
 >;
 
@@ -57,6 +59,18 @@ export async function setProductOverride(
   patch: ProductOverride
 ): Promise<void> {
   await setDoc(doc(db, "products", id), patch, { merge: true });
+}
+
+/**
+ * Borrado lógico de un producto (sirve para los del seed y para los nuevos):
+ * marca eliminado=true; useProducts lo oculta del catálogo y del admin.
+ */
+export async function deleteProduct(id: string): Promise<void> {
+  await setDoc(
+    doc(db, "products", id),
+    { eliminado: true, activo: false },
+    { merge: true }
+  );
 }
 
 // Suscripción en tiempo real al override público.

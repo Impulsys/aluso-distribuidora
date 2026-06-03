@@ -30,15 +30,16 @@ export function useProducts(): Product[] {
   }, []);
 
   return useMemo(() => {
-    // 1) Seed + override
+    // 1) Seed + override (oculta los marcados como eliminados)
     const fromSeed = PRODUCTOS_SEED.map((p) => {
       const o = overrides[p.id];
       return o ? { ...p, ...o } : p;
-    });
+    }).filter((p) => !p.eliminado);
 
     // 2) Productos nuevos (docs de Firestore que no están en el seed)
     const nuevos: Product[] = Object.entries(overrides)
       .filter(([id]) => !SEED_IDS.has(id))
+      .filter(([, d]) => !d.eliminado)
       .map(([id, d]) => ({
         id,
         ean: d.ean,

@@ -28,7 +28,8 @@ export const MARCAS: Record<Marca, string> = {
 
 export interface Product {
   id: string;
-  ean?: string;
+  ean?: string; // código de barras
+  codigo?: string; // código interno del producto (SKU), editable
   marca: Marca;
   nombre: string;
   descripcion: string;
@@ -40,6 +41,7 @@ export interface Product {
   activo: boolean;
   destacado?: boolean; // switch en Admin → aparece en el banner superior
   precioOferta?: number; // si > 0 y < precioVenta → muestra "OFERTA"
+  eliminado?: boolean; // borrado lógico desde Admin (se oculta del catálogo y del admin)
 }
 
 export interface CartItem {
