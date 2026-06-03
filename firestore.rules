@@ -86,7 +86,10 @@ service cloud.firestore {
     // Ventas: remitos (descuentan stock) y facturas
     match /remitos/{id}          { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /facturas/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /config/{id}         { allow read: if isSignedIn();   allow write: if isSuperadmin(); }
+    // Interruptor de servicio: lo lee toda la app (incluso sin login) para
+    // habilitar/bloquear; NADIE lo escribe desde la app (solo consola/admin SDK).
+    match /config/licencia     { allow read: if true;          allow write: if false; }
+    match /config/{id}         { allow read: if isSignedIn();   allow write: if isSuperadmin() && id != 'licencia'; }
 
     // Todo lo demás: denegado.
     match /{document=**} {
