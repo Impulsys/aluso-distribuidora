@@ -137,7 +137,7 @@ export default function AdminProductosPage() {
 
       {/* Tabla de productos */}
       <div className="overflow-hidden rounded-xl border border-brand-border bg-surface">
-        <div className="hidden grid-cols-[100px_minmax(0,1fr)_110px_100px_100px_90px_64px_100px_64px_52px] gap-3 border-b border-brand-border bg-primary-light px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-primary md:grid">
+        <div className="hidden grid-cols-[200px_minmax(0,1fr)_110px_100px_100px_90px_64px_100px_64px_52px] gap-3 border-b border-brand-border bg-primary-light px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-primary md:grid">
           <span></span>
           <span>Producto</span>
           <span>Cód. barras</span>
@@ -419,13 +419,13 @@ function ProductRow({
   return (
     <div className="border-b border-brand-border last:border-b-0">
       {/* Fila lectura */}
-      <div className="grid grid-cols-[80px_1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[100px_minmax(0,1fr)_110px_100px_100px_90px_64px_100px_64px_52px]">
-        <div className="relative h-20 w-20 overflow-hidden rounded-lg border border-brand-border bg-white md:h-24 md:w-24">
+      <div className="grid grid-cols-[160px_1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[200px_minmax(0,1fr)_110px_100px_100px_90px_64px_100px_64px_52px]">
+        <div className="relative h-40 w-40 overflow-hidden rounded-lg border border-brand-border bg-white md:h-48 md:w-48">
           <Image
             src={p.imagen}
             alt={p.nombre}
             fill
-            sizes="96px"
+            sizes="192px"
             className="object-contain p-1"
           />
         </div>

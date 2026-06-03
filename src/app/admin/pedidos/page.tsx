@@ -261,12 +261,12 @@ function NuevaVentaView() {
                     onClick={() => add(p.id)}
                     className="flex w-full items-center gap-3 border-b border-brand-border/60 px-3 py-2 text-left transition last:border-b-0 hover:bg-primary-light/40"
                   >
-                    <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
+                    <span className="relative h-40 w-40 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
                       <Image
                         src={p.imagen}
                         alt={p.nombre}
                         fill
-                        sizes="80px"
+                        sizes="160px"
                         className="object-contain p-1"
                       />
                     </span>
@@ -304,12 +304,12 @@ function NuevaVentaView() {
               return (
                 <div key={l.productId} className="px-5 py-3">
                   <div className="flex items-start gap-3">
-                    <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
+                    <span className="relative h-40 w-40 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
                       <Image
                         src={l.imagen || "https://placehold.co/600x600/006081/ffffff?text=Producto"}
                         alt={l.nombre}
                         fill
-                        sizes="80px"
+                        sizes="160px"
                         className="object-contain p-1"
                       />
                     </span>
