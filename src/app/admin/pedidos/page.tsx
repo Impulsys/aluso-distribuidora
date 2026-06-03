@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { getAllOrders } from "@/lib/orders";
 import {
   updateOrderStatus,
@@ -102,6 +103,7 @@ export default function AdminVentasPage() {
 interface POSLine extends RemitoItem {
   stock: number;
   precioLista: number; // precio actual en la lista (para detectar cambios)
+  imagen?: string;
 }
 
 function NuevaVentaView() {
@@ -148,6 +150,7 @@ function NuevaVentaView() {
           costoUnitario: costs[p.id] ?? 0,
           stock: p.stock,
           precioLista: p.precioVenta,
+          imagen: p.imagen,
         },
       ]);
     }
@@ -258,19 +261,28 @@ function NuevaVentaView() {
                     onClick={() => add(p.id)}
                     className="flex w-full items-center gap-3 border-b border-brand-border/60 px-3 py-2 text-left transition last:border-b-0 hover:bg-primary-light/40"
                   >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-white">
-                      ＋
+                    <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
+                      <Image
+                        src={p.imagen}
+                        alt={p.nombre}
+                        fill
+                        sizes="80px"
+                        className="object-contain p-1"
+                      />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-brand-dark">
+                      <span className="block text-sm font-medium text-brand-dark">
                         {p.nombre}
                       </span>
-                      <span className="text-[11px] text-brand-dark/50">
+                      <span className="text-xs text-brand-dark/50">
                         Stock {p.stock} ·{" "}
                         {p.precioVenta > 0
                           ? formatARS(p.precioVenta)
                           : "sin precio"}
                       </span>
+                    </span>
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-base font-bold text-white">
+                      ＋
                     </span>
                   </button>
                 ))
@@ -291,7 +303,16 @@ function NuevaVentaView() {
                 l.precioVenta > 0 && l.precioVenta !== l.precioLista;
               return (
                 <div key={l.productId} className="px-5 py-3">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
+                      <Image
+                        src={l.imagen || "https://placehold.co/600x600/006081/ffffff?text=Producto"}
+                        alt={l.nombre}
+                        fill
+                        sizes="80px"
+                        className="object-contain p-1"
+                      />
+                    </span>
                     <p className="min-w-0 flex-1 text-sm font-medium text-brand-dark">
                       {l.nombre}
                       {l.cantidad > l.stock && (
