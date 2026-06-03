@@ -22,7 +22,16 @@ export default function PWARegister() {
     if (process.env.NODE_ENV === "production") {
       navigator.serviceWorker
         .register("/sw.js")
+        .then((reg) => reg.update())
         .catch((e) => console.warn("SW register fail:", e));
+      // Cuando un SW nuevo toma el control, recargamos UNA vez para mostrar la
+      // última versión (evita quedar con la app vieja en caché).
+      let recargando = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (recargando) return;
+        recargando = true;
+        window.location.reload();
+      });
     } else {
       navigator.serviceWorker
         .getRegistrations()

@@ -1,6 +1,6 @@
 // Service Worker — Distribuidora Los Amigos NOA
-// Cache-first para assets estáticos, network-first para HTML.
-const CACHE = "dlanoa-v1";
+// network-first SIEMPRE (online trae lo último; cache solo como respaldo offline).
+const CACHE = "dlanoa-v3";
 const SHELL = [
   "/",
   "/catalogo",
@@ -31,38 +31,23 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;
-  // Solo manejamos GETs same-origin (los demás van directo a red)
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // HTML/navegación: network-first, cae a cache si no hay red
-  if (req.mode === "navigate" || req.destination === "document") {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
+  // network-first para TODO (HTML y assets): siempre intenta traer lo último;
+  // si no hay red, usa lo cacheado.
+  e.respondWith(
+    fetch(req)
+      .then((res) => {
+        if (res && res.status === 200) {
           const clone = res.clone();
           caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => null);
-          return res;
-        })
-        .catch(() => caches.match(req).then((cached) => cached || caches.match("/")))
-    );
-    return;
-  }
-
-  // Assets estáticos: cache-first
-  e.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          if (res.status === 200) {
-            const clone = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => null);
-          }
-          return res;
-        })
-        .catch(() => cached);
-    })
+        }
+        return res;
+      })
+      .catch(() =>
+        caches.match(req).then((cached) => cached || caches.match("/"))
+      )
   );
 });
