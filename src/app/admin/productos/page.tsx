@@ -9,6 +9,7 @@ import {
   subscribeProductCosts,
   deleteProduct,
   uploadProductImage,
+  createProduct,
 } from "@/lib/admin";
 import { formatARS } from "@/lib/format";
 import { coincide } from "@/lib/search";
@@ -27,6 +28,7 @@ export default function AdminProductosPage() {
   const [marca, setMarca] = useState<MarcaFilter>("todos");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [crearOpen, setCrearOpen] = useState(false);
   const [costs, setCosts] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -125,6 +127,12 @@ export default function AdminProductosPage() {
           placeholder="Buscar por nombre o código de barras…"
           className="w-full rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary sm:max-w-xs"
         />
+        <button
+          onClick={() => setCrearOpen(true)}
+          className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark sm:ml-auto"
+        >
+          ＋ Crear producto
+        </button>
       </div>
 
       {/* Tabla de productos */}
@@ -170,6 +178,204 @@ export default function AdminProductosPage() {
               )
             )}
           </span>
+        </div>
+      </div>
+
+      {crearOpen && <CrearProductoModal onClose={() => setCrearOpen(false)} />}
+    </div>
+  );
+}
+
+function CrearProductoModal({ onClose }: { onClose: () => void }) {
+  const [nombre, setNombre] = useState("");
+  const [marca, setMarca] = useState<Marca>("nonisec");
+  const [ean, setEan] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [precioVenta, setPrecioVenta] = useState(0);
+  const [precioCosto, setPrecioCosto] = useState(0);
+  const [stock, setStock] = useState(0);
+  const [descripcion, setDescripcion] = useState("");
+  const [imagen, setImagen] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardar = async () => {
+    if (!nombre.trim()) {
+      setError("Poné un nombre al producto.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const id = await createProduct({
+        nombre: nombre.trim(),
+        marca,
+        ean: ean.trim() || undefined,
+        codigo: codigo.trim() || undefined,
+        categoria: categoria.trim() || undefined,
+        precioVenta: Number(precioVenta) || 0,
+        descripcion: descripcion.trim() || undefined,
+        imagen: imagen.trim() || undefined,
+        stock: Number(stock) || 0,
+      });
+      if (file) {
+        const url = await uploadProductImage(id, file);
+        await setProductOverride(id, { imagen: url });
+      }
+      if (Number(precioCosto) > 0) await setProductCost(id, Number(precioCosto));
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setError("No se pudo crear el producto. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const inputCls =
+    "w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary";
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-brand-border p-5">
+          <h2 className="font-serif text-xl text-brand-dark">Nuevo producto</h2>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="space-y-3 p-5">
+          <Field label="Nombre del producto">
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre"
+              className={inputCls}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Marca">
+              <select
+                value={marca}
+                onChange={(e) => setMarca(e.target.value as Marca)}
+                className={inputCls}
+              >
+                {(Object.keys(MARCAS) as Marca[]).map((m) => (
+                  <option key={m} value={m}>
+                    {MARCAS[m]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Categoría">
+              <input
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                placeholder="General"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Código de barras">
+              <input
+                value={ean}
+                onChange={(e) => setEan(e.target.value)}
+                placeholder="779…"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Código de producto">
+              <input
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                placeholder="SKU interno"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Precio de venta (ARS)">
+              <input
+                type="number"
+                min={0}
+                value={precioVenta || ""}
+                onChange={(e) => setPrecioVenta(Number(e.target.value))}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Precio de costo (ARS)">
+              <input
+                type="number"
+                min={0}
+                value={precioCosto || ""}
+                onChange={(e) => setPrecioCosto(Number(e.target.value))}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Stock (unidades)">
+              <input
+                type="number"
+                min={0}
+                value={stock || ""}
+                onChange={(e) => setStock(Number(e.target.value))}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <Field label="Foto del producto">
+            <div className="flex items-center gap-3">
+              <label className="inline-block cursor-pointer rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-dark">
+                {file ? "✓ Foto elegida" : "📷 Elegir foto"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              <input
+                value={imagen}
+                onChange={(e) => setImagen(e.target.value)}
+                placeholder="…o pegá una URL"
+                className="flex-1 rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+              />
+            </div>
+          </Field>
+
+          <Field label="Descripción (opcional)">
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              rows={3}
+              placeholder="Descripción del producto…"
+              className={`resize-y ${inputCls}`}
+            />
+          </Field>
+
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-brand-border px-4 py-2 text-sm font-medium hover:bg-primary-light"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={guardar}
+              disabled={busy}
+              className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
+            >
+              {busy ? "Creando…" : "Crear producto"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

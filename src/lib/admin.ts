@@ -105,6 +105,7 @@ export interface NewProductInput {
   nombre: string;
   marca: Marca;
   ean?: string;
+  codigo?: string;
   categoria?: string;
   precioVenta?: number;
   descripcion?: string;
@@ -117,6 +118,7 @@ export async function createProduct(input: NewProductInput): Promise<string> {
     nombre: input.nombre,
     marca: input.marca,
     ean: input.ean || undefined,
+    codigo: input.codigo || undefined,
     categoria: input.categoria || "General",
     precioVenta: input.precioVenta ?? 0,
     descripcion: input.descripcion || "",
