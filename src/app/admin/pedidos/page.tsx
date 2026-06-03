@@ -205,7 +205,7 @@ function NuevaVentaView() {
         createdBy: user?.uid,
       });
       if (printWin) {
-        printWin.document.write(remitoHTML(r));
+        printWin.document.write(remitoHTML(r, { autoprint: true }));
         printWin.document.close();
         printWin.focus();
       }

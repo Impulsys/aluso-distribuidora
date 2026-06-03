@@ -9,6 +9,7 @@ import {
   mensajeVentaError,
 } from "@/lib/ventas";
 import { printRemito } from "@/lib/remito-print";
+import { printReporteCaja } from "@/lib/reporte-caja-print";
 import {
   subscribeProveedores,
   subscribeSupplierPaymentsRange,
@@ -161,12 +162,37 @@ export default function CajaView() {
         <h2 className="font-serif text-xl text-brand-dark">
           Caja del día{cerrado && <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold uppercase text-slate-700">Cerrada</span>}
         </h2>
-        <input
-          type="date"
-          value={dia}
-          onChange={(e) => setDia(e.target.value)}
-          className="rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              printReporteCaja({
+                fecha: dayTs,
+                ventas: d.ventas,
+                ventaEfectivo: d.ventaEfectivo,
+                ventaTransfer: d.ventaTransfer,
+                ventaCheque: d.ventaCheque,
+                gastosTotal: d.gastosTotal,
+                pagosTotal: d.pagosTotal,
+                disponible: d.disponible,
+                cajaInicial: d.cajaInicial,
+                efectivoEsperado: d.efectivoEsperado,
+                efectivoContado: cierre?.efectivoContado ?? null,
+                diferencia: cierre?.diferencia ?? null,
+                cerrado,
+                cerradoPor: cierre?.cerradoPor,
+              })
+            }
+            className="rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm font-medium text-brand-dark hover:bg-primary-light"
+          >
+            🖨️ Imprimir reporte
+          </button>
+          <input
+            type="date"
+            value={dia}
+            onChange={(e) => setDia(e.target.value)}
+            className="rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </div>
       </div>
 
       {/* KPIs del flujo */}
