@@ -10,8 +10,20 @@ import {
   query,
   limit,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebase";
 import type { AppUser, Marca, Order, OrderStatus, Product, Role } from "./types";
+
+/** Sube una foto de producto a Storage y devuelve la URL pública. */
+export async function uploadProductImage(
+  id: string,
+  file: File
+): Promise<string> {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const r = ref(storage, `productos/${id}-${Date.now()}.${ext}`);
+  await uploadBytes(r, file);
+  return getDownloadURL(r);
+}
 
 // ==================== USUARIOS ====================
 export async function getAllUsers(): Promise<AppUser[]> {

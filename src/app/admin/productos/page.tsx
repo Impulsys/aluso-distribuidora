@@ -8,6 +8,7 @@ import {
   setProductCost,
   subscribeProductCosts,
   deleteProduct,
+  uploadProductImage,
 } from "@/lib/admin";
 import { formatARS } from "@/lib/format";
 import { coincide } from "@/lib/search";
@@ -132,7 +133,7 @@ export default function AdminProductosPage() {
           <span></span>
           <span>Producto</span>
           <span>Cód. barras</span>
-          <span>Cód. producto</span>
+          <span className="text-center">Cód. producto</span>
           <span className="text-right">P. venta</span>
           <span className="text-right">P. costo</span>
           <span className="text-right">Stock</span>
@@ -240,7 +241,7 @@ function ProductRow({
         <span className="hidden font-mono text-xs text-brand-dark/55 md:block">
           {p.ean ?? "—"}
         </span>
-        <span className="hidden font-mono text-xs text-brand-dark/70 md:block">
+        <span className="hidden text-center font-mono text-xs text-brand-dark/70 md:block">
           {p.codigo || "—"}
         </span>
         <span className="hidden text-right font-semibold text-primary md:block">
@@ -335,6 +336,24 @@ function EditForm({
   const [activo, setActivo] = useState(p.activo);
   const [descripcion, setDescripcion] = useState(p.descripcion ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSubiendo(true);
+    setError(null);
+    try {
+      const url = await uploadProductImage(p.id, file);
+      setImagen(url);
+    } catch (err) {
+      console.error(err);
+      setError("No se pudo subir la foto. Probá de nuevo.");
+    } finally {
+      setSubiendo(false);
+      e.target.value = "";
+    }
+  };
 
   // Si este producto NO es destacado y ya hay 3+ destacados → no puede marcarlo
   const destacadoBloqueado = !p.destacado && destacadosCount >= 3;
@@ -430,14 +449,45 @@ function EditForm({
           ))}
         </select>
       </Field>
-      <Field label="Imagen (URL)">
-        <input
-          value={imagen}
-          onChange={(e) => setImagen(e.target.value)}
-          placeholder="https://…"
-          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-      </Field>
+      <div className="sm:col-span-2 lg:col-span-3">
+        <Field label="Foto del producto">
+          <div className="flex items-center gap-3">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-brand-border bg-white">
+              {imagen ? (
+                <Image
+                  src={imagen}
+                  alt="Foto"
+                  fill
+                  sizes="64px"
+                  className="object-contain p-1"
+                />
+              ) : (
+                <span className="grid h-full w-full place-items-center text-[10px] text-brand-dark/40">
+                  sin foto
+                </span>
+              )}
+            </div>
+            <div className="flex-1">
+              <label className="inline-block cursor-pointer rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-dark">
+                {subiendo ? "Subiendo…" : "📷 Subir foto"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={subiendo}
+                  onChange={onPickFile}
+                />
+              </label>
+              <input
+                value={imagen}
+                onChange={(e) => setImagen(e.target.value)}
+                placeholder="…o pegá una URL de imagen"
+                className="mt-2 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-xs outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+        </Field>
+      </div>
 
       <Field label="Precio de venta (ARS)">
         <input
