@@ -16,7 +16,7 @@ export function remitoHTML(r: Remito, opts: { autoprint?: boolean } = {}): strin
       <div class="it">
         <div class="n">${esc(it.nombre)}</div>
         <div class="d">
-          <span>${it.cantidad} x ${ars(it.precioVenta)}</span>
+          <span>Cant. ${it.cantidad} x ${ars(it.precioVenta)}</span>
           <span>${ars(it.precioVenta * it.cantidad)}</span>
         </div>
       </div>`
@@ -38,6 +38,7 @@ export function remitoHTML(r: Remito, opts: { autoprint?: boolean } = {}): strin
       : ""
   }
   <div class="hr"></div>
+  <div class="row" style="font-weight:700;"><span>Descripción</span><span>Subtotal</span></div>
   ${items}
   <div class="hr"></div>
   <div class="row total"><span>TOTAL</span><span>${ars(r.total)}</span></div>

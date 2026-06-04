@@ -3,6 +3,8 @@
 
 export const EMPRESA = {
   nombre: "Distribuidora Los Amigos",
+  cuit: "20250642114",
+  domicilio: "Balcarce 836 · La Quiaca, Jujuy",
   subtitulo: "NOA · Distribuidora mayorista",
   tel: "+54 9 11 2759-7572",
   email: "distribuidoralosamigosnoa@gmail.com",
@@ -36,6 +38,11 @@ const TICKET_CSS = `
          font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.35; }
   h1 { font-size: 14px; margin: 0; text-align: center; }
   .sub { text-align: center; font-size: 10px; color: #222; }
+  .logo { margin: 0 auto 6px; width: 60px; height: 60px; background: #6b46a8;
+          border-radius: 8px; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; color: #fff; }
+  .logo b { font-weight: 800; font-size: 13px; line-height: 1.05; }
+  .logo small { font-size: 6px; letter-spacing: 1.5px; margin-top: 3px; }
   .doc { text-align: center; font-weight: 800; font-size: 14px; margin: 6px 0 2px; }
   .hr { border-top: 1px dashed #000; margin: 6px 0; }
   .row { display: flex; justify-content: space-between; gap: 8px; }
@@ -87,10 +94,12 @@ export function abrirTicket(html: string): void {
   w.focus();
 }
 
-/** Encabezado común (empresa). */
+/** Encabezado común (logo violeta + datos de la empresa), estilo comprobante. */
 export function ticketHeader(): string {
   return `
+  <div class="logo"><b>LOS</b><b>AMIGOS</b><small>DISTRIBUIDORA</small></div>
   <h1>${EMPRESA.nombre}</h1>
-  <div class="sub">${EMPRESA.subtitulo}</div>
-  <div class="sub">Tel: ${EMPRESA.tel}</div>`;
+  <div class="sub">CUIT ${EMPRESA.cuit}</div>
+  <div class="sub">${EMPRESA.domicilio}</div>
+  <div class="sub">${EMPRESA.subtitulo}</div>`;
 }
