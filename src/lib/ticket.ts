@@ -29,6 +29,13 @@ export function fechaCorta(ts: number): string {
   });
 }
 
+export function horaCorta(ts: number): string {
+  return new Date(ts).toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // Estilos del ticket de 80mm (ancho real ~72mm de contenido).
 const TICKET_CSS = `
   * { box-sizing: border-box; }
@@ -38,11 +45,11 @@ const TICKET_CSS = `
          font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.35; }
   h1 { font-size: 14px; margin: 0; text-align: center; }
   .sub { text-align: center; font-size: 10px; color: #222; }
-  .logo { margin: 0 auto 6px; width: 60px; height: 60px; background: #6b46a8;
-          border-radius: 8px; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; color: #fff; }
-  .logo b { font-weight: 800; font-size: 13px; line-height: 1.05; }
-  .logo small { font-size: 6px; letter-spacing: 1.5px; margin-top: 3px; }
+  .logo { margin: 0 auto 6px; width: 74px; height: 74px; background: #6b46a8;
+          border-radius: 9px; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; color: #fff; padding: 4px; }
+  .logo b { font-weight: 800; font-size: 14px; line-height: 1.1; }
+  .logo small { font-size: 6.5px; letter-spacing: 1.5px; margin-top: 4px; }
   .doc { text-align: center; font-weight: 800; font-size: 14px; margin: 6px 0 2px; }
   .hr { border-top: 1px dashed #000; margin: 6px 0; }
   .row { display: flex; justify-content: space-between; gap: 8px; }

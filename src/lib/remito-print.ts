@@ -4,6 +4,7 @@ import {
   ars,
   esc,
   fechaCorta,
+  horaCorta,
   ticketDoc,
   ticketHeader,
   abrirTicket,
@@ -27,6 +28,7 @@ export function remitoHTML(r: Remito, opts: { autoprint?: boolean } = {}): strin
   ${ticketHeader()}
   <div class="doc">REMITO ${esc(r.numero)}</div>
   <div class="row small"><span>Fecha</span><span>${fechaCorta(r.fecha)}</span></div>
+  <div class="row small"><span>Hora</span><span>${horaCorta(r.fecha)}</span></div>
   <div class="row small"><span>Cliente</span><span>${esc(
     r.clienteNombre || "Consumidor final"
   )}</span></div>
