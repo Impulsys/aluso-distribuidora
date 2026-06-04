@@ -86,23 +86,29 @@ export default function Footer() {
           <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">
             Nuestras marcas
           </h3>
-          <div className="flex flex-col items-center gap-6 py-2">
-            <Link href="/catalogo?marca=doncella" className="block">
+          <div className="flex flex-col items-center gap-4 py-2">
+            <Link
+              href="/catalogo?marca=doncella"
+              className="flex h-24 w-56 items-center justify-center rounded-2xl bg-white px-6 shadow-md transition hover:shadow-lg"
+            >
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella"
-                width={240}
-                height={64}
-                className="h-14 w-auto object-contain opacity-90 brightness-0 invert transition hover:opacity-100"
+                width={260}
+                height={90}
+                className="h-14 w-auto object-contain"
               />
             </Link>
-            <Link href="/catalogo?marca=nonisec" className="block">
+            <Link
+              href="/catalogo?marca=nonisec"
+              className="flex h-24 w-56 items-center justify-center rounded-2xl bg-white px-6 shadow-md transition hover:shadow-lg"
+            >
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec"
-                width={240}
-                height={64}
-                className="h-14 w-auto object-contain opacity-90 brightness-0 invert transition hover:opacity-100"
+                width={260}
+                height={90}
+                className="h-14 w-auto object-contain"
               />
             </Link>
           </div>
