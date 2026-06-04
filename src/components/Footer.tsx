@@ -82,37 +82,37 @@ export default function Footer() {
         </div>
 
         {/* Marcas */}
-        <div>
+        <div className="flex flex-col items-center text-center">
           <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">
             Nuestras marcas
           </h3>
-          <div className="flex flex-col items-center gap-4 py-2">
+          <div className="flex flex-col items-center gap-4">
             <Link
               href="/catalogo?marca=doncella"
-              className="flex h-24 w-56 items-center justify-center rounded-2xl bg-white px-6 shadow-md transition hover:shadow-lg"
+              className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-2.5 shadow-md transition hover:shadow-lg"
             >
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella"
-                width={260}
-                height={90}
-                className="h-14 w-auto object-contain"
+                width={320}
+                height={120}
+                className="h-24 max-w-full w-auto object-contain"
               />
             </Link>
             <Link
               href="/catalogo?marca=nonisec"
-              className="flex h-24 w-56 items-center justify-center rounded-2xl bg-white px-6 shadow-md transition hover:shadow-lg"
+              className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-2.5 shadow-md transition hover:shadow-lg"
             >
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec"
-                width={260}
-                height={90}
-                className="h-14 w-auto object-contain"
+                width={320}
+                height={120}
+                className="h-24 max-w-full w-auto object-contain"
               />
             </Link>
           </div>
-          <div className="mt-3 flex gap-2 text-xs text-white/65">
+          <div className="mt-4 flex justify-center gap-2 text-xs text-white/65">
             <a
               href="https://instagram.com/nonisec"
               target="_blank"
