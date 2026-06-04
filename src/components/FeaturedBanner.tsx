@@ -80,7 +80,7 @@ export default function FeaturedBanner() {
                 <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-tight text-brand-dark sm:text-base">
                   {p.nombre}
                 </h3>
-                <p className="mt-1 line-clamp-2 flex-1 text-xs text-brand-dark/60">
+                <p className="mt-1 max-h-24 flex-1 overflow-y-auto pr-1 text-xs leading-relaxed text-brand-dark/60">
                   {p.descripcion}
                 </p>
 

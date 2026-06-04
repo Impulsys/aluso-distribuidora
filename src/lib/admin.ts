@@ -62,6 +62,7 @@ export type ProductOverride = Partial<
     | "categoria"
     | "marca"
     | "codigo"
+    | "ean"
     | "eliminado"
   >
 >;

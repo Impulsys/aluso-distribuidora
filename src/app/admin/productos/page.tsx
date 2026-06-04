@@ -544,6 +544,7 @@ function EditForm({
   onSave: (patch: Partial<Product> & { _costo?: number }) => Promise<void>;
 }) {
   const [nombre, setNombre] = useState(p.nombre);
+  const [ean, setEan] = useState(p.ean ?? "");
   const [codigo, setCodigo] = useState(p.codigo ?? "");
   const [imagen, setImagen] = useState(p.imagen);
   const [categoria, setCategoria] = useState(p.categoria);
@@ -611,6 +612,7 @@ function EditForm({
 
     onSave({
       nombre: nombre.trim(),
+      ean: ean.trim(),
       codigo: codigo.trim(),
       imagen: imagen.trim(),
       categoria: categoria.trim() || "General",
@@ -640,6 +642,14 @@ function EditForm({
           />
         </Field>
       </div>
+      <Field label="Código de barras">
+        <input
+          value={ean}
+          onChange={(e) => setEan(e.target.value)}
+          placeholder="779…"
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+      </Field>
       <Field label="Código de producto">
         <input
           value={codigo}
