@@ -37,6 +37,12 @@ yarn-error.log*
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
 
+# Credenciales AFIP/ARCA — SECRETO, NUNCA commitear (clave privada y cert)
+/afip/
+*.key
+*.csr
+*.crt
+
 # Firebase deploy cache (regenerado en cada deploy)
 .firebase/
 
