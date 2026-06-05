@@ -12,6 +12,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { logActivity } from "./bitacora";
+import { formatARS } from "./format";
 import type {
   Factura,
   FormaPago,
@@ -70,6 +72,12 @@ export async function anularRemito(
       { merge: true }
     );
   });
+
+  logActivity("Anuló venta", {
+    detalle: `${remito.numero} · ${formatARS(remito.total)}`,
+    entidad: "remito",
+    entidadId: remito.id,
+  });
 }
 
 /**
@@ -86,6 +94,7 @@ export async function updateRemitoMeta(
   if (patch.formaPago !== undefined) data.formaPago = patch.formaPago;
   if (patch.fecha !== undefined) data.fecha = patch.fecha;
   await updateDoc(doc(db, "remitos", id), data);
+  logActivity("Editó datos de venta", { entidad: "remito", entidadId: id });
 }
 
 interface RemitoMeta {
@@ -164,6 +173,14 @@ async function persistRemito(
       );
     }
     return num;
+  });
+
+  logActivity("Registró venta", {
+    detalle: `${numero} · ${formatARS(total)}${
+      meta.clienteNombre ? ` · ${meta.clienteNombre}` : ""
+    }`,
+    entidad: "remito",
+    entidadId: remitoRef.id,
   });
 
   return {
@@ -311,6 +328,12 @@ export async function crearFactura(input: CrearFacturaInput): Promise<string> {
     if (rSnap.data()?.facturaId) throw new Error("REMITO_YA_FACTURADO");
     tx.set(facturaRef, data);
     tx.set(remitoRef, { facturaId: facturaRef.id }, { merge: true });
+  });
+
+  logActivity("Generó factura", {
+    detalle: `Factura ${tipo} · ${remito.numero} · ${formatARS(total)}`,
+    entidad: "factura",
+    entidadId: facturaRef.id,
   });
 
   return facturaRef.id;

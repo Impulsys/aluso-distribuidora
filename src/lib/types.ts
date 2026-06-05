@@ -1,12 +1,13 @@
 // ===== Tipos del dominio — Distribuidora Los Amigos NOA =====
 
-export type Role = "cliente" | "vendedor" | "socio" | "superadmin";
+export type Role = "cliente" | "vendedor" | "socio" | "superadmin" | "contador";
 
 export const ROLE_LABELS: Record<Role, string> = {
   cliente: "Cliente",
   vendedor: "Vendedor",
   socio: "Socio administrador",
   superadmin: "Superadmin",
+  contador: "Contador",
 };
 
 export interface AppUser {
@@ -16,6 +17,20 @@ export interface AppUser {
   photoURL?: string;
   role: Role;
   createdAt: number;
+}
+
+// ===== Bitácora (auditoría) — registro inmutable de acciones del sistema =====
+export interface BitacoraEntry {
+  id: string;
+  ts: number; // fecha y hora del evento (timestamp ms)
+  uid: string; // quién lo hizo
+  email: string;
+  nombre: string;
+  role: Role;
+  accion: string; // ej "Anuló venta", "Creó producto"
+  detalle?: string; // descripción legible (nombre/nº/monto afectado)
+  entidad?: string; // colección/tipo afectado: "remito" | "producto" | ...
+  entidadId?: string; // id del documento afectado
 }
 
 export type Marca = "doncella" | "nonisec" | "lenterdit";

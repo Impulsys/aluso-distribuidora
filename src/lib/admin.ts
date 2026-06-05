@@ -12,6 +12,8 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { logActivity } from "./bitacora";
+import { ROLE_LABELS } from "./types";
 import type { AppUser, Marca, Order, OrderStatus, Product, Role } from "./types";
 
 /** Sube una foto de producto a Storage y devuelve la URL pública. */
@@ -35,6 +37,11 @@ export async function getAllUsers(): Promise<AppUser[]> {
 
 export async function updateUserRole(uid: string, role: Role): Promise<void> {
   await updateDoc(doc(db, "users", uid), { role });
+  logActivity("Cambió rol de usuario", {
+    detalle: `→ ${ROLE_LABELS[role]}`,
+    entidad: "usuario",
+    entidadId: uid,
+  });
 }
 
 // ==================== PEDIDOS ====================
@@ -72,6 +79,16 @@ export async function setProductOverride(
   patch: ProductOverride
 ): Promise<void> {
   await setDoc(doc(db, "products", id), patch, { merge: true });
+  // No registrar el borrado lógico acá (deleteProduct ya lo loguea).
+  if (!("eliminado" in patch)) {
+    logActivity("Editó producto", {
+      detalle: patch.nombre
+        ? `${patch.nombre} (${Object.keys(patch).join(", ")})`
+        : Object.keys(patch).join(", "),
+      entidad: "producto",
+      entidadId: id,
+    });
+  }
 }
 
 /**
@@ -84,6 +101,7 @@ export async function deleteProduct(id: string): Promise<void> {
     { eliminado: true, activo: false },
     { merge: true }
   );
+  logActivity("Eliminó producto", { entidad: "producto", entidadId: id });
 }
 
 // Suscripción en tiempo real al override público.
@@ -136,9 +154,19 @@ export async function createProduct(input: NewProductInput): Promise<string> {
   if (input.ean) {
     // id = EAN para escaneo directo
     await setDoc(doc(db, "products", input.ean), clean, { merge: true });
+    logActivity("Creó producto", {
+      detalle: input.nombre,
+      entidad: "producto",
+      entidadId: input.ean,
+    });
     return input.ean;
   }
   const ref = await addDoc(collection(db, "products"), clean);
+  logActivity("Creó producto", {
+    detalle: input.nombre,
+    entidad: "producto",
+    entidadId: ref.id,
+  });
   return ref.id;
 }
 
@@ -162,6 +190,10 @@ export async function setProductCost(
     { precioCosto, updatedAt: Date.now() },
     { merge: true }
   );
+  logActivity("Cambió costo de producto", {
+    entidad: "producto",
+    entidadId: id,
+  });
 }
 
 export function subscribeProductCosts(

@@ -3,7 +3,8 @@
 // llaman a Cloud Functions vía httpsCallable — ver functions/src/index.ts.
 import { httpsCallable } from "firebase/functions";
 import { functions } from "./firebase";
-import type { Role } from "./types";
+import { logActivity } from "./bitacora";
+import { ROLE_LABELS, type Role } from "./types";
 
 // Dominio sintético: las cuentas creadas por usuario son `usuario@dlanoa.com`.
 // Debe coincidir con USER_DOMAIN en functions/src/index.ts y con el login.
@@ -47,6 +48,11 @@ const deleteUserFn = httpsCallable<{ uid: string }, { ok: boolean }>(
 /** Crea un usuario (Auth + perfil). Devuelve el uid. Lanza Error con mensaje legible. */
 export async function adminCreateUser(input: CreateUserInput): Promise<string> {
   const res = await createUserFn(input);
+  logActivity("Creó usuario", {
+    detalle: `${input.displayName} (${input.username}) · ${ROLE_LABELS[input.role]}`,
+    entidad: "usuario",
+    entidadId: res.data.uid,
+  });
   return res.data.uid;
 }
 
@@ -56,9 +62,14 @@ export async function adminSetPassword(
   newPassword: string
 ): Promise<void> {
   await setPasswordFn({ uid, newPassword });
+  logActivity("Cambió contraseña de usuario", {
+    entidad: "usuario",
+    entidadId: uid,
+  });
 }
 
 /** Elimina un usuario (cuenta de Auth + perfil en Firestore). */
 export async function adminDeleteUser(uid: string): Promise<void> {
   await deleteUserFn({ uid });
+  logActivity("Eliminó usuario", { entidad: "usuario", entidadId: uid });
 }

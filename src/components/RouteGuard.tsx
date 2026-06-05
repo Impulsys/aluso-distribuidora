@@ -9,9 +9,12 @@ import { ROLE_LABELS, type Role } from "@/lib/types";
 
 export default function RouteGuard({
   min,
+  roles,
   children,
 }: {
   min: Role;
+  /** Roles extra permitidos además de `min` y superiores (ej. ["contador"]). */
+  roles?: Role[];
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
@@ -30,7 +33,9 @@ export default function RouteGuard({
     );
   }
 
-  if (!hasRole(user!.role, min)) {
+  const permitido =
+    hasRole(user!.role, min) || (roles?.includes(user!.role) ?? false);
+  if (!permitido) {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
         <h2 className="font-serif text-2xl text-brand-dark">

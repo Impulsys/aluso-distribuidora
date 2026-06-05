@@ -27,6 +27,10 @@ service cloud.firestore {
       return isSignedIn() && hasUserDoc() && myRole() in ['vendedor', 'socio', 'superadmin'];
     }
 
+    function isContador() {
+      return isSignedIn() && hasUserDoc() && myRole() == 'contador';
+    }
+
     // ===== users =====
     match /users/{uid} {
       // Cada uno lee su doc; socio/superadmin pueden ver todos.
@@ -84,8 +88,17 @@ service cloud.firestore {
     match /purchases/{id}        { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /supplierPayments/{id} { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     // Ventas: remitos (descuentan stock) y facturas
-    match /remitos/{id}          { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /facturas/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    // El contador también puede LEER remitos y facturas (su área de consulta).
+    match /remitos/{id}          { allow read: if isSocioOrUp() || isContador(); allow write: if isSuperadmin(); }
+    match /facturas/{id}         { allow read: if isSocioOrUp() || isContador(); allow write: if isSuperadmin(); }
+
+    // Bitácora (auditoría): registro INMUTABLE. La crea quien opera; la leen
+    // socio/superadmin (control interno). Nadie la edita ni borra.
+    match /bitacora/{id} {
+      allow read: if isSocioOrUp();
+      allow create: if isVendedorOrUp();
+      allow update, delete: if false;
+    }
     // Interruptor de servicio: lo lee toda la app (incluso sin login) para
     // habilitar/bloquear; NADIE lo escribe desde la app (solo consola/admin SDK).
     match /config/licencia     { allow read: if true;          allow write: if isSignedIn() && request.auth.token.email == 'axelfaber@gmail.com'; }

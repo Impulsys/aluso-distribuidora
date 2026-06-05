@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { createPurchase } from "./cuentas";
+import { logActivity } from "./bitacora";
 import type { Truck } from "./types";
 
 export type NewTruckInput = Pick<
@@ -167,6 +168,12 @@ export async function recibirCamion(
     });
   }
 
+  logActivity("Recibió camión", {
+    detalle: `${input.nombre} · ${input.proveedorNombre}`,
+    entidad: "camion",
+    entidadId: truckId,
+  });
+
   return truckId;
 }
 
@@ -175,6 +182,7 @@ export async function updateTruck(
   patch: Partial<Truck>
 ): Promise<void> {
   await updateDoc(doc(db, "trucks", id), patch);
+  logActivity("Editó camión", { entidad: "camion", entidadId: id });
 }
 
 export async function updateTruckCargo(
@@ -182,6 +190,7 @@ export async function updateTruckCargo(
   carga: NonNullable<Truck["carga"]>
 ): Promise<void> {
   await updateDoc(doc(db, "trucks", id), { carga });
+  logActivity("Editó carga de camión", { entidad: "camion", entidadId: id });
 }
 
 export async function deleteTruck(id: string): Promise<void> {
@@ -195,6 +204,7 @@ export async function deleteTruck(id: string): Promise<void> {
     );
   }
   await deleteDoc(doc(db, "trucks", id));
+  logActivity("Eliminó camión", { entidad: "camion", entidadId: id });
 }
 
 export function subscribeTrucks(cb: (trucks: Truck[]) => void): () => void {

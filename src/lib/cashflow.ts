@@ -12,12 +12,15 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type {
-  Check,
-  CheckStatus,
-  DailyExpense,
-  ExpenseType,
-  FormaPago,
+import { logActivity } from "./bitacora";
+import { formatARS } from "./format";
+import {
+  EXPENSE_LABELS,
+  type Check,
+  type CheckStatus,
+  type DailyExpense,
+  type ExpenseType,
+  type FormaPago,
 } from "./types";
 
 // Firestore rechaza valores undefined → los quitamos antes de escribir.
@@ -46,6 +49,11 @@ export async function createExpense(
     collection(db, "expenses"),
     clean({ ...input, createdAt: Date.now() })
   );
+  logActivity("Registró egreso", {
+    detalle: `${EXPENSE_LABELS[input.tipo]} · ${formatARS(input.monto)}`,
+    entidad: "egreso",
+    entidadId: ref.id,
+  });
   return ref.id;
 }
 
@@ -54,10 +62,12 @@ export async function updateExpense(
   patch: Partial<NewExpenseInput>
 ): Promise<void> {
   await updateDoc(doc(db, "expenses", id), clean(patch));
+  logActivity("Editó egreso", { entidad: "egreso", entidadId: id });
 }
 
 export async function deleteExpense(id: string): Promise<void> {
   await deleteDoc(doc(db, "expenses", id));
+  logActivity("Eliminó egreso", { entidad: "egreso", entidadId: id });
 }
 
 /** Fecha (ts del día) del egreso más reciente, o null si no hay ninguno. */
@@ -124,6 +134,11 @@ export async function createCheck(input: NewCheckInput): Promise<string> {
     collection(db, "checks"),
     clean({ ...input, status: "pendiente" as CheckStatus, createdAt: Date.now() })
   );
+  logActivity("Registró cheque", {
+    detalle: `Nº ${input.numero} · ${input.banco} · ${formatARS(input.monto)}`,
+    entidad: "cheque",
+    entidadId: ref.id,
+  });
   return ref.id;
 }
 
@@ -132,10 +147,16 @@ export async function updateCheckStatus(
   status: CheckStatus
 ): Promise<void> {
   await updateDoc(doc(db, "checks", id), { status });
+  logActivity("Cambió estado de cheque", {
+    detalle: `→ ${status}`,
+    entidad: "cheque",
+    entidadId: id,
+  });
 }
 
 export async function deleteCheck(id: string): Promise<void> {
   await deleteDoc(doc(db, "checks", id));
+  logActivity("Eliminó cheque", { entidad: "cheque", entidadId: id });
 }
 
 export function subscribeChecks(

@@ -12,13 +12,20 @@ import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/format";
 import { ROLE_LABELS, type AppUser, type Role } from "@/lib/types";
 
-const ROLES: Role[] = ["cliente", "vendedor", "socio", "superadmin"];
+const ROLES: Role[] = [
+  "cliente",
+  "vendedor",
+  "socio",
+  "superadmin",
+  "contador",
+];
 
 const ROLE_STYLES: Record<Role, string> = {
   cliente: "bg-slate-100 text-slate-800",
   vendedor: "bg-sky-100 text-sky-800",
   socio: "bg-amber-100 text-amber-800",
   superadmin: "bg-rose-100 text-rose-800",
+  contador: "bg-violet-100 text-violet-800",
 };
 
 /** Saca el mensaje legible de un error de Cloud Function (HttpsError). */

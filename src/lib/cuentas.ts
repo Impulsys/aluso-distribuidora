@@ -13,6 +13,8 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { logActivity } from "./bitacora";
+import { formatARS } from "./format";
 import {
   PROVEEDORES,
   type Proveedor,
@@ -56,6 +58,11 @@ export async function createProveedor(
     collection(db, "proveedores"),
     clean({ ...input, createdAt: Date.now() })
   );
+  logActivity("Creó proveedor", {
+    detalle: input.nombre,
+    entidad: "proveedor",
+    entidadId: ref.id,
+  });
   return ref.id;
 }
 
@@ -64,10 +71,16 @@ export async function updateProveedor(
   patch: Partial<NewProveedorInput>
 ): Promise<void> {
   await updateDoc(doc(db, "proveedores", id), clean(patch));
+  logActivity("Editó proveedor", {
+    detalle: patch.nombre,
+    entidad: "proveedor",
+    entidadId: id,
+  });
 }
 
 export async function deleteProveedor(id: string): Promise<void> {
   await deleteDoc(doc(db, "proveedores", id));
+  logActivity("Eliminó proveedor", { entidad: "proveedor", entidadId: id });
 }
 
 /**
@@ -116,11 +129,20 @@ export async function createPurchase(
     collection(db, "purchases"),
     clean({ ...input, createdAt: Date.now() })
   );
+  logActivity("Registró compra a proveedor", {
+    detalle: `${input.proveedorNombre} · ${formatARS(input.monto)} (${input.modalidad})`,
+    entidad: "compra",
+    entidadId: ref.id,
+  });
   return ref.id;
 }
 
 export async function deletePurchase(id: string): Promise<void> {
   await deleteDoc(doc(db, "purchases", id));
+  logActivity("Eliminó compra a proveedor", {
+    entidad: "compra",
+    entidadId: id,
+  });
 }
 
 // ==================== PAGOS ====================
@@ -183,6 +205,11 @@ export async function createPayment(input: NewPaymentInput): Promise<string> {
     collection(db, "supplierPayments"),
     clean({ ...input, createdAt: Date.now() })
   );
+  logActivity("Registró pago a proveedor", {
+    detalle: `${formatARS(input.monto)}${input.via ? ` · ${input.via}` : ""}`,
+    entidad: "pago",
+    entidadId: ref.id,
+  });
   return ref.id;
 }
 
@@ -194,10 +221,12 @@ export async function updatePayment(
   }
 ): Promise<void> {
   await updateDoc(doc(db, "supplierPayments", id), clean(patch));
+  logActivity("Editó pago a proveedor", { entidad: "pago", entidadId: id });
 }
 
 export async function deletePayment(id: string): Promise<void> {
   await deleteDoc(doc(db, "supplierPayments", id));
+  logActivity("Eliminó pago a proveedor", { entidad: "pago", entidadId: id });
 }
 
 // ==================== HELPERS DE SALDO ====================

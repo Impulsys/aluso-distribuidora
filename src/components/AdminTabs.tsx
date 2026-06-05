@@ -12,6 +12,8 @@ const TABS = [
   { href: "/admin/cheques", label: "🧾 Cheques" },
   { href: "/admin/cuentas", label: "💳 Cuentas Ctes" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },
+  { href: "/admin/bitacora", label: "📋 Bitácora" },
+  { href: "/contador", label: "🧮 Contaduría" },
 ];
 
 export default function AdminTabs() {

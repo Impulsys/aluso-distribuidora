@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { ROLE_LABELS } from "@/lib/types";
@@ -13,9 +13,19 @@ export default function Header() {
   const { count } = useCart();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   // Cerrar el menú móvil al navegar
   useEffect(() => setOpen(false), [pathname]);
+
+  // El contador tiene un área exclusiva: tras loguearse (o si cae en la
+  // portada/login/catálogo), se lo lleva directo a /contador.
+  useEffect(() => {
+    if (loading || user?.role !== "contador") return;
+    if (["/", "/login", "/catalogo"].includes(pathname)) {
+      router.replace("/contador");
+    }
+  }, [loading, user, pathname, router]);
 
   // Bloquear scroll del body cuando el menú móvil está abierto
   useEffect(() => {
@@ -56,6 +66,14 @@ export default function Header() {
           className="rounded px-3 py-2 hover:bg-primary-dark"
         >
           Admin
+        </Link>
+      )}
+      {can.verContaduria(user?.role) && (
+        <Link
+          href="/contador"
+          className="rounded px-3 py-2 hover:bg-primary-dark"
+        >
+          Contaduría
         </Link>
       )}
     </>

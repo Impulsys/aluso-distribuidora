@@ -3,6 +3,13 @@
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { dayKey, type DailyCashInitial } from "./cash-initial";
+import { logActivity } from "./bitacora";
+import { formatARS } from "./format";
+
+/** Etiqueta de fecha corta (DD/MM/AAAA) para los detalles de bitácora. */
+function fechaDia(ts: number): string {
+  return new Date(ts).toLocaleDateString("es-AR");
+}
 
 // Billetes ARS (de mayor a menor) para el arqueo.
 export const DENOMINACIONES = [
@@ -45,6 +52,13 @@ export async function cerrarCaja(
     },
     { merge: true }
   );
+  logActivity("Cerró la caja", {
+    detalle: `${fechaDia(dayTs)} · contado ${formatARS(contado)} · dif. ${formatARS(
+      contado - input.efectivoEsperado
+    )}`,
+    entidad: "caja",
+    entidadId: dayKey(dayTs),
+  });
 }
 
 /** Reabre la caja de un día (vuelve a editable). */
@@ -54,6 +68,11 @@ export async function reabrirCaja(dayTs: number): Promise<void> {
     { cerrado: false },
     { merge: true }
   );
+  logActivity("Reabrió la caja", {
+    detalle: fechaDia(dayTs),
+    entidad: "caja",
+    entidadId: dayKey(dayTs),
+  });
 }
 
 /** Suscripción al doc de caja de un día (caja inicial + cierre). */

@@ -19,7 +19,17 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
+import { setBitacoraActor } from "@/lib/bitacora";
 import type { AppUser, Role } from "@/lib/types";
+
+/** Mantiene sincronizado el actor de la bitácora con el usuario logueado. */
+function syncBitacora(u: AppUser | null) {
+  setBitacoraActor(
+    u
+      ? { uid: u.uid, email: u.email, nombre: u.displayName, role: u.role }
+      : null
+  );
+}
 
 interface AuthState {
   fbUser: FirebaseUser | null;
@@ -78,6 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => unsub();
   }, []);
+
+  // Mantener el actor de la bitácora en sync con el usuario logueado.
+  useEffect(() => {
+    syncBitacora(user);
+  }, [user]);
 
   const signInGoogle = async () => {
     await signInWithPopup(auth, googleProvider);
