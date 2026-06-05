@@ -62,6 +62,13 @@ service cloud.firestore {
       allow write: if isSuperadmin();
     }
 
+    // ===== promociones ===== (banner destacado del catálogo)
+    // Lectura PÚBLICA (las muestra el catálogo). Escritura solo superadmin.
+    match /promociones/{id} {
+      allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
     // ===== productCosts (info sensible: precio costo) =====
     // Solo socio/superadmin pueden leerlo. Vendedor y público no ven precio costo.
     match /productCosts/{id} {

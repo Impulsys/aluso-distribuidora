@@ -33,6 +33,20 @@ export interface BitacoraEntry {
   entidadId?: string; // id del documento afectado
 }
 
+// ===== Promociones (banner destacado del catálogo, en carrusel) =====
+export interface Promocion {
+  id: string;
+  productId: string; // producto asociado (imagen / precio / nombre base)
+  badge: string; // cartel: "OFERTA" | "PROMOCIÓN" | "2x1" | texto libre
+  titulo?: string; // título override (si vacío usa el nombre del producto)
+  texto: string; // descripción de la oferta ("Llevá 3 y 1 de regalo", etc.)
+  paleta: string; // id de la paleta de fondo (ver PALETAS en lib/promos.ts)
+  mostrarPrecio: boolean; // mostrar precio (con tachado si hay oferta)
+  activo: boolean;
+  orden: number; // orden en el carrusel (menor primero)
+  createdAt: number;
+}
+
 export type Marca = "doncella" | "nonisec" | "lenterdit";
 
 export const MARCAS: Record<Marca, string> = {

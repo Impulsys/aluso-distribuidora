@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import ProductCatalog from "@/components/ProductCatalog";
-import FeaturedBanner from "@/components/FeaturedBanner";
+import PromoCarousel from "@/components/PromoCarousel";
 import MarqueeProducts from "@/components/MarqueeProducts";
 
 const StatPill = ({
@@ -82,7 +82,7 @@ export default function CatalogoPage() {
         </div>
       </section>
 
-      <FeaturedBanner />
+      <PromoCarousel />
 
       <Suspense
         fallback={
