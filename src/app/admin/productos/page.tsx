@@ -15,8 +15,6 @@ import { formatARS } from "@/lib/format";
 import { coincide } from "@/lib/search";
 import { MARCAS, type Marca, type Product } from "@/lib/types";
 
-type MarcaFilter = "todos" | Marca;
-
 const MARCA_CHIP: Record<Marca, string> = {
   doncella: "bg-rose-600",
   nonisec: "bg-sky-700",
@@ -25,7 +23,6 @@ const MARCA_CHIP: Record<Marca, string> = {
 
 export default function AdminProductosPage() {
   const productos = useProducts();
-  const [marca, setMarca] = useState<MarcaFilter>("todos");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [crearOpen, setCrearOpen] = useState(false);
@@ -53,14 +50,12 @@ export default function AdminProductosPage() {
 
   const visible = useMemo(
     () =>
-      productos
-        .filter((p) => (marca === "todos" ? true : p.marca === marca))
-        .filter((p) => {
-          const t = q.trim();
-          if (!t) return true;
-          return coincide(p.nombre, t) || coincide(p.ean ?? "", t);
-        }),
-    [productos, marca, q]
+      productos.filter((p) => {
+        const t = q.trim();
+        if (!t) return true;
+        return coincide(p.nombre, t) || coincide(p.ean ?? "", t);
+      }),
+    [productos, q]
   );
 
   const destacadosCount = productos.filter((p) => p.destacado).length;
@@ -106,21 +101,6 @@ export default function AdminProductosPage() {
 
       {/* Filtros */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="inline-flex overflow-hidden rounded-xl bg-surface p-1 ring-1 ring-brand-border">
-          {(["todos", "doncella", "nonisec"] as MarcaFilter[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMarca(m)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${
-                marca === m
-                  ? "bg-primary text-white"
-                  : "text-brand-dark hover:bg-primary-light"
-              }`}
-            >
-              {m === "todos" ? "Todos" : MARCAS[m as Marca]}
-            </button>
-          ))}
-        </div>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
