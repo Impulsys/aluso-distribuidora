@@ -8,6 +8,7 @@ import { formatARS } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 import { consultaProductoLink } from "@/lib/order";
 import { coincide } from "@/lib/search";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 import type { Marca, Product } from "@/lib/types";
 
 type MarcaFilter = "todos" | Marca;
@@ -266,7 +267,7 @@ export default function ProductCatalog() {
                     className="grid place-items-center rounded-lg bg-[#25D366] px-3 text-white shadow-sm transition-transform duration-200 hover:rotate-6 hover:scale-110"
                     title="Consultar por WhatsApp"
                   >
-                    💬
+                    <WhatsAppIcon className="h-5 w-5" />
                   </a>
                 </div>
               </div>

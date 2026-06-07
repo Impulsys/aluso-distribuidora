@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
 const EMAIL = process.env.NEXT_PUBLIC_BUSINESS_EMAIL || "";
@@ -44,7 +45,7 @@ export default function Footer() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 hover:text-secondary"
                 >
-                  💬 WhatsApp
+                  <WhatsAppIcon className="h-4 w-4" /> WhatsApp
                 </a>
               </li>
             )}

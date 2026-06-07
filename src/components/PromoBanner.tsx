@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { getPaleta } from "@/lib/promos";
 import { formatARS } from "@/lib/format";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 import type { Product, Promocion } from "@/lib/types";
 
 interface Props {
@@ -110,13 +111,13 @@ export default function PromoBanner({
               rel="noopener noreferrer"
               aria-label="Consultar por WhatsApp"
               title="Consultar por WhatsApp"
-              className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-lg text-white shadow-md transition hover:scale-[1.03]"
+              className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-white shadow-md transition hover:scale-[1.03]"
             >
-              💬
+              <WhatsAppIcon className="h-6 w-6" />
             </a>
           ) : (
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-lg text-white shadow-md">
-              💬
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-white shadow-md">
+              <WhatsAppIcon className="h-6 w-6" />
             </span>
           )}
         </div>
