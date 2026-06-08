@@ -113,7 +113,7 @@ export default function PromoBanner({
                   height={200}
                   className="h-full w-full object-contain"
                 />
-                <span className="absolute left-0 right-0 top-0 bg-emerald-500 py-0.5 text-center text-[9px] font-extrabold uppercase tracking-wider text-white shadow-sm">
+                <span className="absolute left-0 right-0 top-0 bg-emerald-500 py-1 text-center text-[12px] font-extrabold uppercase tracking-wider text-white shadow-sm">
                   🎁 Gratis
                 </span>
                 <span className="absolute bottom-1 right-1 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-extrabold text-white shadow ring-1 ring-white/70">
