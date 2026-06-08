@@ -27,3 +27,11 @@ export function tsFromISO(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
 }
+
+// Timestamp → "YYYY-MM-DD" en hora LOCAL (para inputs type=date).
+export function isoFromTs(ts: number): string {
+  const d = new Date(ts);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
