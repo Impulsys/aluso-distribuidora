@@ -1,15 +1,16 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import Image from "next/image";
 import ProductCatalog from "@/components/ProductCatalog";
 import PromoCarousel from "@/components/PromoCarousel";
 import MarqueeProducts from "@/components/MarqueeProducts";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 const StatPill = ({
   icon,
   label,
   iconBg,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   iconBg: string;
 }) => (
@@ -56,7 +57,11 @@ export default function CatalogoPage() {
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <StatPill icon="📦" label="80+ productos" iconBg="bg-emerald-500/90" />
               <StatPill icon="🚚" label="Entrega en NOA" iconBg="bg-amber-500/90" />
-              <StatPill icon="💬" label="Pedido por WhatsApp" iconBg="bg-[#25D366]/90" />
+              <StatPill
+                icon={<WhatsAppIcon className="h-4 w-4 text-white" />}
+                label="Pedido por WhatsApp"
+                iconBg="bg-[#25D366]/90"
+              />
             </div>
           </div>
           <div className="hidden gap-3 self-start rounded-xl border border-brand-border bg-white p-3 shadow-md sm:flex">
