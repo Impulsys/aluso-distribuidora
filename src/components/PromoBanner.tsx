@@ -52,140 +52,141 @@ export default function PromoBanner({
 
   return (
     <div
-      className="relative min-h-[220px] overflow-hidden rounded-3xl p-5 text-white shadow-xl sm:p-7"
+      className="relative overflow-hidden rounded-3xl p-6 text-center text-white shadow-xl sm:p-8"
       style={{ background: paleta.bg }}
     >
       {/* Brillos decorativos */}
       <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
       <div className="pointer-events-none absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
 
-      <div className="relative z-10 flex flex-col gap-4">
-        {/* ----- Cartel + título ----- */}
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-serif text-2xl font-bold leading-snug drop-shadow-sm sm:text-3xl">
-            {titulo}
-          </h3>
-          {promo.badge.trim() && (
-            <span
-              className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-extrabold uppercase tracking-wide shadow-sm"
-              style={{ color: paleta.acento }}
-            >
-              ★ {promo.badge.trim()}
-            </span>
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        {/* ----- Cartel al medio ----- */}
+        {promo.badge.trim() && (
+          <span
+            className="rounded-full bg-white px-4 py-1 text-sm font-extrabold uppercase tracking-wide shadow-md"
+            style={{ color: paleta.acento }}
+          >
+            ★ {promo.badge.trim()}
+          </span>
+        )}
+
+        {/* ----- Imágenes: principal (+ regalo) ----- */}
+        <div className="flex items-center justify-center gap-3 sm:gap-4">
+          {/* Principal */}
+          <div
+            className={`relative grid place-items-center overflow-hidden rounded-2xl bg-white p-1 shadow-lg ${
+              regalo ? "h-28 w-28 sm:h-36 sm:w-36" : "h-32 w-32 sm:h-44 sm:w-44"
+            }`}
+          >
+            {product ? (
+              <Image
+                src={product.imagen}
+                alt={titulo}
+                width={300}
+                height={300}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <span className="text-xs text-slate-400">Sin producto</span>
+            )}
+            {cantLleva > 0 && (
+              <span
+                className="absolute left-1 top-1 rounded-full px-2 py-0.5 text-xs font-extrabold text-white shadow"
+                style={{ background: paleta.acento }}
+              >
+                ×{cantLleva}
+              </span>
+            )}
+          </div>
+
+          {/* Regalo (opcional) */}
+          {regalo && (
+            <>
+              <span className="text-3xl font-black text-white/90 drop-shadow">
+                +
+              </span>
+              <div className="relative grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-white p-1 shadow-lg sm:h-24 sm:w-24">
+                <Image
+                  src={regalo.imagen}
+                  alt={regalo.nombre}
+                  width={200}
+                  height={200}
+                  className="h-full w-full object-contain"
+                />
+                <span className="absolute left-0 right-0 top-0 bg-emerald-500 py-0.5 text-center text-[9px] font-extrabold uppercase tracking-wider text-white shadow-sm">
+                  🎁 Gratis
+                </span>
+                <span className="absolute bottom-1 right-1 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-extrabold text-white shadow ring-1 ring-white/70">
+                  ×{cantRegalo}
+                </span>
+              </div>
+            </>
           )}
         </div>
 
-        {/* ----- Productos + precio / acciones ----- */}
-        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-          {/* Imágenes */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            {/* Principal */}
-            <div
-              className={`relative grid aspect-square place-items-center overflow-hidden rounded-2xl bg-white shadow-lg ${
-                regalo ? "w-24 sm:w-32" : "w-32 sm:w-40"
-              }`}
-            >
-              {product ? (
-                <Image
-                  src={product.imagen}
-                  alt={titulo}
-                  width={300}
-                  height={300}
-                  className="h-full w-full object-contain p-3"
-                />
-              ) : (
-                <span className="text-xs text-slate-400">Sin producto</span>
-              )}
-              {cantLleva > 0 && (
-                <span
-                  className="absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-xs font-extrabold text-white shadow"
-                  style={{ background: paleta.acento }}
-                >
-                  ×{cantLleva}
-                </span>
-              )}
-            </div>
+        {/* ----- Título (acotado, no domina la pieza) ----- */}
+        <h3 className="line-clamp-2 max-w-2xl font-serif text-lg font-bold leading-snug drop-shadow-sm sm:text-2xl">
+          {titulo}
+        </h3>
 
-            {/* Regalo (opcional) */}
-            {regalo && (
-              <>
-                <span className="text-2xl font-black text-white/90 drop-shadow sm:text-3xl">
-                  +
-                </span>
-                <div className="relative grid aspect-square w-20 place-items-center overflow-hidden rounded-2xl bg-white shadow-lg sm:w-28">
-                  <Image
-                    src={regalo.imagen}
-                    alt={regalo.nombre}
-                    width={220}
-                    height={220}
-                    className="h-full w-full object-contain p-2"
-                  />
-                  <span className="absolute left-0 right-0 top-0 bg-emerald-500 py-0.5 text-center text-[9px] font-extrabold uppercase tracking-wide text-white">
-                    🎁 Regalo
-                  </span>
-                  <span className="absolute bottom-1.5 right-1.5 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
-                    ×{cantRegalo}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Precio + acciones */}
-          <div className="flex flex-col gap-3 sm:ml-auto sm:items-end">
-            {promo.mostrarPrecio && product && product.precioVenta > 0 && (
-              <p className="flex items-baseline gap-2">
-                {enOferta && (
-                  <span className="text-base text-white/60 line-through">
-                    {formatARS(product.precioVenta)}
-                  </span>
-                )}
-                <span className="text-3xl font-extrabold drop-shadow-sm sm:text-4xl">
-                  {formatARS(
-                    enOferta ? product.precioOferta! : product.precioVenta
-                  )}
-                </span>
-              </p>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onAdd}
-                disabled={!onAdd}
-                className="rounded-xl bg-white px-6 py-2.5 text-sm font-bold shadow-md transition hover:scale-[1.03] disabled:cursor-default disabled:hover:scale-100"
-                style={{ color: paleta.acento }}
-              >
-                {agregado ? "✓ Agregado" : "Agregar"}
-              </button>
-              {consultaHref ? (
-                <a
-                  href={consultaHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Consultar por WhatsApp"
-                  title="Consultar por WhatsApp"
-                  className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-white shadow-md transition hover:scale-[1.03]"
-                >
-                  <WhatsAppIcon className="h-6 w-6" />
-                </a>
-              ) : (
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-white shadow-md">
-                  <WhatsAppIcon className="h-6 w-6" />
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ----- Descripción a todo el ancho (completa) ----- */}
+        {/* ----- Descripción de la oferta ----- */}
         {promo.texto.trim() && (
-          <div className="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur-sm">
-            <p className="text-sm leading-relaxed text-white sm:text-base">
-              {promo.texto.trim()}
+          <p className="max-w-2xl text-sm leading-relaxed text-white/95 sm:text-base">
+            {promo.texto.trim()}
+          </p>
+        )}
+
+        {/* ----- Precio (con anclaje + ahorro) ----- */}
+        {promo.mostrarPrecio && product && product.precioVenta > 0 && (
+          <div className="flex flex-col items-center gap-1">
+            <p className="flex items-baseline justify-center gap-2">
+              {enOferta && (
+                <span className="text-base text-white/60 line-through">
+                  {formatARS(product.precioVenta)}
+                </span>
+              )}
+              <span className="text-3xl font-extrabold drop-shadow-sm sm:text-4xl">
+                {formatARS(
+                  enOferta ? product.precioOferta! : product.precioVenta
+                )}
+              </span>
             </p>
+            {enOferta && (
+              <span className="rounded-full bg-amber-300 px-3 py-0.5 text-xs font-extrabold uppercase tracking-wide text-amber-950 shadow-sm">
+                Ahorrás {formatARS(product.precioVenta - product.precioOferta!)}
+              </span>
+            )}
           </div>
         )}
+
+        {/* ----- Acciones ----- */}
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={!onAdd}
+            className="rounded-xl bg-white px-6 py-2.5 text-sm font-bold shadow-md transition hover:scale-[1.03] disabled:cursor-default disabled:hover:scale-100"
+            style={{ color: paleta.acento }}
+          >
+            {agregado ? "✓ Agregado" : "Agregar"}
+          </button>
+          {consultaHref ? (
+            <a
+              href={consultaHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Consultar por WhatsApp"
+              title="Consultar por WhatsApp"
+              className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-white shadow-md transition hover:scale-[1.03]"
+            >
+              <WhatsAppIcon className="h-6 w-6" />
+            </a>
+          ) : (
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#25D366] text-white shadow-md">
+              <WhatsAppIcon className="h-6 w-6" />
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
