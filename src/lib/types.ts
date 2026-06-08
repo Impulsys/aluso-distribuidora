@@ -42,6 +42,10 @@ export interface Promocion {
   texto: string; // descripción de la oferta ("Llevá 3 y 1 de regalo", etc.)
   paleta: string; // id de la paleta de fondo (ver PALETAS en lib/promos.ts)
   mostrarPrecio: boolean; // mostrar precio (con tachado si hay oferta)
+  // Oferta combinada (opcional): "llevá N del principal y te regalamos M de otro"
+  cantidadLleva?: number; // cantidad del producto principal a llevar
+  regaloProductId?: string; // producto de regalo (si hay)
+  cantidadRegalo?: number; // cantidad que se regala (por defecto 1)
   activo: boolean;
   orden: number; // orden en el carrusel (menor primero)
   createdAt: number;

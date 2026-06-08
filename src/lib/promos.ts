@@ -58,6 +58,9 @@ export interface NewPromoInput {
   texto: string;
   paleta: string;
   mostrarPrecio: boolean;
+  cantidadLleva?: number;
+  regaloProductId?: string;
+  cantidadRegalo?: number;
   activo: boolean;
   orden: number;
 }
@@ -72,6 +75,14 @@ export function subscribePromos(cb: (xs: Promocion[]) => void): () => void {
   });
 }
 
+// Campos opcionales: presentes solo si tienen valor (Firestore no acepta undefined).
+const OPCIONALES = [
+  "titulo",
+  "cantidadLleva",
+  "regaloProductId",
+  "cantidadRegalo",
+] as const;
+
 function clean(input: NewPromoInput): Record<string, unknown> {
   const out: Record<string, unknown> = {
     productId: input.productId,
@@ -83,6 +94,16 @@ function clean(input: NewPromoInput): Record<string, unknown> {
     orden: input.orden,
   };
   if (input.titulo && input.titulo.trim()) out.titulo = input.titulo.trim();
+  if (input.cantidadLleva && input.cantidadLleva > 0)
+    out.cantidadLleva = input.cantidadLleva;
+  // El regalo solo vale si se eligió un producto de regalo.
+  if (input.regaloProductId) {
+    out.regaloProductId = input.regaloProductId;
+    out.cantidadRegalo =
+      input.cantidadRegalo && input.cantidadRegalo > 0
+        ? input.cantidadRegalo
+        : 1;
+  }
   return out;
 }
 
@@ -103,9 +124,11 @@ export async function updatePromo(
   id: string,
   input: NewPromoInput
 ): Promise<void> {
-  // titulo puede quedar vacío → lo borramos explícitamente.
+  // Los campos opcionales que queden vacíos se borran explícitamente (null).
   const data = clean(input);
-  if (!("titulo" in data)) data.titulo = null;
+  for (const k of OPCIONALES) {
+    if (!(k in data)) data[k] = null;
+  }
   await updateDoc(doc(db, "promociones", id), data);
   logActivity("Editó promoción", { entidad: "promocion", entidadId: id });
 }

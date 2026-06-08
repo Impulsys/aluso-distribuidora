@@ -76,6 +76,11 @@ export default function PromoCarousel() {
         <PromoBanner
           promo={actual.promo}
           product={actual.product}
+          regalo={
+            actual.promo.regaloProductId
+              ? byId.get(actual.promo.regaloProductId)
+              : undefined
+          }
           onAdd={handleAdd}
           consultaHref={
             actual.product ? consultaProductoLink(actual.product) : undefined

@@ -25,6 +25,9 @@ const VACIO: NewPromoInput = {
   texto: "",
   paleta: "violeta",
   mostrarPrecio: true,
+  cantidadLleva: 0,
+  regaloProductId: "",
+  cantidadRegalo: 1,
   activo: true,
   orden: 0,
 };
@@ -35,6 +38,7 @@ export default function PromocionesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<NewPromoInput>(VACIO);
   const [filtro, setFiltro] = useState("");
+  const [filtroRegalo, setFiltroRegalo] = useState("");
   const [busy, setBusy] = useState(false);
   const [ok, setOk] = useState("");
 
@@ -47,20 +51,29 @@ export default function PromocionesPage() {
     () => productos.find((p) => p.id === form.productId),
     [productos, form.productId]
   );
+  const selectedRegalo = useMemo(
+    () => productos.find((p) => p.id === form.regaloProductId),
+    [productos, form.regaloProductId]
+  );
 
-  const productosFiltrados = useMemo(() => {
-    const t = filtro.trim();
+  const buscar = (t: string) => {
     const activos = productos.filter((p) => p.activo);
-    if (!t) return activos.slice(0, 60);
+    if (!t.trim()) return activos.slice(0, 60);
     return activos
       .filter((p) => coincide(p.nombre, t) || coincide(p.ean ?? "", t))
       .slice(0, 60);
-  }, [productos, filtro]);
+  };
+  const productosFiltrados = useMemo(() => buscar(filtro), [productos, filtro]);
+  const productosRegalo = useMemo(
+    () => buscar(filtroRegalo),
+    [productos, filtroRegalo]
+  );
 
   const resetForm = () => {
     setEditId(null);
     setForm(VACIO);
     setFiltro("");
+    setFiltroRegalo("");
   };
 
   const handleEdit = (p: Promocion) => {
@@ -72,10 +85,14 @@ export default function PromocionesPage() {
       texto: p.texto,
       paleta: p.paleta,
       mostrarPrecio: p.mostrarPrecio,
+      cantidadLleva: p.cantidadLleva ?? 0,
+      regaloProductId: p.regaloProductId ?? "",
+      cantidadRegalo: p.cantidadRegalo ?? 1,
       activo: p.activo,
       orden: p.orden ?? 0,
     });
     setFiltro("");
+    setFiltroRegalo("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -229,6 +246,90 @@ export default function PromocionesPage() {
               />
             </div>
 
+            {/* Oferta combinada (opcional): llevá N → regalo de otro producto */}
+            <div className="rounded-xl border border-dashed border-brand-border bg-primary-light/20 p-3">
+              <p className="text-sm font-semibold text-brand-dark">
+                Oferta combinada{" "}
+                <span className="font-normal text-brand-dark/50">
+                  (opcional — “llevá X y te regalamos Y”)
+                </span>
+              </p>
+
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-brand-dark/70">
+                    Cantidad a llevar (del principal)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.cantidadLleva || ""}
+                    onChange={(e) =>
+                      set("cantidadLleva", Number(e.target.value) || 0)
+                    }
+                    placeholder="Ej: 3"
+                    className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-brand-dark/70">
+                    Cantidad de regalo
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.cantidadRegalo || 1}
+                    onChange={(e) =>
+                      set("cantidadRegalo", Number(e.target.value) || 1)
+                    }
+                    className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <label className="mt-3 block text-xs font-medium text-brand-dark/70">
+                Producto de regalo
+              </label>
+              {form.regaloProductId ? (
+                <div className="mt-1 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                  <span className="truncate text-brand-dark">
+                    🎁 {selectedRegalo?.nombre ?? "—"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => set("regaloProductId", "")}
+                    className="ml-2 shrink-0 rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    value={filtroRegalo}
+                    onChange={(e) => setFiltroRegalo(e.target.value)}
+                    placeholder="Buscar el producto de regalo…"
+                    className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <select
+                    value=""
+                    onChange={(e) => set("regaloProductId", e.target.value)}
+                    size={4}
+                    className="mt-2 w-full rounded-lg border border-brand-border bg-white px-2 py-1 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="" disabled>
+                      Elegí un producto…
+                    </option>
+                    {productosRegalo.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+
             {/* Paleta */}
             <div>
               <label className="block text-sm font-medium text-brand-dark">
@@ -281,7 +382,11 @@ export default function PromocionesPage() {
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-primary">
               Vista previa
             </p>
-            <PromoBanner promo={form} product={selectedProduct} />
+            <PromoBanner
+              promo={form}
+              product={selectedProduct}
+              regalo={selectedRegalo}
+            />
             <div className="mt-4 flex items-center gap-3">
               <button
                 onClick={handleSave}

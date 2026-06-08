@@ -9,9 +9,17 @@ import type { Product, Promocion } from "@/lib/types";
 interface Props {
   promo: Pick<
     Promocion,
-    "badge" | "titulo" | "texto" | "paleta" | "mostrarPrecio"
+    | "badge"
+    | "titulo"
+    | "texto"
+    | "paleta"
+    | "mostrarPrecio"
+    | "cantidadLleva"
+    | "cantidadRegalo"
   >;
   product?: Product;
+  /** Producto de regalo de la oferta combinada (opcional). */
+  regalo?: Product;
   /** Si se pasa, el botón "Agregar" funciona; si no, es vista previa. */
   onAdd?: () => void;
   consultaHref?: string;
@@ -25,6 +33,7 @@ interface Props {
 export default function PromoBanner({
   promo,
   product,
+  regalo,
   onAdd,
   consultaHref,
   agregado,
@@ -35,6 +44,8 @@ export default function PromoBanner({
     !!product &&
     (product.precioOferta ?? 0) > 0 &&
     (product.precioOferta ?? 0) < product.precioVenta;
+  const cantLleva = promo.cantidadLleva && promo.cantidadLleva > 0 ? promo.cantidadLleva : 0;
+  const cantRegalo = promo.cantidadRegalo && promo.cantidadRegalo > 0 ? promo.cantidadRegalo : 1;
 
   return (
     <div
@@ -45,18 +56,57 @@ export default function PromoBanner({
       <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
       <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
 
-      {/* Imagen */}
-      <div className="relative z-10 grid aspect-square w-28 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-lg sm:w-44 md:w-52">
-        {product ? (
-          <Image
-            src={product.imagen}
-            alt={titulo}
-            width={300}
-            height={300}
-            className="h-full w-full object-contain p-3"
-          />
-        ) : (
-          <span className="text-xs text-slate-400">Sin producto</span>
+      {/* Imágenes: principal (+ regalo si la oferta es combinada) */}
+      <div className="relative z-10 flex shrink-0 items-center gap-2 sm:gap-3">
+        {/* Principal */}
+        <div
+          className={`relative grid aspect-square place-items-center overflow-hidden rounded-2xl bg-white shadow-lg ${
+            regalo ? "w-24 sm:w-36" : "w-28 sm:w-44 md:w-52"
+          }`}
+        >
+          {product ? (
+            <Image
+              src={product.imagen}
+              alt={titulo}
+              width={300}
+              height={300}
+              className="h-full w-full object-contain p-3"
+            />
+          ) : (
+            <span className="text-xs text-slate-400">Sin producto</span>
+          )}
+          {cantLleva > 0 && (
+            <span
+              className="absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-xs font-extrabold text-white shadow"
+              style={{ background: paleta.acento }}
+            >
+              ×{cantLleva}
+            </span>
+          )}
+        </div>
+
+        {/* Regalo (opcional) */}
+        {regalo && (
+          <>
+            <span className="text-2xl font-black text-white/90 drop-shadow sm:text-3xl">
+              +
+            </span>
+            <div className="relative grid aspect-square w-20 place-items-center overflow-hidden rounded-2xl bg-white shadow-lg sm:w-28">
+              <Image
+                src={regalo.imagen}
+                alt={regalo.nombre}
+                width={220}
+                height={220}
+                className="h-full w-full object-contain p-2"
+              />
+              <span className="absolute left-0 right-0 top-0 bg-emerald-500 py-0.5 text-center text-[9px] font-extrabold uppercase tracking-wide text-white">
+                🎁 Regalo
+              </span>
+              <span className="absolute bottom-1.5 right-1.5 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
+                ×{cantRegalo}
+              </span>
+            </div>
+          </>
         )}
       </div>
 
