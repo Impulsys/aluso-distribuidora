@@ -267,7 +267,8 @@ export default function CuentaCorrienteView({
                                       "—"}
                                     {pg.comisionMonto ? (
                                       <span className="ml-1 text-[10px] text-amber-700">
-                                        (+{formatARS(pg.comisionMonto)} com.)
+                                        ({pg.comisionMonto > 0 ? "+" : ""}
+                                        {formatARS(pg.comisionMonto)} com.)
                                       </span>
                                     ) : null}
                                     {detallePago(pg) && (

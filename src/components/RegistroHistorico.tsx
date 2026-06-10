@@ -335,7 +335,9 @@ export default function RegistroHistorico() {
                               </b>{" "}
                               · {VIA_LABELS[p.via ?? ""] ?? p.via ?? "—"}
                               {p.comisionMonto
-                                ? ` (+${formatARS(p.comisionMonto)} com.)`
+                                ? ` (${p.comisionMonto > 0 ? "+" : ""}${formatARS(
+                                    p.comisionMonto
+                                  )} com.)`
                                 : ""}
                               {detallePago(p) && (
                                 <span className="block text-[10px] text-brand-dark/45">

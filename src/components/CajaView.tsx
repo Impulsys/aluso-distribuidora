@@ -374,7 +374,8 @@ function Movimientos({
                 -{formatARS(p.monto)}
                 {p.comisionMonto ? (
                   <span className="ml-1 text-[10px] text-amber-700">
-                    (+{formatARS(p.comisionMonto)} com.)
+                    ({p.comisionMonto > 0 ? "+" : ""}
+                    {formatARS(p.comisionMonto)} com.)
                   </span>
                 ) : null}
               </span>

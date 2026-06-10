@@ -229,7 +229,8 @@ export default function AdminCuentasPage() {
   const buildOpts = (): PagoOpts => ({
     via: gVia,
     comisionPct: gVia === "agencia" ? Number(gComisionPct) || 0 : undefined,
-    comisionMonto: gVia === "agencia" && comisionMonto > 0 ? comisionMonto : undefined,
+    comisionMonto:
+      gVia === "agencia" && comisionMonto !== 0 ? comisionMonto : undefined,
     arqueoDeposito:
       usaBilletes && totalArqueo(gArqueo) > 0 ? gArqueo : undefined,
     transferNumero:
@@ -273,15 +274,16 @@ export default function AdminCuentasPage() {
       primera = false;
     }
     // Comisión de agencia → queda registrada como gasto financiero del día.
-    if (opts.comisionMonto && opts.comisionMonto > 0) {
+    // Puede ser positiva (costo) o negativa (descuento/reintegro).
+    if (opts.comisionMonto && opts.comisionMonto !== 0) {
       await createExpense({
         fecha,
         tipo: "comision_agencia",
         monto: opts.comisionMonto,
         formaPago: "transferencia",
-        detalle: `Comisión agencia — pago a ${
-          proveedores.find((p) => p.id === gProv)?.nombre ?? ""
-        }`,
+        detalle: `${
+          opts.comisionMonto < 0 ? "Descuento financiera" : "Comisión agencia"
+        } — pago a ${proveedores.find((p) => p.id === gProv)?.nombre ?? ""}`,
         createdBy: user?.uid,
       });
     }
@@ -853,15 +855,14 @@ export default function AdminCuentasPage() {
             {gVia === "agencia" && (
               <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                  Comisión de la financiera (%)
+                  Comisión de la financiera (%) — negativa = descuento
                 </label>
                 <input
                   type="number"
-                  min={0}
                   step="any"
                   value={gComisionPct || ""}
                   onChange={(e) => setGComisionPct(Number(e.target.value))}
-                  placeholder="4"
+                  placeholder="4 (o -4 para restar)"
                   className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
                 />
                 {gMonto > 0 && (
