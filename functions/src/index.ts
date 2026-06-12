@@ -9,11 +9,19 @@
  * Firestore `users/{uid}.role`). El front llama estas funciones con httpsCallable.
  */
 import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { requestCAE, buildAfipQrUrl, fechaHoyAfip, type IvaEntry } from "./afip";
 
 initializeApp();
+
+// ===== Config AFIP (producción) — Distribuidora Los Amigos =====
+const AFIP_CUIT = 20250642114;
+const AFIP_PTO_VENTA = 6;
+const AFIP_CERT = defineSecret("AFIP_CERT"); // .crt en base64
+const AFIP_KEY = defineSecret("AFIP_KEY"); // .key en base64
 
 // Debe coincidir con el dominio sintético usado en el login del front.
 const USER_DOMAIN = "dlanoa.com";
@@ -186,3 +194,175 @@ export const adminDeleteUser = onCall(async (request) => {
 
   return { ok: true };
 });
+
+// ============================================================================
+//  FACTURACIÓN ELECTRÓNICA AFIP
+// ============================================================================
+
+/** Quien factura debe ser staff (vendedor / socio / superadmin). */
+async function assertStaff(request: CallableRequest): Promise<void> {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Necesitás iniciar sesión.");
+  const snap = await getFirestore().collection("users").doc(uid).get();
+  const role = snap.data()?.role;
+  if (!["vendedor", "socio", "superadmin"].includes(role)) {
+    throw new HttpsError("permission-denied", "No tenés permiso para facturar.");
+  }
+}
+
+function condicionIvaReceptorId(cond: string | undefined, tipo: "A" | "B"): number {
+  switch (cond) {
+    case "responsable_inscripto":
+      return 1;
+    case "exento":
+      return 4;
+    case "monotributo":
+      return 6;
+    case "consumidor_final":
+      return 5;
+    default:
+      return tipo === "A" ? 1 : 5; // A → RI · B → Consumidor Final
+  }
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Emite una factura electrónica (A o B) a partir de un remito.
+ * data: { remitoId, tipo: 'A'|'B', clienteCuit?, clienteCondicionIva?, clienteNombre? }
+ */
+export const emitirFactura = onCall(
+  { secrets: [AFIP_CERT, AFIP_KEY] },
+  async (request) => {
+    await assertStaff(request);
+    const db = getFirestore();
+    const data = request.data ?? {};
+
+    const tipo = data.tipo === "A" ? "A" : "B";
+    const remitoId = String(data.remitoId ?? "");
+    if (!remitoId) throw new HttpsError("invalid-argument", "Falta el remito.");
+
+    // Cargar remito
+    const remRef = db.collection("remitos").doc(remitoId);
+    const remSnap = await remRef.get();
+    if (!remSnap.exists) throw new HttpsError("not-found", "No existe el remito.");
+    const remito = remSnap.data() as any;
+
+    // Idempotencia: si ya tiene factura, devolverla
+    if (remito.facturaId) {
+      const f = await db.collection("facturas").doc(remito.facturaId).get();
+      if (f.exists && f.data()?.estado === "emitida") {
+        return { id: f.id, ...f.data(), yaExistia: true };
+      }
+    }
+
+    const total = Number(remito.total) || 0;
+    if (total <= 0)
+      throw new HttpsError("failed-precondition", "El remito no tiene importe válido.");
+
+    // Documento del receptor
+    const cuitDigits = String(data.clienteCuit ?? "").replace(/\D/g, "");
+    let docTipo = 99;
+    let docNro = 0;
+    if (cuitDigits.length === 11) {
+      docTipo = 80;
+      docNro = Number(cuitDigits);
+    } else if (cuitDigits.length === 7 || cuitDigits.length === 8) {
+      docTipo = 96;
+      docNro = Number(cuitDigits);
+    }
+    if (tipo === "A" && docTipo !== 80) {
+      throw new HttpsError(
+        "invalid-argument",
+        "La Factura A requiere el CUIT del cliente (11 dígitos)."
+      );
+    }
+    if (docNro === AFIP_CUIT) {
+      throw new HttpsError(
+        "invalid-argument",
+        "El CUIT del cliente no puede ser el del emisor."
+      );
+    }
+
+    // Importes (IVA 21% incluido en el total)
+    const neto = r2(total / 1.21);
+    const iva = r2(total - neto);
+    const ivaArray: IvaEntry[] = [{ Id: 5, BaseImp: neto, Importe: iva }];
+
+    const certPem = Buffer.from(AFIP_CERT.value(), "base64").toString("utf8");
+    const keyPem = Buffer.from(AFIP_KEY.value(), "base64").toString("utf8");
+    const fechaStr = fechaHoyAfip();
+
+    let cae;
+    try {
+      cae = await requestCAE({
+        certPem,
+        keyPem,
+        cuit: AFIP_CUIT,
+        puntoVenta: AFIP_PTO_VENTA,
+        tipoComprobante: tipo === "A" ? 1 : 6,
+        importeNeto: neto,
+        importeIVA: iva,
+        importeTotal: total,
+        ivaArray,
+        docTipo,
+        docNro,
+        condicionIvaReceptorId: condicionIvaReceptorId(
+          data.clienteCondicionIva,
+          tipo
+        ),
+        fechaStr,
+      });
+    } catch (e) {
+      throw new HttpsError("internal", (e as Error).message);
+    }
+
+    const numeroFmt = `${String(AFIP_PTO_VENTA).padStart(4, "0")}-${String(
+      cae.numero
+    ).padStart(8, "0")}`;
+    const fechaISO = `${fechaStr.slice(0, 4)}-${fechaStr.slice(
+      4,
+      6
+    )}-${fechaStr.slice(6, 8)}`;
+    const qrUrl = buildAfipQrUrl({
+      fecha: fechaISO,
+      cuit: AFIP_CUIT,
+      ptoVta: AFIP_PTO_VENTA,
+      tipoCmp: tipo === "A" ? 1 : 6,
+      nroCmp: cae.numero,
+      importe: total,
+      tipoDocRec: docTipo,
+      nroDocRec: docNro,
+      cae: cae.cae,
+    });
+
+    // Persistir la factura
+    const facturaDoc = {
+      remitoId,
+      remitoNumero: remito.numero ?? "",
+      tipo,
+      consumidorFinal: docTipo === 99,
+      cuit: docTipo === 80 ? String(docNro) : null,
+      razonSocial: data.clienteNombre?.trim() || null,
+      items: remito.items ?? [],
+      neto,
+      iva,
+      total,
+      puntoVenta: AFIP_PTO_VENTA,
+      numero: numeroFmt,
+      cae: cae.cae,
+      caeVto: cae.caeVto,
+      qrUrl,
+      verification: cae.verification,
+      verificationDetail: cae.verificationDetail ?? null,
+      estado: "emitida",
+      createdBy: request.auth?.uid ?? null,
+      createdAt: Date.now(),
+      fecha: Date.now(),
+    };
+    const facturaRef = await db.collection("facturas").add(facturaDoc);
+    await remRef.set({ facturaId: facturaRef.id }, { merge: true });
+
+    return { id: facturaRef.id, ...facturaDoc };
+  }
+);

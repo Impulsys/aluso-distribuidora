@@ -18,10 +18,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "fast-xml-parser": "^5.8.0",
     "firebase-admin": "^13.10.0",
     "node-forge": "^1.4.0",
     "pdfkit": "^0.19.0",
     "sharp": "^0.34.5",
+    "soap": "^1.9.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "xlsx": "^0.18.5"
