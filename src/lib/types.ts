@@ -147,10 +147,13 @@ export interface Factura {
   neto: number;
   iva: number;
   total: number;
-  // AFIP (etapa B): se completan al emitir
-  numero?: string; // nº de comprobante AFIP
+  // AFIP: se completan al emitir
+  numero?: string; // nº de comprobante AFIP (ej "0006-00000002")
+  puntoVenta?: number;
   cae?: string | null;
-  caeVto?: number | null;
+  caeVto?: string | null; // YYYYMMDD (formato AFIP)
+  qrUrl?: string | null; // URL del QR oficial (RG 4291)
+  verification?: "verified" | "mismatch" | "pending" | null;
   estado: "interna" | "emitida";
   createdBy?: string;
   createdAt: number;

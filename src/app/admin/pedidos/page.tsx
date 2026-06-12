@@ -12,13 +12,13 @@ import {
   crearRemitoDesdePedido,
   crearRemitoDirecto,
   subscribeRemitos,
-  crearFactura,
   subscribeFacturas,
   mensajeVentaError,
 } from "@/lib/ventas";
 import { useProducts } from "@/hooks/useProducts";
 import { remitoHTML } from "@/lib/remito-print";
 import { printFactura } from "@/lib/factura-print";
+import { emitirFacturaAfip, mensajeFacturaError } from "@/lib/factura-afip";
 import CajaView from "@/components/CajaView";
 import RegistroHistorico from "@/components/RegistroHistorico";
 import { useAuth } from "@/context/AuthContext";
@@ -757,6 +757,9 @@ function FacturarView() {
   const [consumidorFinal, setConsumidorFinal] = useState(true);
   const [cuit, setCuit] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
+  const [condicion, setCondicion] = useState<
+    "responsable_inscripto" | "monotributo" | "exento"
+  >("responsable_inscripto");
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -777,35 +780,50 @@ function FacturarView() {
     return remitos.filter((r) => coincide(r.numero, t)).slice(0, 8);
   }, [remitos, numero]);
 
+  const esCF = tipo === "B" && consumidorFinal;
+
   const facturar = async () => {
     if (!remito) return;
     if (remito.facturaId) {
       setError("Este remito ya fue facturado.");
       return;
     }
-    if (!consumidorFinal && !cuit.trim()) {
-      setError("Ingresá el CUIT del cliente o marcá consumidor final.");
+    if (!esCF && !cuit.trim()) {
+      setError(
+        tipo === "A"
+          ? "La Factura A requiere el CUIT del cliente."
+          : "Ingresá el CUIT del cliente o marcá consumidor final."
+      );
       return;
     }
     setBusy(true);
     setError(null);
+    setMsg(null);
     try {
-      await crearFactura({
-        remito,
-        tipo,
-        consumidorFinal,
-        cuit: consumidorFinal ? undefined : cuit,
-        razonSocial: consumidorFinal ? undefined : razonSocial,
-        createdBy: user?.uid,
+      const f = await emitirFacturaAfip({
+        remitoId: remito.id,
+        tipo: tipo === "A" ? "A" : "B",
+        clienteCuit: esCF ? undefined : cuit.trim() || undefined,
+        clienteCondicionIva: esCF
+          ? "consumidor_final"
+          : tipo === "A"
+          ? "responsable_inscripto"
+          : condicion,
+        clienteNombre: esCF ? undefined : razonSocial.trim() || undefined,
       });
-      setMsg(`Factura ${tipo} generada para el remito ${remito.numero}.`);
+      setMsg(
+        `✓ Factura ${f.tipo} ${f.numero} emitida. CAE ${f.cae}.${
+          f.yaExistia ? " (ya existía)" : ""
+        }`
+      );
+      void printFactura(f); // abre el PDF con QR
       setRemito(null);
       setNumero("");
       setCuit("");
       setRazonSocial("");
     } catch (e) {
       console.error(e);
-      setError(mensajeVentaError(e));
+      setError(mensajeFacturaError(e));
     } finally {
       setBusy(false);
     }
@@ -822,8 +840,8 @@ function FacturarView() {
           Facturar un remito
         </h2>
         <p className="mb-3 text-xs text-brand-dark/55">
-          Ingresá el nº de remito para traer lo comprado y generar la factura.
-          (La emisión electrónica AFIP se habilita en una etapa siguiente.)
+          Ingresá el nº de remito para traer lo comprado y emitir la factura
+          electrónica en <b>AFIP</b> (CAE + QR oficial). Punto de venta 6.
         </p>
         <input
           value={numero}
@@ -898,34 +916,54 @@ function FacturarView() {
                   onChange={(e) => setTipo(e.target.value as TipoFactura)}
                   className={inputCls}
                 >
-                  <option value="A">Factura A</option>
-                  <option value="B">Factura B</option>
-                  <option value="C">Factura C</option>
+                  <option value="A">Factura A (a Responsable Inscripto)</option>
+                  <option value="B">Factura B (consumidor final / otros)</option>
                 </select>
               </label>
-              <label className="flex items-end gap-2 pb-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={consumidorFinal}
-                  onChange={(e) => setConsumidorFinal(e.target.checked)}
-                />
-                Consumidor final
-              </label>
+              {tipo === "B" && (
+                <label className="flex items-end gap-2 pb-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={consumidorFinal}
+                    onChange={(e) => setConsumidorFinal(e.target.checked)}
+                  />
+                  Consumidor final
+                </label>
+              )}
             </div>
-            {!consumidorFinal && (
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <input
-                  value={cuit}
-                  onChange={(e) => setCuit(e.target.value)}
-                  placeholder="CUIT del cliente"
-                  className={inputCls}
-                />
-                <input
-                  value={razonSocial}
-                  onChange={(e) => setRazonSocial(e.target.value)}
-                  placeholder="Razón social"
-                  className={inputCls}
-                />
+            {!esCF && (
+              <div className="mt-2 space-y-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input
+                    value={cuit}
+                    onChange={(e) => setCuit(e.target.value)}
+                    placeholder={
+                      tipo === "A" ? "CUIT del cliente (obligatorio)" : "CUIT / DNI del cliente"
+                    }
+                    className={inputCls}
+                  />
+                  <input
+                    value={razonSocial}
+                    onChange={(e) => setRazonSocial(e.target.value)}
+                    placeholder="Razón social / nombre"
+                    className={inputCls}
+                  />
+                </div>
+                {tipo === "B" && (
+                  <select
+                    value={condicion}
+                    onChange={(e) =>
+                      setCondicion(e.target.value as typeof condicion)
+                    }
+                    className={inputCls}
+                  >
+                    <option value="responsable_inscripto">
+                      Cliente: Responsable Inscripto
+                    </option>
+                    <option value="monotributo">Cliente: Monotributista</option>
+                    <option value="exento">Cliente: Exento</option>
+                  </select>
+                )}
               </div>
             )}
 
@@ -937,8 +975,8 @@ function FacturarView() {
               {remito.facturaId
                 ? "Remito ya facturado"
                 : busy
-                ? "Generando…"
-                : "Generar factura"}
+                ? "Emitiendo en AFIP…"
+                : "Emitir factura AFIP"}
             </button>
           </div>
         )}
@@ -973,7 +1011,7 @@ function FacturarView() {
               >
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">
-                    Factura {f.tipo} · {f.remitoNumero}
+                    Factura {f.tipo} · {f.numero || f.remitoNumero}
                     <span
                       className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                         f.estado === "emitida"
