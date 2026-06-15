@@ -76,6 +76,12 @@ service cloud.firestore {
       allow write: if isSuperadmin();
     }
 
+    // ===== clientes ===== (CRM: lo usan vendedores y socios)
+    match /clientes/{id} {
+      allow read, create, update: if isVendedorOrUp();
+      allow delete: if isSocioOrUp();
+    }
+
     // ===== orders ===== (pedidos web/vendedor)
     match /orders/{id} {
       // El que crea el pedido debe ser el dueño (createdBy) y el total un número.

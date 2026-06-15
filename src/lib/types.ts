@@ -53,6 +53,35 @@ export interface Promocion {
   createdAt: number;
 }
 
+// ===== Clientes (CRM simple) =====
+export type CondicionIva =
+  | "responsable_inscripto"
+  | "monotributo"
+  | "exento"
+  | "consumidor_final";
+
+export const CONDICION_IVA_LABELS: Record<CondicionIva, string> = {
+  responsable_inscripto: "Responsable Inscripto",
+  monotributo: "Monotributista",
+  exento: "Exento",
+  consumidor_final: "Consumidor Final",
+};
+
+export interface Cliente {
+  id: string;
+  nombre: string; // nombre / contacto
+  razonSocial?: string;
+  cuit?: string;
+  condicionIva?: CondicionIva;
+  email?: string;
+  telefono?: string;
+  direccionEntrega?: string;
+  domicilioFiscal?: string;
+  vendedorId?: string; // quién lo cargó (automático)
+  vendedorNombre?: string; // snapshot
+  createdAt: number;
+}
+
 export type Marca = "doncella" | "nonisec" | "lenterdit";
 
 export const MARCAS: Record<Marca, string> = {
