@@ -5,6 +5,8 @@ import { useProducts } from "@/hooks/useProducts";
 import {
   PALETAS,
   BADGES_SUGERIDOS,
+  COLORES_TEXTO,
+  COLOR_TEXTO_DEFAULT,
   getPaleta,
   subscribePromos,
   createPromo,
@@ -24,10 +26,12 @@ const VACIO: NewPromoInput = {
   titulo: "",
   texto: "",
   paleta: "violeta",
+  colorTexto: COLOR_TEXTO_DEFAULT,
   mostrarPrecio: true,
   cantidadLleva: 0,
   regaloProductId: "",
   cantidadRegalo: 1,
+  textoRegalo: "GRATIS",
   activo: true,
   orden: 0,
 };
@@ -84,10 +88,12 @@ export default function PromocionesPage() {
       titulo: p.titulo ?? "",
       texto: p.texto,
       paleta: p.paleta,
+      colorTexto: p.colorTexto ?? COLOR_TEXTO_DEFAULT,
       mostrarPrecio: p.mostrarPrecio,
       cantidadLleva: p.cantidadLleva ?? 0,
       regaloProductId: p.regaloProductId ?? "",
       cantidadRegalo: p.cantidadRegalo ?? 1,
+      textoRegalo: p.textoRegalo ?? "GRATIS",
       activo: p.activo,
       orden: p.orden ?? 0,
     });
@@ -328,6 +334,21 @@ export default function PromocionesPage() {
                   </select>
                 </>
               )}
+
+              {form.regaloProductId && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-brand-dark/70">
+                    Cartel del regalo
+                  </label>
+                  <input
+                    value={form.textoRegalo || ""}
+                    onChange={(e) => set("textoRegalo", e.target.value)}
+                    placeholder="GRATIS"
+                    maxLength={14}
+                    className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Paleta */}
@@ -354,6 +375,36 @@ export default function PromocionesPage() {
               <p className="mt-1 text-xs text-brand-dark/50">
                 {getPaleta(form.paleta).label}
               </p>
+            </div>
+
+            {/* Color de las letras */}
+            <div>
+              <label className="block text-sm font-medium text-brand-dark">
+                Color de las letras
+              </label>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {COLORES_TEXTO.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => set("colorTexto", c)}
+                    title={c}
+                    className={`h-9 w-9 rounded-full border border-brand-border ring-2 ring-offset-2 transition ${
+                      (form.colorTexto || COLOR_TEXTO_DEFAULT) === c
+                        ? "ring-brand-dark"
+                        : "ring-transparent hover:ring-brand-dark/30"
+                    }`}
+                    style={{ background: c }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={form.colorTexto || COLOR_TEXTO_DEFAULT}
+                  onChange={(e) => set("colorTexto", e.target.value)}
+                  title="Color personalizado"
+                  className="h-9 w-12 cursor-pointer rounded-lg border border-brand-border bg-white"
+                />
+              </div>
             </div>
 
             {/* Opciones */}

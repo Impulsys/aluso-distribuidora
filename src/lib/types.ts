@@ -40,12 +40,14 @@ export interface Promocion {
   badge: string; // cartel: "OFERTA" | "PROMOCIÓN" | "2x1" | texto libre
   titulo?: string; // título override (si vacío usa el nombre del producto)
   texto: string; // descripción de la oferta ("Llevá 3 y 1 de regalo", etc.)
-  paleta: string; // id de la paleta de fondo (ver PALETAS en lib/promos.ts)
+  paleta: string; // id de la paleta de fondo (color sólido, ver PALETAS)
+  colorTexto?: string; // color de las letras del anuncio (hex)
   mostrarPrecio: boolean; // mostrar precio (con tachado si hay oferta)
   // Oferta combinada (opcional): "llevá N del principal y te regalamos M de otro"
   cantidadLleva?: number; // cantidad del producto principal a llevar
   regaloProductId?: string; // producto de regalo (si hay)
   cantidadRegalo?: number; // cantidad que se regala (por defecto 1)
+  textoRegalo?: string; // cartel del regalo (default "GRATIS")
   activo: boolean;
   orden: number; // orden en el carrusel (menor primero)
   createdAt: number;

@@ -1,7 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 import Image from "next/image";
 import ProductCatalog from "@/components/ProductCatalog";
-import PromoCarousel from "@/components/PromoCarousel";
+import PromoGrid from "@/components/PromoGrid";
 import MarqueeProducts from "@/components/MarqueeProducts";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
@@ -87,7 +87,7 @@ export default function CatalogoPage() {
         </div>
       </section>
 
-      <PromoCarousel />
+      <PromoGrid />
 
       <Suspense
         fallback={
