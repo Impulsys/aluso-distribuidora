@@ -1,12 +1,16 @@
 import {
   collection,
   addDoc,
+  doc,
+  updateDoc,
+  onSnapshot,
   query,
   where,
   limit,
   getDocs,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { logActivity } from "./bitacora";
 import { findTruckForDay } from "./trucks";
 import type {
   CartItem,
@@ -94,4 +98,39 @@ export async function getAllOrders(max = 100): Promise<Order[]> {
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() } as Order))
     .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Pedidos con entrega agendada en [start, end). Para la sección Entregas. */
+export function subscribeOrdersByEntrega(
+  start: number,
+  end: number,
+  cb: (xs: Order[]) => void
+): () => void {
+  const q = query(
+    collection(db, "orders"),
+    where("fechaEntrega", ">=", start),
+    where("fechaEntrega", "<", end)
+  );
+  return onSnapshot(q, (snap) => {
+    cb(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as Order))
+        .sort((a, b) => (a.horarioEntrega ?? "").localeCompare(b.horarioEntrega ?? ""))
+    );
+  });
+}
+
+/** Marca/desmarca un pedido como entregado. */
+export async function setOrderEntregado(
+  id: string,
+  entregado: boolean
+): Promise<void> {
+  await updateDoc(doc(db, "orders", id), {
+    entregado,
+    fechaEntregado: entregado ? Date.now() : null,
+  });
+  logActivity(entregado ? "Marcó entrega" : "Desmarcó entrega", {
+    entidad: "pedido",
+    entidadId: id,
+  });
 }
