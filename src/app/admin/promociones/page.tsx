@@ -433,11 +433,13 @@ export default function PromocionesPage() {
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-primary">
               Vista previa
             </p>
-            <PromoBanner
-              promo={form}
-              product={selectedProduct}
-              regalo={selectedRegalo}
-            />
+            <div className="mx-auto max-w-md">
+              <PromoBanner
+                promo={form}
+                product={selectedProduct}
+                regalo={selectedRegalo}
+              />
+            </div>
             <div className="mt-4 flex items-center gap-3">
               <button
                 onClick={handleSave}
