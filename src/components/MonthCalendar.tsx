@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { findTruckForDay } from "@/lib/trucks";
-import type { Remito, Truck } from "@/lib/types";
+import type { Order, Remito, Truck } from "@/lib/types";
 
 const MONTH_NAMES = [
   "Enero",
@@ -36,6 +36,7 @@ export interface MonthCalendarProps {
   month: number; // 0-11
   trucks: Truck[];
   remitos: Remito[]; // ventas (remitos) del año
+  orders?: Order[]; // pedidos (para puntito de vendedor y de entrega)
   onDayClick: (ts: number) => void;
 }
 
@@ -44,6 +45,7 @@ export default function MonthCalendar({
   month,
   trucks,
   remitos,
+  orders = [],
   onDayClick,
 }: MonthCalendarProps) {
   const today = useMemo(() => {
@@ -76,6 +78,26 @@ export default function MonthCalendar({
     });
     return map;
   }, [remitos, year, month]);
+
+  // Días en que vendió un VENDEDOR (puntito púrpura) y días con entrega
+  // agendada (puntito azul).
+  const { vendioVendedor, conEntrega } = useMemo(() => {
+    const v = new Set<number>();
+    const e = new Set<number>();
+    orders.forEach((o) => {
+      if (o.createdByRole === "vendedor") {
+        const d = new Date(o.createdAt);
+        if (d.getFullYear() === year && d.getMonth() === month)
+          v.add(d.getDate());
+      }
+      if (o.fechaEntrega) {
+        const d = new Date(o.fechaEntrega);
+        if (d.getFullYear() === year && d.getMonth() === month)
+          e.add(d.getDate());
+      }
+    });
+    return { vendioVendedor: v, conEntrega: e };
+  }, [orders, year, month]);
 
   return (
     <div className="rounded-xl border border-brand-border bg-surface p-3 shadow-sm">
@@ -138,6 +160,17 @@ export default function MonthCalendar({
               <span className="absolute inset-0 grid place-items-center">
                 {cell.day}
               </span>
+              {/* Puntitos: púrpura = vendió un vendedor · azul = entrega agendada */}
+              {(vendioVendedor.has(cell.day) || conEntrega.has(cell.day)) && (
+                <span className="absolute inset-x-0 bottom-0.5 flex justify-center gap-0.5">
+                  {vendioVendedor.has(cell.day) && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-purple-600" />
+                  )}
+                  {conEntrega.has(cell.day) && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                  )}
+                </span>
+              )}
             </button>
           );
         })}

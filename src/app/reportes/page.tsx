@@ -24,11 +24,13 @@ import {
 import { useProducts } from "@/hooks/useProducts";
 import { subscribeProductCosts } from "@/lib/admin";
 import { subscribeRemitos } from "@/lib/ventas";
+import { getAllOrders } from "@/lib/orders";
 import MonthCalendar from "@/components/MonthCalendar";
 import DayReportModal from "@/components/DayReportModal";
 import { formatARS } from "@/lib/format";
 import type {
   DailyExpense,
+  Order,
   Purchase,
   Remito,
   SupplierPayment,
@@ -60,6 +62,7 @@ export default function ReportesPage() {
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [costs, setCosts] = useState<Record<string, number>>({});
   const [remitos, setRemitos] = useState<Remito[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const productos = useProducts();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,7 @@ export default function ReportesPage() {
     const u4 = subscribeSupplierPayments(setSupplierPayments);
     const u5 = subscribeProductCosts(setCosts);
     const u6 = subscribeRemitos(setRemitos);
+    getAllOrders(500).then(setOrders).catch(() => {});
     return () => {
       u1();
       u2();
@@ -324,6 +328,8 @@ export default function ReportesPage() {
           <Legend swatch="bg-emerald-300" label="Con ventas" />
           <Legend swatch="bg-rose-300" label="Sin ventas" />
           <Legend swatch="bg-slate-200" label="Futuro" />
+          <Legend swatch="bg-purple-600" label="Vendió un vendedor" />
+          <Legend swatch="bg-blue-600" label="Entrega agendada" />
         </div>
       </div>
 
@@ -375,6 +381,7 @@ export default function ReportesPage() {
               month={m}
               trucks={trucks}
               remitos={remitos}
+              orders={orders}
               onDayClick={(ts) => setDayOpen(ts)}
             />
           ))}
