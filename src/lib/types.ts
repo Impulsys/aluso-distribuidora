@@ -123,6 +123,7 @@ export interface Order {
   origin: OrderOrigin;
   createdBy: string; // uid o "anonimo"
   createdByName: string;
+  createdByRole?: Role; // rol de quien cargó el pedido (snapshot)
   items: CartItem[];
   total: number;
   status: OrderStatus;

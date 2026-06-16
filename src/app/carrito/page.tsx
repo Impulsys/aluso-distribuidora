@@ -83,6 +83,7 @@ export default function CarritoPage() {
         origin: "vendedor",
         createdBy: user.uid,
         createdByName: user.displayName,
+        createdByRole: user.role,
         items,
         total,
         clienteNombre: nombre.trim() || undefined,

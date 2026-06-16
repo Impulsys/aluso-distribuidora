@@ -20,6 +20,7 @@ export interface CreateOrderInput {
   origin: OrderOrigin;
   createdBy: string;
   createdByName: string;
+  createdByRole?: Order["createdByRole"];
   items: CartItem[];
   total: number;
   clienteNombre?: string;
