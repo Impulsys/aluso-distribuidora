@@ -76,14 +76,14 @@ export default function PromoBanner({
         }`}
       >
         {/* Principal */}
-        <div className="relative flex h-56 items-center justify-center sm:h-80">
+        <div className="relative flex h-44 items-center justify-center sm:h-60">
           {product ? (
             <Image
               src={product.imagen}
               alt={titulo}
-              width={500}
-              height={500}
-              className="h-full w-auto max-w-full object-contain"
+              width={400}
+              height={400}
+              className="h-full w-auto object-contain"
               style={{ mixBlendMode: "multiply" }}
             />
           ) : (
@@ -108,13 +108,13 @@ export default function PromoBanner({
             >
               +
             </span>
-            <div className="relative flex h-48 items-center justify-center sm:h-64">
+            <div className="relative flex h-36 items-center justify-center sm:h-48">
               <Image
                 src={regalo.imagen}
                 alt={regalo.nombre}
-                width={420}
-                height={420}
-                className="h-full w-auto max-w-full object-contain"
+                width={320}
+                height={320}
+                className="h-full w-auto object-contain"
                 style={{ mixBlendMode: "multiply" }}
               />
               <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-white shadow">
