@@ -128,6 +128,17 @@ export interface Order {
   status: OrderStatus;
   clienteNombre?: string;
   clienteTelefono?: string;
+  // Cliente guardado (CRM) + datos snapshot para la entrega/factura
+  clienteId?: string;
+  clienteCuit?: string;
+  clienteRazonSocial?: string;
+  clienteCondicionIva?: CondicionIva;
+  clienteDireccion?: string;
+  // Entrega
+  fechaEntrega?: number; // día agendado de entrega (timestamp)
+  horarioEntrega?: string; // ej "10 a 12" o "16:30"
+  entregado?: boolean; // se marca en la sección Entregas
+  fechaEntregado?: number; // cuándo se marcó entregado
   notas?: string;
   formaPago?: FormaPago; // efectivo / cheque / transferencia
   truckId?: string; // asignación al camión activo del día

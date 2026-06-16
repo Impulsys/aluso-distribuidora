@@ -24,6 +24,13 @@ export interface CreateOrderInput {
   total: number;
   clienteNombre?: string;
   clienteTelefono?: string;
+  clienteId?: string;
+  clienteCuit?: string;
+  clienteRazonSocial?: string;
+  clienteCondicionIva?: Order["clienteCondicionIva"];
+  clienteDireccion?: string;
+  fechaEntrega?: number;
+  horarioEntrega?: string;
   notas?: string;
   formaPago?: FormaPago;
 }

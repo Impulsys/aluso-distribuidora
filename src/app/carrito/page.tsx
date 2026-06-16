@@ -1,14 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { formatARS } from "@/lib/format";
+import { formatARS, tsFromISO } from "@/lib/format";
 import { pedidoCarritoLink } from "@/lib/order";
 import { createOrder } from "@/lib/orders";
-import type { FormaPago } from "@/lib/types";
+import { subscribeClientes, createCliente } from "@/lib/clientes";
+import {
+  CONDICION_IVA_LABELS,
+  type Cliente,
+  type CondicionIva,
+  type FormaPago,
+} from "@/lib/types";
 
 const FORMAS: { id: FormaPago; label: string; emoji: string }[] = [
   { id: "efectivo", label: "Efectivo", emoji: "💵" },
@@ -27,8 +33,26 @@ export default function CarritoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Clientes (CRM) + entrega
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteSel, setClienteSel] = useState<Cliente | null>(null);
+  const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [fechaEntrega, setFechaEntrega] = useState("");
+  const [horario, setHorario] = useState("");
+
   const isVendedor =
     user?.role === "vendedor" || user?.role === "superadmin";
+
+  useEffect(() => subscribeClientes(setClientes), []);
+
+  const elegirCliente = (id: string) => {
+    const c = clientes.find((x) => x.id === id) ?? null;
+    setClienteSel(c);
+    if (c) {
+      setNombre(c.nombre);
+      if (c.telefono) setTelefono(c.telefono);
+    }
+  };
 
   if (count === 0) {
     return (
@@ -63,6 +87,13 @@ export default function CarritoPage() {
         total,
         clienteNombre: nombre.trim() || undefined,
         clienteTelefono: telefono.trim() || undefined,
+        clienteId: clienteSel?.id,
+        clienteCuit: clienteSel?.cuit,
+        clienteRazonSocial: clienteSel?.razonSocial,
+        clienteCondicionIva: clienteSel?.condicionIva,
+        clienteDireccion: clienteSel?.direccionEntrega,
+        fechaEntrega: fechaEntrega ? tsFromISO(fechaEntrega) : undefined,
+        horarioEntrega: horario.trim() || undefined,
         notas: nota.trim() || undefined,
         formaPago,
       });
@@ -160,8 +191,48 @@ export default function CarritoPage() {
       </div>
 
       <div className="mt-6 grid gap-3 rounded-xl border border-brand-border bg-surface p-4">
+        {isVendedor && (
+          <div>
+            <label className="text-sm font-medium">
+              Cliente guardado
+              <select
+                value={clienteSel?.id ?? ""}
+                onChange={(e) => elegirCliente(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-brand-border bg-white px-3 py-2 outline-none focus:border-primary"
+              >
+                <option value="">— Sin cliente / nombre manual —</option>
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                    {c.razonSocial ? ` · ${c.razonSocial}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => setNuevoOpen((v) => !v)}
+              className="mt-2 rounded-lg bg-primary-light px-3 py-1.5 text-xs font-semibold text-primary"
+            >
+              {nuevoOpen ? "Cerrar" : "➕ Nuevo cliente"}
+            </button>
+            {nuevoOpen && (
+              <NuevoClienteInline
+                vendedorId={user?.uid}
+                vendedorNombre={user?.displayName}
+                onCreated={(c) => {
+                  setClienteSel(c);
+                  setNombre(c.nombre);
+                  if (c.telefono) setTelefono(c.telefono);
+                  setNuevoOpen(false);
+                }}
+              />
+            )}
+          </div>
+        )}
+
         <label className="text-sm font-medium">
-          {isVendedor ? "Cliente" : "Tu nombre (opcional)"}
+          {isVendedor ? "Nombre del cliente" : "Tu nombre (opcional)"}
           <input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
@@ -170,15 +241,37 @@ export default function CarritoPage() {
           />
         </label>
         {isVendedor && (
-          <label className="text-sm font-medium">
-            Teléfono del cliente
-            <input
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              placeholder="Ej: 387 555-1234"
-              className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
-            />
-          </label>
+          <>
+            <label className="text-sm font-medium">
+              Teléfono del cliente
+              <input
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                placeholder="Ej: 387 555-1234"
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm font-medium">
+                Fecha de entrega
+                <input
+                  type="date"
+                  value={fechaEntrega}
+                  onChange={(e) => setFechaEntrega(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+                />
+              </label>
+              <label className="text-sm font-medium">
+                Horario
+                <input
+                  value={horario}
+                  onChange={(e) => setHorario(e.target.value)}
+                  placeholder="ej. 10 a 12"
+                  className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+                />
+              </label>
+            </div>
+          </>
         )}
         <div>
           <span className="block text-sm font-medium">
@@ -256,6 +349,119 @@ export default function CarritoPage() {
           ? "El pedido queda guardado en la plataforma + se abre WhatsApp con el detalle precargado."
           : "Al enviar se abre WhatsApp con tu pedido precargado. La distribuidora te confirma stock y coordina el pago."}
       </p>
+    </div>
+  );
+}
+
+// ===== Alta rápida de cliente desde el carrito (vendedor) =====
+function NuevoClienteInline({
+  vendedorId,
+  vendedorNombre,
+  onCreated,
+}: {
+  vendedorId?: string;
+  vendedorNombre?: string;
+  onCreated: (c: Cliente) => void;
+}) {
+  const [f, setF] = useState({
+    nombre: "",
+    razonSocial: "",
+    cuit: "",
+    condicionIva: "consumidor_final" as CondicionIva,
+    telefono: "",
+    email: "",
+    direccionEntrega: "",
+    domicilioFiscal: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
+  const cls =
+    "mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-primary";
+
+  const guardar = async () => {
+    if (!f.nombre.trim()) {
+      alert("Poné al menos el nombre del cliente.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const id = await createCliente({ ...f, vendedorId, vendedorNombre });
+      onCreated({ id, createdAt: Date.now(), ...f } as Cliente);
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo crear el cliente.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 grid gap-2 rounded-lg border border-dashed border-brand-border bg-primary-light/20 p-3">
+      <input
+        value={f.nombre}
+        onChange={(e) => set("nombre", e.target.value)}
+        placeholder="Nombre / contacto *"
+        className={cls}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          value={f.razonSocial}
+          onChange={(e) => set("razonSocial", e.target.value)}
+          placeholder="Razón social"
+          className={cls}
+        />
+        <input
+          value={f.cuit}
+          onChange={(e) => set("cuit", e.target.value)}
+          placeholder="CUIT"
+          className={cls}
+        />
+      </div>
+      <select
+        value={f.condicionIva}
+        onChange={(e) => set("condicionIva", e.target.value)}
+        className={cls}
+      >
+        {(Object.keys(CONDICION_IVA_LABELS) as CondicionIva[]).map((c) => (
+          <option key={c} value={c}>
+            {CONDICION_IVA_LABELS[c]}
+          </option>
+        ))}
+      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          value={f.telefono}
+          onChange={(e) => set("telefono", e.target.value)}
+          placeholder="Teléfono"
+          className={cls}
+        />
+        <input
+          value={f.email}
+          onChange={(e) => set("email", e.target.value)}
+          placeholder="Email"
+          className={cls}
+        />
+      </div>
+      <input
+        value={f.direccionEntrega}
+        onChange={(e) => set("direccionEntrega", e.target.value)}
+        placeholder="Dirección de entrega"
+        className={cls}
+      />
+      <input
+        value={f.domicilioFiscal}
+        onChange={(e) => set("domicilioFiscal", e.target.value)}
+        placeholder="Domicilio fiscal"
+        className={cls}
+      />
+      <button
+        type="button"
+        onClick={guardar}
+        disabled={busy}
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {busy ? "Guardando…" : "Guardar cliente"}
+      </button>
     </div>
   );
 }
