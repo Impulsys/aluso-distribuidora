@@ -38,18 +38,22 @@ export function horaCorta(ts: number): string {
 
 // Estilos del ticket de 80mm (ancho real ~72mm de contenido).
 const TICKET_CSS = `
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   @page { size: 80mm auto; margin: 0; }
-  html, body { margin: 0; }
-  body { width: 80mm; padding: 4mm 3mm 8mm; color: #000;
-         font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.35; }
-  h1 { font-size: 14px; margin: 0; text-align: center; }
+  html { margin: 0; }
+  body { width: 80mm; margin: 0 auto; padding: 4mm 3mm 8mm; color: #000;
+         font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.35;
+         text-align: center;
+         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  h1 { font-size: 15px; margin: 0; text-align: center; }
   .sub { text-align: center; font-size: 10px; color: #222; }
-  .logo { margin: 0 auto 6px; width: 74px; height: 74px; background: #6b46a8;
-          border-radius: 9px; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; color: #fff; padding: 4px; }
-  .logo b { font-weight: 800; font-size: 14px; line-height: 1.1; }
-  .logo small { font-size: 6.5px; letter-spacing: 1.5px; margin-top: 4px; }
+  .logo { margin: 0 auto 6px; width: 84px; height: 84px; background: #6b46a8 !important;
+          border-radius: 10px; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; color: #fff !important; padding: 5px;
+          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .logo b { font-weight: 800; font-size: 16px; line-height: 1.1; }
+  .logo small { font-size: 7px; letter-spacing: 1.5px; margin-top: 4px; }
   .doc { text-align: center; font-weight: 800; font-size: 14px; margin: 6px 0 2px; }
   .hr { border-top: 1px dashed #000; margin: 6px 0; }
   .row { display: flex; justify-content: space-between; gap: 8px; }
