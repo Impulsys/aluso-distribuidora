@@ -146,6 +146,9 @@ export async function createProduct(input: NewProductInput): Promise<string> {
       "https://placehold.co/600x600/006081/ffffff?text=Producto",
     stock: input.stock ?? 0,
     activo: true,
+    // Si el EAN coincide con un producto borrado, al recrearlo lo "revivimos"
+    // (sin esto, el merge mantenía eliminado:true y el producto quedaba oculto).
+    eliminado: false,
   };
   // Quitar undefined (Firestore los rechaza)
   const clean = Object.fromEntries(
