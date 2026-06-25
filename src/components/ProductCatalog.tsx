@@ -230,9 +230,16 @@ export default function ProductCatalog() {
 
               {/* === Content === */}
               <div className="flex flex-1 flex-col p-3">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-primary transition-colors group-hover:text-primary-dark">
-                  {p.categoria}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-primary transition-colors group-hover:text-primary-dark">
+                    {p.categoria}
+                  </span>
+                  {p.codigo && (
+                    <span className="rounded-full bg-brand-dark px-2 py-0.5 text-[10px] font-bold text-white">
+                      Cód {p.codigo}
+                    </span>
+                  )}
+                </div>
                 <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-tight text-brand-dark transition-colors group-hover:text-primary-dark">
                   {p.nombre}
                 </h3>

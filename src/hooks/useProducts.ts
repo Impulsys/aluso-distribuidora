@@ -43,6 +43,7 @@ export function useProducts(): Product[] {
       .map(([id, d]) => ({
         id,
         ean: d.ean,
+        codigo: d.codigo,
         marca: d.marca ?? "nonisec",
         nombre: d.nombre ?? "(sin nombre)",
         descripcion: d.descripcion ?? "",
