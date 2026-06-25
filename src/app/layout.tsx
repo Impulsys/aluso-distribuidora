@@ -18,7 +18,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://distribuidora-los-amigos-noa.web.app"),
+  metadataBase: new URL("https://distribuidoralosamigosnoa.com.ar"),
   title: {
     default: "Distribuidora Los Amigos NOA · Mayorista del NOA",
     template: "%s · Distribuidora Los Amigos NOA",
