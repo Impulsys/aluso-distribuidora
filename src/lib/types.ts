@@ -151,6 +151,7 @@ export interface Order {
 
 export interface RemitoItem {
   productId: string;
+  codigo?: string; // código interno del producto (snapshot, para el ticket)
   nombre: string;
   cantidad: number;
   precioVenta: number; // ARS por unidad al momento de la venta

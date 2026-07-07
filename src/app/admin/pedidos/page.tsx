@@ -144,6 +144,7 @@ function NuevaVentaView() {
         ...prev,
         {
           productId: p.id,
+          codigo: p.codigo,
           nombre: p.nombre,
           cantidad: 1,
           precioVenta: p.precioVenta,
@@ -183,6 +184,7 @@ function NuevaVentaView() {
     // Sanitizar cantidades/precios (evita NaN o 0 que contaminan totales)
     const items: RemitoItem[] = lines.map((l) => ({
       productId: l.productId,
+      codigo: l.codigo,
       nombre: l.nombre,
       cantidad: Math.max(1, Math.floor(Number(l.cantidad) || 0)),
       precioVenta: Math.max(0, Number(l.precioVenta) || 0),
@@ -205,7 +207,7 @@ function NuevaVentaView() {
         createdBy: user?.uid,
       });
       if (printWin) {
-        printWin.document.write(remitoHTML(r, { autoprint: true }));
+        printWin.document.write(remitoHTML(r));
         printWin.document.close();
         printWin.focus();
       }

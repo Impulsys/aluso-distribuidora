@@ -42,10 +42,9 @@ const TICKET_CSS = `
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   @page { size: 80mm auto; margin: 0; }
   html { margin: 0; }
-  body { width: 80mm; margin: 0 auto; padding: 4mm 3mm 8mm; color: #000;
+  body { width: 74mm; margin: 0 auto; padding: 3mm 2mm 6mm; color: #000;
          font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.35;
-         text-align: center;
-         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+         text-align: center; }
   h1 { font-size: 15px; margin: 0; text-align: center; }
   .sub { text-align: center; font-size: 10px; color: #222; }
   /* Logo monocromático (imprime nítido en térmica/B&N): borde negro, sin relleno. */
@@ -66,11 +65,17 @@ const TICKET_CSS = `
   .nota { margin-top: 8px; text-align: center; font-size: 9px; color: #555; }
   .firma { margin-top: 24px; border-top: 1px solid #000; padding-top: 3px;
            text-align: center; font-size: 10px; color: #444; }
-  .toolbar { position: fixed; top: 8px; right: 8px; display: flex; gap: 6px; }
-  .toolbar button { cursor: pointer; border: 0; border-radius: 8px; padding: 8px 12px;
-                    font-size: 12px; font-weight: 700; }
+  .toolbar { position: fixed; top: 6px; left: 6px; right: 6px; display: flex; gap: 6px;
+             flex-wrap: wrap; justify-content: center; }
+  .toolbar button { cursor: pointer; border: 0; border-radius: 8px; padding: 7px 10px;
+                    font-size: 11px; font-weight: 700; }
   .toolbar .pr { background: #006081; color: #fff; }
   .toolbar .cl { background: #e2e8f0; color: #1e293b; }
+  /* Copia (ORIGINAL / DUPLICADO) y salto de página */
+  .copia { margin: 5px auto 3px; width: 62%; border: 1px solid #000; border-radius: 5px;
+           padding: 2px 0; font-weight: 800; font-size: 12px; letter-spacing: 3px; }
+  .pagebreak { page-break-before: always; }
+  body.solo-original .copia-dup { display: none !important; }
   @media print { .toolbar { display: none !important; } }
 `;
 
@@ -94,6 +99,13 @@ export function ticketDoc(
       : ""
   }
 </body></html>`;
+}
+
+/** Envuelve un body arbitrario con el <html> + CSS del ticket (sin toolbar fijo). */
+export function ticketShell(title: string, body: string): string {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>${esc(title)}</title><style>${TICKET_CSS}</style></head>
+<body>${body}</body></html>`;
 }
 
 export function abrirTicket(html: string): void {
