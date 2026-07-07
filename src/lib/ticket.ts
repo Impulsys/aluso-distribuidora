@@ -48,12 +48,12 @@ const TICKET_CSS = `
          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   h1 { font-size: 15px; margin: 0; text-align: center; }
   .sub { text-align: center; font-size: 10px; color: #222; }
-  .logo { margin: 0 auto 6px; width: 84px; height: 84px; background: #6b46a8 !important;
-          border-radius: 10px; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; color: #fff !important; padding: 5px;
-          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .logo b { font-weight: 800; font-size: 16px; line-height: 1.1; }
-  .logo small { font-size: 7px; letter-spacing: 1.5px; margin-top: 4px; }
+  /* Logo monocromático (imprime nítido en térmica/B&N): borde negro, sin relleno. */
+  .logo { margin: 0 auto 6px; width: 88px; height: 88px; background: #fff; border: 3px solid #000;
+          border-radius: 12px; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; color: #000; padding: 5px; }
+  .logo b { font-weight: 800; font-size: 17px; line-height: 1.05; color: #000; }
+  .logo small { font-size: 7px; letter-spacing: 1.5px; margin-top: 5px; color: #000; }
   .doc { text-align: center; font-weight: 800; font-size: 14px; margin: 6px 0 2px; }
   .hr { border-top: 1px dashed #000; margin: 6px 0; }
   .row { display: flex; justify-content: space-between; gap: 8px; }
