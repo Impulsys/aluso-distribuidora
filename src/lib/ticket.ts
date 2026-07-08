@@ -43,28 +43,28 @@ const TICKET_CSS = `
   @page { size: 80mm auto; margin: 0; }
   html { margin: 0; }
   body { width: 74mm; margin: 0 auto; padding: 3mm 2mm 6mm; color: #000;
-         font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.35;
-         text-align: center; }
-  h1 { font-size: 15px; margin: 0; text-align: center; }
-  .sub { text-align: center; font-size: 10px; color: #222; }
+         font-family: 'Segoe UI', Arial, sans-serif; font-size: 12.5px; line-height: 1.4;
+         font-weight: 700; text-align: center; }
+  h1 { font-size: 16px; margin: 0; text-align: center; font-weight: 800; }
+  .sub { text-align: center; font-size: 11px; color: #000; }
   /* Logo monocromático (imprime nítido en térmica/B&N): borde negro, sin relleno. */
   .logo { margin: 0 auto 6px; width: 88px; height: 88px; background: #fff; border: 3px solid #000;
           border-radius: 12px; display: flex; flex-direction: column;
           align-items: center; justify-content: center; color: #000; padding: 5px; }
   .logo b { font-weight: 800; font-size: 17px; line-height: 1.05; color: #000; }
   .logo small { font-size: 7px; letter-spacing: 1.5px; margin-top: 5px; color: #000; }
-  .doc { text-align: center; font-weight: 800; font-size: 14px; margin: 6px 0 2px; }
-  .hr { border-top: 1px dashed #000; margin: 6px 0; }
+  .doc { text-align: center; font-weight: 800; font-size: 15px; margin: 6px 0 2px; }
+  .hr { border-top: 1.5px dashed #000; margin: 6px 0; }
   .row { display: flex; justify-content: space-between; gap: 8px; }
-  .small { font-size: 10px; color: #333; }
-  .it { margin-top: 4px; }
-  .it .n { font-weight: 600; }
-  .it .d { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #222; }
-  .total { font-size: 16px; font-weight: 800; margin-top: 2px; }
+  .small { font-size: 11px; color: #000; }
+  .it { margin-top: 5px; }
+  .it .n { font-weight: 800; }
+  .it .d { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: #000; font-weight: 700; }
+  .total { font-size: 17px; font-weight: 800; margin-top: 2px; }
   .center { text-align: center; }
-  .nota { margin-top: 8px; text-align: center; font-size: 9px; color: #555; }
-  .firma { margin-top: 24px; border-top: 1px solid #000; padding-top: 3px;
-           text-align: center; font-size: 10px; color: #444; }
+  .nota { margin-top: 8px; text-align: center; font-size: 10px; color: #000; }
+  .firma { margin-top: 22px; border-top: 1px solid #000; padding-top: 3px;
+           text-align: center; font-size: 11px; color: #000; font-weight: 700; }
   .toolbar { position: fixed; top: 6px; left: 6px; right: 6px; display: flex; gap: 6px;
              flex-wrap: wrap; justify-content: center; }
   .toolbar button { cursor: pointer; border: 0; border-radius: 8px; padding: 7px 10px;
