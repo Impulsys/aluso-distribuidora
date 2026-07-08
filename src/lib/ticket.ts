@@ -42,9 +42,11 @@ const TICKET_CSS = `
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   @page { size: 80mm auto; margin: 0; }
   html { margin: 0; }
-  body { width: 74mm; margin: 0 auto; padding: 3mm 2mm 6mm; color: #000;
+  body { width: 74mm; margin: 0; padding: 3mm 2mm 6mm; color: #000;
          font-family: 'Segoe UI', Arial, sans-serif; font-size: 12.5px; line-height: 1.4;
-         font-weight: 700; text-align: center; }
+         font-weight: 700; text-align: left; }
+  /* Encabezado siempre centrado */
+  .logo, h1, .sub, .doc, .copia, .firma, .nota, .center { text-align: center; }
   h1 { font-size: 16px; margin: 0; text-align: center; font-weight: 800; }
   .sub { text-align: center; font-size: 11px; color: #000; }
   /* Logo monocromático (imprime nítido en térmica/B&N): borde negro, sin relleno. */

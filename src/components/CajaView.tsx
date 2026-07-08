@@ -14,7 +14,7 @@ import {
   subscribeProveedores,
   subscribeSupplierPaymentsRange,
 } from "@/lib/cuentas";
-import { subscribeExpensesRange } from "@/lib/cashflow";
+import { subscribeExpensesRange, createExpense } from "@/lib/cashflow";
 import { setCashInitial, type DailyCashInitial } from "@/lib/cash-initial";
 import {
   DENOMINACIONES,
@@ -27,6 +27,8 @@ import { formatARS, formatDate } from "@/lib/format";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
+  type ExpenseType,
+  type FormaPago,
   type Proveedor,
   type Remito,
   type SupplierPayment,
@@ -234,6 +236,7 @@ export default function CajaView() {
               Ir a registrar pago / depósito →
             </Link>
           </div>
+          <GastoDelDia dayTs={dayTs} createdBy={user?.uid} />
           <CierreCaja
             d={d}
             cierre={cierre}
@@ -387,6 +390,120 @@ function Movimientos({
   );
 }
 
+// ==================== Gasto del día (sueldo, flete, etc.) ====================
+function GastoDelDia({
+  dayTs,
+  createdBy,
+}: {
+  dayTs: number;
+  createdBy?: string;
+}) {
+  const [tipo, setTipo] = useState<ExpenseType>("sueldos");
+  const [monto, setMonto] = useState("");
+  const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
+  const [detalle, setDetalle] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [ok, setOk] = useState("");
+
+  const agregar = async () => {
+    const m = Number(monto) || 0;
+    if (m <= 0) {
+      alert("Poné el monto del gasto.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await createExpense({
+        fecha: dayTs,
+        tipo,
+        monto: m,
+        formaPago,
+        detalle: detalle.trim() || undefined,
+        createdBy,
+      });
+      setMonto("");
+      setDetalle("");
+      setOk("Gasto cargado ✓");
+      setTimeout(() => setOk(""), 2000);
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo cargar el gasto.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const inputCls =
+    "w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-sm outline-none focus:border-primary";
+
+  return (
+    <div className="rounded-2xl border border-brand-border bg-surface p-4">
+      <h3 className="mb-1 font-serif text-lg text-brand-dark">Gasto del día</h3>
+      <p className="mb-3 text-xs text-brand-dark/55">
+        Cargá acá los gastos (sueldos, fletes, etc.). Se suman al cierre de la caja.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-xs font-medium text-brand-dark/70">
+          Tipo
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as ExpenseType)}
+            className={inputCls}
+          >
+            {(Object.keys(EXPENSE_LABELS) as ExpenseType[]).map((t) => (
+              <option key={t} value={t}>
+                {EXPENSE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-medium text-brand-dark/70">
+          Monto
+          <input
+            type="number"
+            min={0}
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            placeholder="0"
+            className={`${inputCls} text-right`}
+          />
+        </label>
+        <label className="text-xs font-medium text-brand-dark/70">
+          Forma de pago
+          <select
+            value={formaPago}
+            onChange={(e) => setFormaPago(e.target.value as FormaPago)}
+            className={inputCls}
+          >
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </label>
+        <label className="text-xs font-medium text-brand-dark/70">
+          Detalle (opcional)
+          <input
+            value={detalle}
+            onChange={(e) => setDetalle(e.target.value)}
+            placeholder="Ej: Joaquín / flete Mafe"
+            className={inputCls}
+          />
+        </label>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={agregar}
+          disabled={busy}
+          className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+        >
+          {busy ? "Guardando…" : "＋ Agregar gasto"}
+        </button>
+        {ok && <span className="text-sm font-medium text-emerald-700">{ok}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ==================== Cierre de caja (arqueo) ====================
 function CierreCaja({
   d,
@@ -481,31 +598,45 @@ function CierreCaja({
         Arqueo (contá los billetes)
       </p>
       <div className="grid grid-cols-2 gap-1.5">
-        {DENOMINACIONES.map((den) => (
-          <div
-            key={den}
-            className="flex items-center gap-1 rounded-lg border border-brand-border bg-white px-2 py-1"
-          >
-            <span className="w-16 text-xs text-brand-dark/60">
-              {formatARS(den)}
-            </span>
-            <span className="text-brand-dark/30">×</span>
-            <input
-              type="number"
-              min={0}
-              disabled={cerrado}
-              value={arqueo[den] || ""}
-              onChange={(e) =>
-                setArqueo((prev) => ({
-                  ...prev,
-                  [den]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
-                }))
-              }
-              className="w-full rounded border border-brand-border px-1.5 py-0.5 text-right text-sm outline-none focus:border-primary disabled:bg-slate-50"
-              placeholder="0"
-            />
-          </div>
-        ))}
+        {DENOMINACIONES.map((den) => {
+          const cant = arqueo[den] || 0;
+          return (
+            <div
+              key={den}
+              className="flex items-center gap-1 rounded-lg border border-brand-border bg-white px-2 py-1"
+            >
+              <span className="w-14 shrink-0 text-xs text-brand-dark/60">
+                {formatARS(den)}
+              </span>
+              <span className="text-brand-dark/30">×</span>
+              <input
+                type="number"
+                min={0}
+                disabled={cerrado}
+                value={arqueo[den] || ""}
+                onChange={(e) =>
+                  setArqueo((prev) => ({
+                    ...prev,
+                    [den]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                  }))
+                }
+                className="w-12 rounded border border-brand-border px-1.5 py-0.5 text-right text-sm outline-none focus:border-primary disabled:bg-slate-50"
+                placeholder="0"
+              />
+              <span className="ml-auto text-xs font-semibold tabular-nums text-brand-dark/70">
+                {cant > 0 ? formatARS(den * cant) : ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Total del arqueo — va sumando en vivo */}
+      <div className="mt-2 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2">
+        <span className="text-sm font-bold text-primary">Total en billetes</span>
+        <span className="text-xl font-extrabold tabular-nums text-primary">
+          {formatARS(contado)}
+        </span>
       </div>
 
       {/* Totales del cierre */}

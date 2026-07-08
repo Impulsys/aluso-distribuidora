@@ -50,7 +50,8 @@ function copia(r: Remito, etiqueta: string): string {
       : ""
   }
   <div class="hr"></div>
-  <div class="row" style="font-weight:700;"><span>Descripción</span><span>Subtotal</span></div>
+  <div class="row" style="font-weight:800;"><span>Descripción</span><span>Subtotal</span></div>
+  <div class="hr"></div>
   ${itemsHTML(r)}
   <div class="hr"></div>
   <div class="row total"><span>TOTAL</span><span>${ars(r.total)}</span></div>
