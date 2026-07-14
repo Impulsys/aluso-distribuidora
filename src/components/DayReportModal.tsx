@@ -10,13 +10,15 @@ import {
   subscribeReportesConfig,
   type ReportesConfig,
 } from "@/lib/config";
-import { subscribeCierre } from "@/lib/caja";
+import { subscribeCierre, efectivoEsperadoDelDia } from "@/lib/caja";
+import { subscribeSupplierPaymentsRange } from "@/lib/cuentas";
 import type { DailyCashInitial } from "@/lib/cash-initial";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
   type ExpenseType,
   type Remito,
+  type SupplierPayment,
   type Truck,
 } from "@/lib/types";
 
@@ -65,11 +67,24 @@ export default function DayReportModal({
   const [loadingExp, setLoadingExp] = useState(false);
   const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
   const [cierre, setCierre] = useState<DailyCashInitial | null>(null);
+  const [pagos, setPagos] = useState<SupplierPayment[]>([]);
 
   useEffect(() => {
     const unsub = subscribeReportesConfig(setConfig);
     return unsub;
   }, []);
+
+  // Pagos a proveedores del día: si se pagó con billetes, esa plata SALIÓ de la
+  // caja. Sin esto el reporte mostraba más efectivo esperado que la pantalla de
+  // Caja para el mismo día.
+  useEffect(() => {
+    if (dayTs === null) {
+      setPagos([]);
+      return;
+    }
+    const { start, end } = dayBounds(dayTs);
+    return subscribeSupplierPaymentsRange(start, end + 1, setPagos);
+  }, [dayTs]);
 
   // Cierre de caja del día (solo lectura; el cierre se hace en Ventas → Caja)
   useEffect(() => {
@@ -186,8 +201,16 @@ export default function DayReportModal({
       .reduce((s, r) => s + r.total, 0);
     // Caja Fidel = total vendido; la caja física solo cuenta el EFECTIVO.
     const cajaFidel = ventaRemitos;
-    const cajaFisica = Math.max(0, cajaInicial + ventaEfectivo - gastosEfectivo);
-    const banco = Math.max(0, cajaFisica - cajaInicial);
+    // MISMA fórmula que el cierre en Ventas → Caja (incluye los pagos a
+    // proveedores hechos con billetes y no tapa los negativos con un max(0)).
+    const cajaFisica = efectivoEsperadoDelDia({
+      cajaInicial,
+      ventaEfectivo,
+      gastos: expenses,
+      pagos,
+    });
+    const pagosEfectivo =
+      cajaInicial + ventaEfectivo - gastosEfectivo - cajaFisica;
     const gananciaEstimada =
       truck && truck.porcentajeGanancia
         ? (ventaRemitos * truck.porcentajeGanancia) / 100
@@ -201,9 +224,9 @@ export default function DayReportModal({
       totalGastos,
       gastosPorTipo,
       gastosEfectivo,
+      pagosEfectivo,
       cajaFidel,
       cajaFisica,
-      banco,
       gananciaEstimada,
       dayRemitos,
       ventaRemitos,
@@ -213,7 +236,7 @@ export default function DayReportModal({
       ventaTransferencia,
       ventaCheque,
     };
-  }, [dayTs, trucks, expenses, remitos, cajaInicial]);
+  }, [dayTs, trucks, expenses, remitos, cajaInicial, pagos]);
 
   if (dayTs === null || !data) return null;
 
@@ -482,6 +505,13 @@ export default function DayReportModal({
                 <Row label="• Cheque (a cobrar)" value={data.ventaCheque} />
               )}
               <Row label="Gastos en efectivo" value={-data.gastosEfectivo} tone="rose" />
+              {data.pagosEfectivo > 0 && (
+                <Row
+                  label="Pagos a proveedores (billetes)"
+                  value={-data.pagosEfectivo}
+                  tone="rose"
+                />
+              )}
               <div className="my-1 h-px bg-brand-border" />
               <Row label="Efectivo esperado en caja" value={data.cajaFisica} bold />
               {cierre?.cerrado && (

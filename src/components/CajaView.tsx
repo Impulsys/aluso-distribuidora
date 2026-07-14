@@ -23,8 +23,10 @@ import {
   reabrirCaja,
   subscribeCierre,
   guardarArqueoParcial,
+  pagoUsaEfectivo,
+  efectivoEsperadoDelDia,
 } from "@/lib/caja";
-import { formatARS, formatDate } from "@/lib/format";
+import { formatARS, formatDate, formatGasto } from "@/lib/format";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
@@ -46,17 +48,6 @@ function isoDeTs(ts: number): string {
   const d = new Date(ts);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-/**
- * ¿El pago a proveedor salió con BILLETES de la caja?
- * Todas las vías menos "transferencia" usan plata física (depósito bancario en
- * efectivo, agencia/financiera, efectivo). Antes solo se restaba via==="efectivo"
- * y por eso la caja daba "falta plata" al pagar un camión con billetes.
- */
-function pagoUsaEfectivo(p: SupplierPayment): boolean {
-  if (p.via) return p.via !== "transferencia";
-  return (p.formaPago ?? "efectivo") === "efectivo"; // pagos viejos sin `via`
 }
 
 export default function CajaView() {
@@ -137,8 +128,12 @@ export default function CajaView() {
 
     const disponible = ventas - gastosTotal - pagosTotal;
     const cajaInicial = cierre?.cajaInicial ?? 0;
-    const efectivoEsperado =
-      cajaInicial + ventaEfectivo - gastosEfectivo - pagosEfectivo;
+    const efectivoEsperado = efectivoEsperadoDelDia({
+      cajaInicial,
+      ventaEfectivo,
+      gastos,
+      pagos: pagosDia,
+    });
 
     return {
       remitosDia,
@@ -164,6 +159,18 @@ export default function CajaView() {
   );
 
   const handleAnular = async (r: Remito) => {
+    // Con la caja YA cerrada, anular una venta cambia el efectivo esperado del
+    // día y el arqueo firmado queda descuadrado para siempre. Hay que reabrir.
+    if (cerrado) {
+      alert(
+        "La caja de este día ya está cerrada.\n\n" +
+          "Anular ahora descuadraría el arqueo que ya firmaron. " +
+          (isSuperadmin
+            ? "Reabrí la caja, anulá la venta y volvé a cerrar."
+            : "Pedile a un superadmin que reabra la caja.")
+      );
+      return;
+    }
     if (
       !confirm(
         `¿Anular la venta ${r.numero}? Se devuelve el stock al depósito.`
@@ -235,6 +242,7 @@ export default function CajaView() {
             pagos={d.pagosDia}
             proveedorById={proveedorById}
             onAnular={handleAnular}
+            cerrado={cerrado}
           />
         </div>
 
@@ -281,12 +289,14 @@ function Movimientos({
   pagos,
   proveedorById,
   onAnular,
+  cerrado,
 }: {
   remitos: Remito[];
   gastos: DailyExpense[];
   pagos: SupplierPayment[];
   proveedorById: Record<string, string>;
   onAnular: (r: Remito) => void;
+  cerrado: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-brand-border bg-surface p-4">
@@ -342,8 +352,13 @@ function Movimientos({
                 {!r.anulado && (
                   <button
                     onClick={() => onAnular(r)}
-                    className="text-xs text-rose-600 hover:underline"
-                    title="Anular venta (devuelve stock)"
+                    disabled={cerrado}
+                    className="text-xs text-rose-600 hover:underline disabled:cursor-not-allowed disabled:text-brand-dark/25 disabled:no-underline"
+                    title={
+                      cerrado
+                        ? "Caja cerrada: reabrí la caja para poder anular"
+                        : "Anular venta (devuelve stock)"
+                    }
                   >
                     Anular
                   </button>
@@ -370,8 +385,12 @@ function Movimientos({
                 {EXPENSE_LABELS[g.tipo]}{" "}
                 <span className="text-brand-dark/45">· {g.formaPago}</span>
               </span>
-              <span className="font-semibold text-rose-700">
-                -{formatARS(g.monto)}
+              <span
+                className={`font-semibold ${
+                  g.monto < 0 ? "text-emerald-700" : "text-rose-700"
+                }`}
+              >
+                {formatGasto(g.monto)}
               </span>
             </div>
           ))}

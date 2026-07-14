@@ -252,10 +252,43 @@ export function saldoCompra(
   return compra.monto - pagado;
 }
 
-/** Deuda global a todos los proveedores. */
+/**
+ * Deuda global a todos los proveedores: suma de las deudas POSITIVAS de cada uno.
+ *
+ * Antes era `sum(compras) − sum(pagos)`, y eso mentía: si a un proveedor le
+ * pagaste de más (saldo a favor), ese crédito tapaba la deuda de OTRO proveedor
+ * y el total daba menos de lo que realmente se debe. La plata a favor en A no
+ * paga lo que se le debe a B.
+ */
 export function deudaGlobal(
   purchases: Purchase[],
   payments: SupplierPayment[]
 ): number {
-  return sum(purchases) - sum(payments);
+  const porProveedor: Record<string, number> = {};
+  for (const p of purchases) {
+    porProveedor[p.proveedorId] =
+      (porProveedor[p.proveedorId] ?? 0) + (p.monto || 0);
+  }
+  for (const p of payments) {
+    porProveedor[p.proveedorId] =
+      (porProveedor[p.proveedorId] ?? 0) - (p.monto || 0);
+  }
+  return Object.values(porProveedor).reduce((s, deuda) => s + Math.max(0, deuda), 0);
+}
+
+/** Saldo a favor total (lo que pagamos de más, por proveedor). Informativo. */
+export function saldoAFavorGlobal(
+  purchases: Purchase[],
+  payments: SupplierPayment[]
+): number {
+  const porProveedor: Record<string, number> = {};
+  for (const p of purchases) {
+    porProveedor[p.proveedorId] =
+      (porProveedor[p.proveedorId] ?? 0) + (p.monto || 0);
+  }
+  for (const p of payments) {
+    porProveedor[p.proveedorId] =
+      (porProveedor[p.proveedorId] ?? 0) - (p.monto || 0);
+  }
+  return Object.values(porProveedor).reduce((s, deuda) => s + Math.max(0, -deuda), 0);
 }

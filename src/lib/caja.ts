@@ -5,6 +5,7 @@ import { db } from "./firebase";
 import { dayKey, type DailyCashInitial } from "./cash-initial";
 import { logActivity } from "./bitacora";
 import { formatARS } from "./format";
+import type { DailyExpense, SupplierPayment } from "./types";
 
 /** Etiqueta de fecha corta (DD/MM/AAAA) para los detalles de bitácora. */
 function fechaDia(ts: number): string {
@@ -22,6 +23,41 @@ export function totalArqueo(arqueo: Record<string, number>): number {
     (s, [denom, cant]) => s + Number(denom) * (Number(cant) || 0),
     0
   );
+}
+
+/**
+ * ¿El pago a proveedor salió con BILLETES de la caja?
+ *
+ * Todas las vías menos "transferencia" usan plata física (depósito bancario en
+ * efectivo, agencia/financiera, efectivo). Antes solo se restaba via==="efectivo"
+ * y por eso la caja daba "falta plata" al pagar un camión con billetes.
+ */
+export function pagoUsaEfectivo(p: SupplierPayment): boolean {
+  if (p.via) return p.via !== "transferencia";
+  return (p.formaPago ?? "efectivo") === "efectivo"; // pagos viejos sin `via`
+}
+
+/**
+ * Efectivo que TIENE QUE haber en la caja al cerrar el día.
+ *
+ * ÚNICA fórmula de la app: la usan el cierre de Caja y el reporte del día. Antes
+ * cada pantalla calculaba lo suyo (Reportes ni siquiera restaba los pagos a
+ * proveedores) y daban números distintos para el mismo día.
+ */
+export function efectivoEsperadoDelDia(args: {
+  cajaInicial: number;
+  ventaEfectivo: number;
+  gastos: DailyExpense[];
+  pagos: SupplierPayment[];
+}): number {
+  const gastosEfectivo = args.gastos
+    .filter((g) => g.formaPago === "efectivo")
+    .reduce((s, g) => s + g.monto, 0);
+  const pagosEfectivo = args.pagos
+    .filter(pagoUsaEfectivo)
+    .reduce((s, p) => s + p.monto, 0);
+  // Sin clamp: si da negativo, es que falta plata y hay que verlo, no esconderlo.
+  return args.cajaInicial + args.ventaEfectivo - gastosEfectivo - pagosEfectivo;
 }
 
 export interface CierreInput {

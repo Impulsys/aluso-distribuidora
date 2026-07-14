@@ -11,7 +11,7 @@ import { getAllUsers } from "@/lib/admin";
 import { subscribeCierres, type DailyCashInitial } from "@/lib/cash-initial";
 import { DENOMINACIONES, totalArqueo } from "@/lib/caja";
 import { openRemito, printRemito } from "@/lib/remito-print";
-import { formatARS, formatDate, tsFromISO } from "@/lib/format";
+import { formatARS, formatDate, formatGasto, tsFromISO } from "@/lib/format";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
@@ -309,8 +309,12 @@ export default function RegistroHistorico() {
                               </b>
                               {g.detalle ? ` · ${g.detalle}` : ""}
                             </span>
-                            <span className="font-semibold text-rose-700">
-                              −{formatARS(g.monto)}
+                            <span
+                              className={`font-semibold ${
+                                g.monto < 0 ? "text-emerald-700" : "text-rose-700"
+                              }`}
+                            >
+                              {formatGasto(g.monto)}
                             </span>
                           </li>
                         ))}

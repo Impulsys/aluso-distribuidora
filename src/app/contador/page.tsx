@@ -4,17 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { subscribeRemitos, subscribeFacturas } from "@/lib/ventas";
 import { openRemito } from "@/lib/remito-print";
 import { openFactura } from "@/lib/factura-print";
-import { formatARS, tsFromISO } from "@/lib/format";
+import { formatARS, isoFromTs, tsFromISO } from "@/lib/format";
 import type { Factura, Remito } from "@/lib/types";
 
 type Tab = "remitos" | "facturas";
 
+// Fechas en hora LOCAL: con toISOString() (UTC), después de las 21 hs argentinas
+// el filtro arrancaba en el día siguiente y no mostraba nada.
 function isoHoy(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoFromTs(Date.now());
 }
 function isoInicioMes(): string {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return isoFromTs(new Date(d.getFullYear(), d.getMonth(), 1).getTime());
 }
 function fechaHora(ts: number): string {
   const d = new Date(ts);

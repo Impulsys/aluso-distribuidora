@@ -590,7 +590,7 @@ function EditForm({
       return;
     }
 
-    onSave({
+    const patch: Partial<Product> & { _costo?: number } = {
       nombre: nombre.trim(),
       ean: ean.trim(),
       codigo: codigo.trim(),
@@ -599,12 +599,17 @@ function EditForm({
       marca,
       precioVenta: pv,
       _costo: pc, // precio costo va a colección admin-only
-      stock: st,
       destacado,
       precioOferta: po,
       activo,
       descripcion: descripcion.trim(),
-    });
+    };
+    // El stock se escribe SOLO si el usuario lo tocó. Si no, al guardar el form
+    // (abierto hace rato) se pisaba el stock actual y "resucitaban" unidades ya
+    // vendidas mientras el panel estaba abierto.
+    if (st !== p.stock) patch.stock = st;
+
+    onSave(patch);
   };
 
   return (

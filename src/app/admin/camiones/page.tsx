@@ -319,10 +319,22 @@ function CargoEditor({
   const totalCosto = cargados.reduce((s, v) => s + v.cantidad * (v.costo || 0), 0);
 
   const guardar = async () => {
+    // Antes se descartaba en silencio todo ítem sin costo: cargabas 50 unidades,
+    // te olvidabas el costo, y esas 50 NUNCA entraban al stock. Ahora avisamos.
+    const sinCosto = cargados.filter((c) => !(c.costo > 0));
+    if (sinCosto.length > 0) {
+      const ok = confirm(
+        `⚠️ ${sinCosto.length} producto(s) tienen cantidad pero NO tienen costo:\n\n` +
+          sinCosto.map((c) => `· ${c.nombre} (${c.cantidad} u.)`).join("\n") +
+          `\n\nSi guardás así, entran al stock igual pero el costo queda en $0 y el ` +
+          `margen de ese camión sale mal.\n\nAceptar = guardar igual · Cancelar = cargar los costos.`
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     try {
       const next: TruckCargoItem[] = Object.entries(draft)
-        .filter(([, v]) => v.cantidad > 0 && v.costo > 0)
+        .filter(([, v]) => v.cantidad > 0)
         .map(([id, v]) => {
           const p = productos.find((x) => x.id === id);
           const item: TruckCargoItem = {

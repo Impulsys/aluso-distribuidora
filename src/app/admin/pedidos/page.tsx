@@ -110,6 +110,9 @@ function NuevaVentaView() {
   const { user } = useAuth();
   const productos = useProducts();
   const [costs, setCosts] = useState<Record<string, number>>({});
+  // Sin los costos cargados, el remito guardaría costoUnitario 0 y el margen de
+  // esa venta queda roto PARA SIEMPRE (los ítems del remito son inmutables).
+  const [costsListo, setCostsListo] = useState(false);
   const [cliente, setCliente] = useState("");
   const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
   const [q, setQ] = useState("");
@@ -118,7 +121,14 @@ function NuevaVentaView() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => subscribeProductCosts(setCosts), []);
+  useEffect(
+    () =>
+      subscribeProductCosts((c) => {
+        setCosts(c);
+        setCostsListo(true);
+      }),
+    []
+  );
 
   const resultados = useMemo(() => {
     const t = q.trim();
@@ -181,6 +191,12 @@ function NuevaVentaView() {
   const generar = async () => {
     setError(null);
     setMsg(null);
+    if (!costsListo) {
+      setError(
+        "Esperá un segundo: se están cargando los costos. Si generás ahora, el margen de esta venta queda mal para siempre."
+      );
+      return;
+    }
     // Sanitizar cantidades/precios (evita NaN o 0 que contaminan totales)
     const items: RemitoItem[] = lines.map((l) => ({
       productId: l.productId,
@@ -194,6 +210,16 @@ function NuevaVentaView() {
     if (items.length === 0 || totalCalc <= 0) {
       setError("Agregá al menos un producto con cantidad y precio válidos.");
       return;
+    }
+    // Aviso: ítems a $0 se entregan GRATIS y descuentan stock igual.
+    const sinPrecio = items.filter((it) => it.precioVenta <= 0);
+    if (sinPrecio.length > 0) {
+      const ok = confirm(
+        `⚠️ Hay ${sinPrecio.length} producto(s) con precio $0:\n\n` +
+          sinPrecio.map((i) => `· ${i.nombre}`).join("\n") +
+          `\n\nSe entregan GRATIS y se descuentan del stock igual.\n\n¿Generar el remito así?`
+      );
+      if (!ok) return;
     }
     setBusy(true);
     // Abrimos la ventana YA (en el gesto del click) para que no la bloquee el

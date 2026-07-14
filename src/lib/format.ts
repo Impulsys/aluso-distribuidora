@@ -9,6 +9,19 @@ export function formatARS(value: number): string {
   }).format(value);
 }
 
+/**
+ * Importe de un GASTO con su signo correcto.
+ *
+ * Un gasto normal es plata que SALE → "−$1.000". Pero la comisión de la
+ * financiera puede ser negativa (descuento a favor): ahí la plata ENTRA →
+ * "+$1.000". Antes se anteponía un "−" a mano al `formatARS`, y con montos
+ * negativos salía el clásico "−−$1.000".
+ */
+export function formatGasto(monto: number): string {
+  const v = formatARS(Math.abs(monto));
+  return `${monto < 0 ? "+" : "−"}${v}`;
+}
+
 export function formatDate(ts: number): string {
   return new Intl.DateTimeFormat("es-AR", {
     day: "2-digit",

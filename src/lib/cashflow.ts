@@ -169,22 +169,30 @@ export function subscribeChecks(
 }
 
 /**
- * Cheques pendientes que vencen en los próximos `days` días.
+ * Arranque del día de hoy (00:00 local).
+ *
+ * La fecha de pago del cheque se guarda a las 00:00 de ese día, así que hay que
+ * comparar DÍA contra DÍA. Comparando contra `Date.now()`, un cheque que vencía
+ * HOY quedaba "vencido" apenas pasaba la medianoche y encima desaparecía del
+ * aviso de "próximos a vencer" — justo el día en que hay que ir al banco.
  */
+function inicioDeHoy(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** Cheques pendientes que vencen HOY o en los próximos `days` días. */
 export function chequesProximos(checks: Check[], days = 3): Check[] {
-  const now = Date.now();
-  const limit = now + days * 86_400_000;
+  const hoy = inicioDeHoy();
+  const limit = hoy + days * 86_400_000;
   return checks.filter(
-    (c) =>
-      c.status === "pendiente" &&
-      c.fechaPago >= now &&
-      c.fechaPago <= limit
+    (c) => c.status === "pendiente" && c.fechaPago >= hoy && c.fechaPago <= limit
   );
 }
 
+/** Cheques pendientes cuya fecha de pago ya pasó (el de HOY todavía no vence). */
 export function chequesVencidos(checks: Check[]): Check[] {
-  const now = Date.now();
-  return checks.filter(
-    (c) => c.status === "pendiente" && c.fechaPago < now
-  );
+  const hoy = inicioDeHoy();
+  return checks.filter((c) => c.status === "pendiente" && c.fechaPago < hoy);
 }

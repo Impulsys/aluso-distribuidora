@@ -8,7 +8,7 @@ import {
   subscribeExpensesRange,
   getLastExpenseDate,
 } from "@/lib/cashflow";
-import { formatARS, formatDate, tsFromISO } from "@/lib/format";
+import { formatARS, formatDate, formatGasto, tsFromISO } from "@/lib/format";
 import {
   EXPENSE_LABELS,
   type DailyExpense,
@@ -419,8 +419,12 @@ export default function AdminGastosPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold text-rose-700">
-                    -{formatARS(g.monto)}
+                  <span
+                    className={`font-semibold ${
+                      g.monto < 0 ? "text-emerald-700" : "text-rose-700"
+                    }`}
+                  >
+                    {formatGasto(g.monto)}
                   </span>
                   <button
                     onClick={() => startEdit(g)}

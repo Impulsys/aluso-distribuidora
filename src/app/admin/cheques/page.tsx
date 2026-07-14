@@ -9,7 +9,13 @@ import {
   subscribeChecks,
   updateCheckStatus,
 } from "@/lib/cashflow";
-import { formatARS, formatDate, daysBetween, tsFromISO } from "@/lib/format";
+import {
+  formatARS,
+  formatDate,
+  daysBetween,
+  isoFromTs,
+  tsFromISO,
+} from "@/lib/format";
 import type { Check, CheckStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: CheckStatus[] = ["pendiente", "pagado", "rechazado"];
@@ -25,8 +31,17 @@ const STATUS_LABEL: Record<CheckStatus, string> = {
   rechazado: "Rechazado",
 };
 
+// Hoy en hora LOCAL. Con toISOString() (UTC) después de las 21 hs argentinas el
+// form arrancaba con la fecha de MAÑANA.
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return isoFromTs(Date.now());
+}
+
+/** Arranque del día de hoy (00:00 local). Las fechas de pago se guardan así. */
+function inicioDeHoy(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }
 
 export default function AdminChequesPage() {
@@ -53,6 +68,7 @@ export default function AdminChequesPage() {
     return unsub;
   }, []);
 
+  const hoy0 = useMemo(() => inicioDeHoy(), []);
   const alertas = useMemo(() => chequesProximos(cheques, 3), [cheques]);
   const vencidos = useMemo(() => chequesVencidos(cheques), [cheques]);
 
@@ -289,8 +305,12 @@ export default function AdminChequesPage() {
         ) : (
           <div className="space-y-2">
             {cheques.map((c) => {
-              const dias = daysBetween(Date.now(), c.fechaPago);
-              const futuro = c.fechaPago >= Date.now();
+              // Comparamos DÍA contra DÍA. Antes se comparaba contra Date.now(),
+              // y como la fecha de pago se guarda a las 00:00, un cheque que
+              // vencía HOY ya figuraba "vencido hace 0 días".
+              const dias = Math.round((c.fechaPago - hoy0) / 86_400_000);
+              const venceHoy = dias === 0;
+              const futuro = dias > 0;
               return (
                 <article
                   key={c.id}
@@ -322,16 +342,20 @@ export default function AdminChequesPage() {
                         {c.status === "pendiente" && (
                           <span
                             className={`ml-2 font-bold ${
-                              futuro
-                                ? dias <= 3
-                                  ? "text-amber-700"
-                                  : "text-brand-dark/55"
-                                : "text-rose-700"
+                              venceHoy
+                                ? "text-amber-700"
+                                : futuro
+                                  ? dias <= 3
+                                    ? "text-amber-700"
+                                    : "text-brand-dark/55"
+                                  : "text-rose-700"
                             }`}
                           >
-                            {futuro
-                              ? `en ${dias} día${dias === 1 ? "" : "s"}`
-                              : `vencido hace ${dias} día${dias === 1 ? "" : "s"}`}
+                            {venceHoy
+                              ? "vence HOY"
+                              : futuro
+                                ? `en ${dias} día${dias === 1 ? "" : "s"}`
+                                : `vencido hace ${-dias} día${-dias === 1 ? "" : "s"}`}
                           </span>
                         )}
                       </p>
