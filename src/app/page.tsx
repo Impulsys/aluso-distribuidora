@@ -29,7 +29,7 @@ export default function LandingPage() {
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white">
       {/* ============ PRESENTACIÓN ============ */}
       <section className="flex flex-1 items-center">
-        <div className="mx-auto grid w-full max-w-6xl items-center gap-10 px-6 py-10 md:grid-cols-[1.15fr_1fr]">
+        <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-6 py-8 md:grid-cols-[1fr_1.25fr]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
               Distribuidora mayorista · Noroeste argentino
@@ -65,25 +65,29 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Las dos presentaciones de Doncella (rosa y verde). */}
-          <div className="flex items-center justify-center gap-1">
-            <div className="relative aspect-square w-1/2 max-w-[230px] -rotate-3">
+          {/*
+            Las dos presentaciones de Doncella (rosa y verde), centradas en el
+            campo blanco. Se superponen un poco para ganar tamaño: los JPG son
+            cuadrados y traen aire propio alrededor del pack.
+          */}
+          <div className="flex items-center justify-center">
+            <div className="relative aspect-square w-[56%] -rotate-3">
               <Image
                 src="/productos/7790940216212.jpg"
                 alt="Doncella Normal dúo pack — tela suave con alas, sin perfume"
                 fill
                 priority
-                sizes="(max-width: 768px) 45vw, 230px"
+                sizes="(max-width: 768px) 50vw, 420px"
                 className="object-contain"
               />
             </div>
-            <div className="relative aspect-square w-1/2 max-w-[230px] rotate-3">
+            <div className="relative -ml-[10%] aspect-square w-[56%] rotate-3">
               <Image
                 src="/productos/7790940216229.jpg"
                 alt="Doncella Normal dúo pack — tela suave con alas, con perfume"
                 fill
                 priority
-                sizes="(max-width: 768px) 45vw, 230px"
+                sizes="(max-width: 768px) 50vw, 420px"
                 className="object-contain"
               />
             </div>
