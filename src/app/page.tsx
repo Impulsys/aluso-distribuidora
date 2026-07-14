@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 /*
@@ -54,18 +55,38 @@ export default function LandingPage() {
               algodón, con stock permanente y logística propia. Atención directa
               con el fabricante y precios mayoristas para tu negocio.
             </p>
+
+            <Link
+              href="/catalogo"
+              className="mt-7 inline-flex items-center gap-2 rounded-full bg-rose-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-500/30 transition hover:-translate-y-0.5 hover:bg-rose-600 hover:shadow-xl hover:shadow-rose-500/40"
+            >
+              Ver el catálogo
+              <span aria-hidden>→</span>
+            </Link>
           </div>
 
-          {/* Una sola imagen. */}
-          <div className="relative mx-auto aspect-square w-full max-w-[380px]">
-            <Image
-              src="/productos/7790940410245.jpg"
-              alt="Productos Nonisec y Doncella"
-              fill
-              priority
-              sizes="(max-width: 768px) 70vw, 380px"
-              className="object-contain"
-            />
+          {/* Las dos presentaciones de Doncella (rosa y verde). */}
+          <div className="flex items-center justify-center gap-1">
+            <div className="relative aspect-square w-1/2 max-w-[230px] -rotate-3">
+              <Image
+                src="/productos/7790940216212.jpg"
+                alt="Doncella Normal dúo pack — tela suave con alas, sin perfume"
+                fill
+                priority
+                sizes="(max-width: 768px) 45vw, 230px"
+                className="object-contain"
+              />
+            </div>
+            <div className="relative aspect-square w-1/2 max-w-[230px] rotate-3">
+              <Image
+                src="/productos/7790940216229.jpg"
+                alt="Doncella Normal dúo pack — tela suave con alas, con perfume"
+                fill
+                priority
+                sizes="(max-width: 768px) 45vw, 230px"
+                className="object-contain"
+              />
+            </div>
           </div>
         </div>
       </section>
