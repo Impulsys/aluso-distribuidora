@@ -62,6 +62,7 @@ type SubTab = "nueva" | "pedidos" | "caja" | "historico" | "facturar";
 
 export default function AdminVentasPage() {
   const [tab, setTab] = useState<SubTab>("nueva");
+  const [cartCount, setCartCount] = useState(0);
 
   return (
     <div>
@@ -86,11 +87,30 @@ export default function AdminVentasPage() {
             }`}
           >
             {t.label}
+            {t.id === "nueva" && cartCount > 0 && (
+              <span
+                className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  tab === "nueva"
+                    ? "bg-white/25 text-white"
+                    : "bg-amber-100 text-amber-800"
+                }`}
+                title="Tenés una venta sin cerrar"
+              >
+                {cartCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
 
-      {tab === "nueva" && <NuevaVentaView />}
+      {/*
+        La venta en curso NO se desmonta: queda oculta. Si se desmonta, el
+        carrito se pierde entero — el vendedor se iba a Caja a mirar un dato,
+        volvía, y tenía que cargar los 20 productos otra vez.
+      */}
+      <div className={tab === "nueva" ? undefined : "hidden"}>
+        <NuevaVentaView onCartCount={setCartCount} />
+      </div>
       {tab === "pedidos" && <PedidosView />}
       {tab === "caja" && <CajaView />}
       {tab === "historico" && <RegistroHistorico />}
@@ -106,7 +126,11 @@ interface POSLine extends RemitoItem {
   imagen?: string;
 }
 
-function NuevaVentaView() {
+function NuevaVentaView({
+  onCartCount,
+}: {
+  onCartCount?: (n: number) => void;
+}) {
   const { user } = useAuth();
   const productos = useProducts();
   const [costs, setCosts] = useState<Record<string, number>>({});
@@ -120,6 +144,12 @@ function NuevaVentaView() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // La pestaña muestra cuántos ítems hay en la venta abierta (la vista queda
+  // montada pero oculta al cambiar de solapa).
+  useEffect(() => {
+    onCartCount?.(lines.length);
+  }, [lines.length, onCartCount]);
 
   useEffect(
     () =>

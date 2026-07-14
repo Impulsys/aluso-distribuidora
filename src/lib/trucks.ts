@@ -9,10 +9,11 @@ import {
   orderBy,
   where,
   limit,
+  getDoc,
   getDocs,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { createPurchase } from "./cuentas";
 import { logActivity } from "./bitacora";
 import type { Truck } from "./types";
 
@@ -127,54 +128,92 @@ export async function recibirCamion(
     );
   }
 
-  const truckId = await createTruck({
-    nombre: input.nombre,
-    color: input.color,
-    fechaIngreso: input.fechaIngreso,
-    porcentajeGanancia: input.porcentajeGanancia,
-    transporte: input.transporte,
-    transporteOtro: input.transporteOtro,
-    descripcion: input.descripcion,
-    proveedor: input.proveedorNombre,
-    proveedorId: input.proveedorId,
-    costoCamion: input.logistica && input.logistica > 0 ? input.logistica : undefined,
-    logisticaDetalle: input.logisticaDetalle?.trim() || undefined,
-    numeroFactura: tieneA ? input.facturaA!.numero : undefined,
-    numeroRemito: tieneB ? input.remitoB!.numero : undefined,
-  });
+  // Recepción ATÓMICA: el camión y sus comprobantes entran juntos o no entra
+  // nada. Antes eran 3 escrituras sueltas: si la red se cortaba en el medio,
+  // quedaba el camión creado sin su deuda (o con una sola), el usuario apretaba
+  // "Recibir" de nuevo y se DUPLICABA la deuda al proveedor.
+  const snap = await getDocs(collection(db, "trucks"));
+  const activos = snap.docs
+    .map((d) => ({ ...(d.data() as Truck), id: d.id }))
+    .filter((t) => !t.fechaCierre);
+  for (const a of activos) {
+    if (input.fechaIngreso < a.fechaIngreso) {
+      throw new TruckValidationError(
+        `La fecha de ingreso es anterior al camión activo "${a.nombre}". ` +
+          `Ingresá una fecha posterior o cerrá manualmente el anterior.`
+      );
+    }
+  }
+
+  const batch = writeBatch(db);
+  // Cerrar el/los activo(s) previo(s): 1 solo camión activo a la vez.
+  for (const a of activos) {
+    batch.update(doc(db, "trucks", a.id), { fechaCierre: input.fechaIngreso });
+  }
+
+  const truckRef = doc(collection(db, "trucks"));
+  batch.set(
+    truckRef,
+    stripUndefined({
+      nombre: input.nombre,
+      color: input.color,
+      fechaIngreso: input.fechaIngreso,
+      porcentajeGanancia: input.porcentajeGanancia,
+      transporte: input.transporte,
+      transporteOtro: input.transporteOtro,
+      descripcion: input.descripcion,
+      proveedor: input.proveedorNombre,
+      proveedorId: input.proveedorId,
+      costoCamion:
+        input.logistica && input.logistica > 0 ? input.logistica : undefined,
+      logisticaDetalle: input.logisticaDetalle?.trim() || undefined,
+      numeroFactura: tieneA ? input.facturaA!.numero : undefined,
+      numeroRemito: tieneB ? input.remitoB!.numero : undefined,
+      createdAt: Date.now(),
+    })
+  );
 
   const base = {
     proveedorId: input.proveedorId,
     proveedorNombre: input.proveedorNombre,
     fecha: input.fechaIngreso,
-    camionId: truckId,
+    camionId: truckRef.id,
     camionNombre: input.nombre,
     createdBy: input.createdBy,
+    createdAt: Date.now(),
   };
   if (tieneA) {
-    await createPurchase({
-      ...base,
-      modalidad: "A",
-      numero: input.facturaA!.numero,
-      monto: input.facturaA!.monto,
-    });
+    batch.set(
+      doc(collection(db, "purchases")),
+      stripUndefined({
+        ...base,
+        modalidad: "A",
+        numero: input.facturaA!.numero,
+        monto: input.facturaA!.monto,
+      })
+    );
   }
   if (tieneB) {
-    await createPurchase({
-      ...base,
-      modalidad: "B",
-      numero: input.remitoB!.numero,
-      monto: input.remitoB!.monto,
-    });
+    batch.set(
+      doc(collection(db, "purchases")),
+      stripUndefined({
+        ...base,
+        modalidad: "B",
+        numero: input.remitoB!.numero,
+        monto: input.remitoB!.monto,
+      })
+    );
   }
+
+  await batch.commit();
 
   logActivity("Recibió camión", {
     detalle: `${input.nombre} · ${input.proveedorNombre}`,
     entidad: "camion",
-    entidadId: truckId,
+    entidadId: truckRef.id,
   });
 
-  return truckId;
+  return truckRef.id;
 }
 
 export async function updateTruck(
@@ -191,6 +230,20 @@ export async function updateTruckCargo(
 ): Promise<void> {
   await updateDoc(doc(db, "trucks", id), { carga });
   logActivity("Editó carga de camión", { entidad: "camion", entidadId: id });
+}
+
+/**
+ * Carga ACTUAL del camión en la base (no la que tenía la pantalla al abrirse).
+ *
+ * El editor guarda el array `carga` completo. Si dos personas cargan el mismo
+ * camión a la vez, el que guarda segundo borraba todo lo del primero. Antes de
+ * escribir hay que releer y mezclar.
+ */
+export async function getTruckCargo(
+  id: string
+): Promise<NonNullable<Truck["carga"]>> {
+  const snap = await getDoc(doc(db, "trucks", id));
+  return (snap.data()?.carga ?? []) as NonNullable<Truck["carga"]>;
 }
 
 export async function deleteTruck(id: string): Promise<void> {

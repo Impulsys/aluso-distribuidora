@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   deleteTruck,
+  getTruckCargo,
   subscribeTrucks,
   updateTruck,
   updateTruckCargo,
@@ -333,9 +334,15 @@ function CargoEditor({
     }
     setBusy(true);
     try {
-      const next: TruckCargoItem[] = Object.entries(draft)
-        .filter(([, v]) => v.cantidad > 0)
-        .map(([id, v]) => {
+      // Releemos la carga REAL antes de escribir: el editor guarda el array
+      // entero, así que si otro usuario cargó productos mientras tanto, guardar
+      // a ciegas se los borraba. Mezclamos: lo suyo se conserva, lo mío pisa.
+      const dbCarga = await getTruckCargo(truck.id);
+      const dbMap = new Map(dbCarga.map((i) => [i.productId, i]));
+
+      const merged = new Map(dbMap);
+      for (const [id, v] of Object.entries(draft)) {
+        if (v.cantidad > 0) {
           const p = productos.find((x) => x.id === id);
           const item: TruckCargoItem = {
             productId: id,
@@ -347,29 +354,28 @@ function CargoEditor({
           // Firestore rechaza undefined → solo incluimos descripción si tiene texto.
           const desc = v.descripcion?.trim();
           if (desc) item.descripcion = desc;
-          return item;
-        });
+          merged.set(id, item);
+        } else {
+          merged.delete(id); // lo saqué a propósito
+        }
+      }
+      const next = Array.from(merged.values());
 
       // 1) Guardar la carga del camión (alimenta el reporte por camión).
       await updateTruckCargo(truck.id, next);
 
-      // 2) Actualizar STOCK por la diferencia vs lo ya guardado (no duplica al
-      //    re-guardar; si bajás la cantidad, descuenta) + actualizar COSTO.
-      const ids = new Set<string>([
-        ...Object.keys(savedQty),
-        ...next.map((i) => i.productId),
-      ]);
-      const nextMap: Record<string, number> = {};
-      next.forEach((i) => (nextMap[i.productId] = i.cantidadUnidades));
-      for (const id of ids) {
-        const nuevo = nextMap[id] ?? 0;
-        const anterior = savedQty[id] ?? 0;
-        const delta = nuevo - anterior;
+      // 2) STOCK: la diferencia se calcula contra lo que hay EN LA BASE, no
+      //    contra el snapshot que tenía la pantalla (que puede estar viejo).
+      //    Solo tocamos los productos que están en MI draft.
+      for (const [id, v] of Object.entries(draft)) {
+        const anterior = dbMap.get(id)?.cantidadUnidades ?? 0;
+        const delta = (v.cantidad || 0) - anterior;
         if (delta !== 0) await incrementStock(id, delta);
-        const costo = draft[id]?.costo ?? 0;
-        if (nuevo > 0 && costo > 0) await setProductCost(id, costo);
+        if (v.cantidad > 0 && v.costo > 0) await setProductCost(id, v.costo);
       }
 
+      const nextMap: Record<string, number> = {};
+      next.forEach((i) => (nextMap[i.productId] = i.cantidadUnidades));
       setSavedQty(nextMap);
       setDirty(false);
     } catch (e) {

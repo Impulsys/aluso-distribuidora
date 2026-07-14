@@ -20,10 +20,7 @@ import type {
   Order,
   Remito,
   RemitoItem,
-  TipoFactura,
 } from "./types";
-
-const IVA_RATE = 0.21;
 
 /** Traduce los errores de venta a un mensaje legible para mostrar al usuario. */
 export function mensajeVentaError(e: unknown): string {
@@ -279,65 +276,13 @@ export async function getRemitoByNumero(
   return { ...(d.data() as Remito), id: d.id };
 }
 
-export interface CrearFacturaInput {
-  remito: Remito;
-  tipo: TipoFactura;
-  consumidorFinal: boolean;
-  cuit?: string;
-  razonSocial?: string;
-  createdBy?: string;
-}
-
-/**
- * Crea la factura (comprobante). NO toca stock. Transacción anti-doble
- * facturación: aborta si el remito ya tiene factura. AFIP/CAE es etapa B.
+/*
+ * NO agregues acá una `crearFactura()` que escriba en `facturas` desde el
+ * cliente. Existió una y era una bomba: creaba la factura SIN CAE y le ponía el
+ * `facturaId` al remito, con lo cual la Cloud Function `emitirFactura` (la que
+ * habla con AFIP de verdad) veía el remito como "ya facturado" y ese remito no
+ * se podía facturar NUNCA MÁS. La factura fiscal la emite SOLO la función.
  */
-export async function crearFactura(input: CrearFacturaInput): Promise<string> {
-  const { remito, tipo } = input;
-  const total = remito.total;
-  // En A el IVA se discrimina; en B/C va incluido (no discriminado).
-  const neto = tipo === "A" ? total / (1 + IVA_RATE) : total;
-  const iva = tipo === "A" ? total - neto : 0;
-  const now = Date.now();
-
-  const data = {
-    remitoId: remito.id,
-    remitoNumero: remito.numero,
-    tipo,
-    consumidorFinal: input.consumidorFinal,
-    cuit: input.cuit?.trim() || null,
-    razonSocial: input.razonSocial?.trim() || null,
-    items: remito.items,
-    neto,
-    iva,
-    total,
-    cae: null,
-    caeVto: null,
-    estado: "interna" as Factura["estado"],
-    createdBy: input.createdBy ?? null,
-    createdAt: now,
-    fecha: now,
-  };
-
-  const remitoRef = doc(db, "remitos", remito.id);
-  const facturaRef = doc(collection(db, "facturas"));
-
-  await runTransaction(db, async (tx) => {
-    const rSnap = await tx.get(remitoRef);
-    if (!rSnap.exists()) throw new Error("REMITO_NO_EXISTE");
-    if (rSnap.data()?.facturaId) throw new Error("REMITO_YA_FACTURADO");
-    tx.set(facturaRef, data);
-    tx.set(remitoRef, { facturaId: facturaRef.id }, { merge: true });
-  });
-
-  logActivity("Generó factura", {
-    detalle: `Factura ${tipo} · ${remito.numero} · ${formatARS(total)}`,
-    entidad: "factura",
-    entidadId: facturaRef.id,
-  });
-
-  return facturaRef.id;
-}
 
 export function subscribeFacturas(cb: (xs: Factura[]) => void): () => void {
   return onSnapshot(collection(db, "facturas"), (snap) => {

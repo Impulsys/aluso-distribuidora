@@ -152,6 +152,10 @@ export async function updatePromo(
   for (const k of OPCIONALES) {
     if (!(k in data)) data[k] = null;
   }
+  // `orden` NO se toca al editar: no está en el formulario, viaja escondido con
+  // el valor que tenía la promo cuando lo abriste. Si mientras tanto la moviste
+  // con las flechas (setPromoOrden), guardar la edición revertía el orden.
+  delete data.orden;
   await updateDoc(doc(db, "promociones", id), data);
   logActivity("Editó promoción", { entidad: "promocion", entidadId: id });
 }

@@ -19,6 +19,9 @@ interface Line {
   cantidad: number;
   costo: number;
   nuevo?: { ean?: string; marca: Marca; categoria: string };
+  // Ya sumó stock en Firestore. Si la carga se corta a la mitad y el usuario
+  // reintenta, estos NO se vuelven a sumar (antes se duplicaba el stock).
+  cargado?: boolean;
 }
 
 let lineSeq = 0;
@@ -86,15 +89,21 @@ export default function RecepcionModal({ proveedorNombre, onClose }: Props) {
   const total = lines.reduce((s, l) => s + l.cantidad * l.costo, 0);
 
   const confirmar = async () => {
-    const validas = lines.filter((l) => l.cantidad > 0);
-    if (validas.length === 0) {
-      setError("Agregá al menos un producto con cantidad.");
+    // Los que ya entraron en un intento anterior NO se vuelven a cargar.
+    const pendientes = lines.filter((l) => l.cantidad > 0 && !l.cargado);
+    if (pendientes.length === 0) {
+      setError(
+        lines.some((l) => l.cargado)
+          ? "Ya se cargó todo. Cerrá la ventana."
+          : "Agregá al menos un producto con cantidad."
+      );
       return;
     }
     setBusy(true);
     setError(null);
+    let hechos = 0;
     try {
-      for (const l of validas) {
+      for (const l of pendientes) {
         let id = l.productId;
         if (!id && l.nuevo) {
           id = await createProduct({
@@ -103,15 +112,29 @@ export default function RecepcionModal({ proveedorNombre, onClose }: Props) {
             ean: l.nuevo.ean,
             categoria: l.nuevo.categoria,
           });
+          // Guardamos el id: si hay que reintentar, no se crea otra vez.
+          const nuevoId = id;
+          setLines((prev) =>
+            prev.map((x) => (x.key === l.key ? { ...x, productId: nuevoId } : x))
+          );
         }
         if (!id) continue;
         await incrementStock(id, l.cantidad);
         if (l.costo > 0) await setProductCost(id, l.costo);
+        hechos++;
+        setLines((prev) =>
+          prev.map((x) => (x.key === l.key ? { ...x, cargado: true } : x))
+        );
       }
       onClose();
     } catch (e) {
       console.error(e);
-      setError("No se pudo guardar la recepción. Intentá de nuevo.");
+      setError(
+        hechos > 0
+          ? `Se cargaron ${hechos} de ${pendientes.length} productos y falló el resto. ` +
+              `Volvé a apretar "Confirmar": se cargan SOLO los que faltan (los ✓ ya entraron).`
+          : "No se pudo guardar la recepción. Intentá de nuevo."
+      );
     } finally {
       setBusy(false);
     }
@@ -250,9 +273,19 @@ export default function RecepcionModal({ proveedorNombre, onClose }: Props) {
                 {lines.map((l) => (
                   <div
                     key={l.key}
-                    className="grid grid-cols-[1fr_70px_100px_90px_32px] items-center gap-2 border-t border-brand-border px-3 py-2 text-sm"
+                    className={`grid grid-cols-[1fr_70px_100px_90px_32px] items-center gap-2 border-t border-brand-border px-3 py-2 text-sm ${
+                      l.cargado ? "bg-emerald-50/70" : ""
+                    }`}
                   >
                     <span className="line-clamp-1">
+                      {l.cargado && (
+                        <span
+                          className="mr-1 font-bold text-emerald-700"
+                          title="Ya sumó stock — no se vuelve a cargar"
+                        >
+                          ✓
+                        </span>
+                      )}
                       {l.nombre}
                       {l.nuevo && (
                         <span className="ml-1 rounded bg-emerald-100 px-1 text-[9px] font-bold uppercase text-emerald-800">
@@ -264,28 +297,35 @@ export default function RecepcionModal({ proveedorNombre, onClose }: Props) {
                       type="number"
                       min={1}
                       value={l.cantidad || ""}
+                      disabled={l.cargado}
                       onChange={(e) =>
                         updateLine(l.key, { cantidad: Number(e.target.value) })
                       }
-                      className="rounded border border-brand-border px-1.5 py-1 text-right text-xs"
+                      className="rounded border border-brand-border px-1.5 py-1 text-right text-xs disabled:bg-slate-100 disabled:text-brand-dark/50"
                     />
                     <input
                       type="number"
                       min={0}
                       step="any"
                       value={l.costo || ""}
+                      disabled={l.cargado}
                       onChange={(e) =>
                         updateLine(l.key, { costo: Number(e.target.value) })
                       }
-                      className="rounded border border-brand-border px-1.5 py-1 text-right text-xs"
+                      className="rounded border border-brand-border px-1.5 py-1 text-right text-xs disabled:bg-slate-100 disabled:text-brand-dark/50"
                     />
                     <span className="text-right font-semibold">
                       {formatARS(l.cantidad * l.costo)}
                     </span>
                     <button
                       onClick={() => removeLine(l.key)}
-                      className="text-rose-600 hover:opacity-70"
-                      title="Quitar"
+                      disabled={l.cargado}
+                      className="text-rose-600 hover:opacity-70 disabled:cursor-not-allowed disabled:text-brand-dark/25"
+                      title={
+                        l.cargado
+                          ? "Ya sumó stock: para sacarlo, corregí el stock en Productos"
+                          : "Quitar"
+                      }
                     >
                       ✕
                     </button>
