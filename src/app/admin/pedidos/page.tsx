@@ -786,6 +786,12 @@ function FacturarView() {
 
   const facturar = async () => {
     if (!remito) return;
+    if (remito.anulado) {
+      setError(
+        "Esta venta está ANULADA: no se puede facturar (sería un CAE de AFIP por una venta que no existe)."
+      );
+      return;
+    }
     if (remito.facturaId) {
       setError("Este remito ya fue facturado.");
       return;
@@ -872,6 +878,11 @@ function FacturarView() {
                   <span className="text-brand-dark/55">
                     {r.clienteNombre || "(sin nombre)"}
                   </span>
+                  {r.anulado && (
+                    <span className="ml-1 text-[10px] font-bold uppercase text-rose-700">
+                      · ANULADA
+                    </span>
+                  )}
                   {r.facturaId && (
                     <span className="ml-1 text-[10px] font-bold uppercase text-sky-700">
                       · facturado
@@ -971,10 +982,12 @@ function FacturarView() {
 
             <button
               onClick={facturar}
-              disabled={busy || !!remito.facturaId}
+              disabled={busy || !!remito.facturaId || !!remito.anulado}
               className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {remito.facturaId
+              {remito.anulado
+                ? "Venta ANULADA — no se puede facturar"
+                : remito.facturaId
                 ? "Remito ya facturado"
                 : busy
                 ? "Emitiendo en AFIP…"

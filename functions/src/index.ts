@@ -12,7 +12,7 @@ import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { requestCAE, buildAfipQrUrl, fechaHoyAfip, type IvaEntry } from "./afip";
 
 initializeApp();
@@ -199,13 +199,17 @@ export const adminDeleteUser = onCall(async (request) => {
 //  FACTURACIÓN ELECTRÓNICA AFIP
 // ============================================================================
 
-/** Quien factura debe ser staff (vendedor / socio / superadmin). */
+/**
+ * Quien factura debe ser socio o superadmin. Un `vendedor` NO puede emitir
+ * comprobantes fiscales reales (las reglas de Firestore tampoco lo dejan
+ * escribir remitos, pero esta función usa el Admin SDK y las saltea).
+ */
 async function assertStaff(request: CallableRequest): Promise<void> {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Necesitás iniciar sesión.");
   const snap = await getFirestore().collection("users").doc(uid).get();
   const role = snap.data()?.role;
-  if (!["vendedor", "socio", "superadmin"].includes(role)) {
+  if (!["socio", "superadmin"].includes(role)) {
     throw new HttpsError("permission-denied", "No tenés permiso para facturar.");
   }
 }
@@ -232,7 +236,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * data: { remitoId, tipo: 'A'|'B', clienteCuit?, clienteCondicionIva?, clienteNombre? }
  */
 export const emitirFactura = onCall(
-  { secrets: [AFIP_CERT, AFIP_KEY] },
+  // AFIP (WSAA + WSFE + verificación) tarda: con el timeout default de 60s la
+  // función moría DESPUÉS de obtener el CAE y el reintento emitía otro.
+  { secrets: [AFIP_CERT, AFIP_KEY], timeoutSeconds: 300 },
   async (request) => {
     await assertStaff(request);
     const db = getFirestore();
@@ -248,15 +254,31 @@ export const emitirFactura = onCall(
     if (!remSnap.exists) throw new HttpsError("not-found", "No existe el remito.");
     const remito = remSnap.data() as any;
 
-    // Idempotencia: si ya tiene factura, devolverla
+    // NO facturar una venta anulada (sería un CAE real por una venta que no existe).
+    if (remito.anulado) {
+      throw new HttpsError(
+        "failed-precondition",
+        "La venta está ANULADA: no se puede facturar."
+      );
+    }
+
+    // Idempotencia: si ya tiene factura emitida, devolverla.
     if (remito.facturaId) {
       const f = await db.collection("facturas").doc(remito.facturaId).get();
       if (f.exists && f.data()?.estado === "emitida") {
         return { id: f.id, ...f.data(), yaExistia: true };
       }
+      if (f.exists && f.data()?.estado === "emitiendo") {
+        throw new HttpsError(
+          "already-exists",
+          "Ya hay una emisión en curso para este remito. Verificá en AFIP si el comprobante salió antes de reintentar (para no emitir dos veces)."
+        );
+      }
     }
 
-    const total = Number(remito.total) || 0;
+    // Redondear a 2 decimales: un total con basura de punto flotante
+    // (ej. 3704.9700000000003) hace que AFIP RECHACE el comprobante.
+    const total = r2(Number(remito.total) || 0);
     if (total <= 0)
       throw new HttpsError("failed-precondition", "El remito no tiene importe válido.");
 
@@ -293,6 +315,32 @@ export const emitirFactura = onCall(
     const keyPem = Buffer.from(AFIP_KEY.value(), "base64").toString("utf8");
     const fechaStr = fechaHoyAfip();
 
+    // RESERVA ATÓMICA antes de pegarle a AFIP. Si dos pestañas/equipos facturan
+    // el mismo remito a la vez, solo una pasa. Y si la función muere después de
+    // obtener el CAE, el remito queda "en emisión" y el reintento NO emite otro.
+    const facturaRef = db.collection("facturas").doc();
+    await db.runTransaction(async (tx) => {
+      const s = await tx.get(remRef);
+      if (!s.exists) throw new HttpsError("not-found", "No existe el remito.");
+      const r = s.data() as any;
+      if (r.anulado)
+        throw new HttpsError("failed-precondition", "La venta está ANULADA.");
+      if (r.facturaId)
+        throw new HttpsError(
+          "already-exists",
+          "Este remito ya tiene una factura (o una emisión en curso)."
+        );
+      tx.set(facturaRef, {
+        remitoId,
+        remitoNumero: remito.numero ?? "",
+        tipo,
+        estado: "emitiendo",
+        createdBy: request.auth?.uid ?? null,
+        createdAt: Date.now(),
+      });
+      tx.set(remRef, { facturaId: facturaRef.id }, { merge: true });
+    });
+
     let cae;
     try {
       cae = await requestCAE({
@@ -314,6 +362,12 @@ export const emitirFactura = onCall(
         fechaStr,
       });
     } catch (e) {
+      // AFIP rechazó o falló ANTES de dar el CAE → liberar la reserva para que
+      // se pueda reintentar (borramos la factura provisoria y el facturaId).
+      await facturaRef.delete().catch(() => undefined);
+      await remRef
+        .set({ facturaId: FieldValue.delete() }, { merge: true })
+        .catch(() => undefined);
       throw new HttpsError("internal", (e as Error).message);
     }
 
@@ -360,8 +414,8 @@ export const emitirFactura = onCall(
       createdAt: Date.now(),
       fecha: Date.now(),
     };
-    const facturaRef = await db.collection("facturas").add(facturaDoc);
-    await remRef.set({ facturaId: facturaRef.id }, { merge: true });
+    // Escribimos SOBRE la reserva (el remito ya apunta a este facturaRef).
+    await facturaRef.set(facturaDoc);
 
     return { id: facturaRef.id, ...facturaDoc };
   }
