@@ -139,12 +139,15 @@ export async function createProduct(input: NewProductInput): Promise<string> {
     ean: input.ean || undefined,
     codigo: input.codigo || undefined,
     categoria: input.categoria || "General",
-    precioVenta: input.precioVenta ?? 0,
-    descripcion: input.descripcion || "",
+    // OJO: stock y precioVenta van SIN default. Si acá pusiéramos `?? 0`, al
+    // "crear" un producto cuyo EAN YA EXISTE (ej. recepción de mercadería), el
+    // merge le pisaba el stock y el precio con 0 y se perdía todo.
+    precioVenta: input.precioVenta,
+    descripcion: input.descripcion || undefined,
     imagen:
       input.imagen ||
       "https://placehold.co/600x600/006081/ffffff?text=Producto",
-    stock: input.stock ?? 0,
+    stock: input.stock,
     activo: true,
     // Si el EAN coincide con un producto borrado, al recrearlo lo "revivimos"
     // (sin esto, el merge mantenía eliminado:true y el producto quedaba oculto).

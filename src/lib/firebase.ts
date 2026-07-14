@@ -1,7 +1,7 @@
 // Inicialización de Firebase (cliente). Config por variables de entorno.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
@@ -17,7 +17,12 @@ const firebaseConfig = {
 const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// ignoreUndefinedProperties: red de seguridad. Sin esto, un solo campo opcional
+// en `undefined` (ej. un producto sin código interno) hacía que Firestore
+// RECHAZARA la escritura y la venta no se pudiera cerrar.
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+});
 export const storage = getStorage(app);
 export const functions = getFunctions(app); // región default us-central1
 export const googleProvider = new GoogleAuthProvider();

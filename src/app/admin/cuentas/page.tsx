@@ -280,7 +280,9 @@ export default function AdminCuentasPage() {
         fecha,
         tipo: "comision_agencia",
         monto: opts.comisionMonto,
-        formaPago: "transferencia",
+        // La comisión sale por la MISMA vía del pago: si fuiste con billetes a
+        // la agencia, es efectivo (y tiene que bajar de la caja).
+        formaPago: opts.via === "transferencia" ? "transferencia" : "efectivo",
         detalle: `${
           opts.comisionMonto < 0 ? "Descuento financiera" : "Comisión agencia"
         } — pago a ${proveedores.find((p) => p.id === gProv)?.nombre ?? ""}`,

@@ -22,6 +22,7 @@ import {
   cerrarCaja,
   reabrirCaja,
   subscribeCierre,
+  guardarArqueoParcial,
 } from "@/lib/caja";
 import { formatARS, formatDate } from "@/lib/format";
 import {
@@ -45,6 +46,17 @@ function isoDeTs(ts: number): string {
   const d = new Date(ts);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * ¿El pago a proveedor salió con BILLETES de la caja?
+ * Todas las vías menos "transferencia" usan plata física (depósito bancario en
+ * efectivo, agencia/financiera, efectivo). Antes solo se restaba via==="efectivo"
+ * y por eso la caja daba "falta plata" al pagar un camión con billetes.
+ */
+function pagoUsaEfectivo(p: SupplierPayment): boolean {
+  if (p.via) return p.via !== "transferencia";
+  return (p.formaPago ?? "efectivo") === "efectivo"; // pagos viejos sin `via`
 }
 
 export default function CajaView() {
@@ -117,8 +129,10 @@ export default function CajaView() {
       .reduce((s, g) => s + g.monto, 0);
 
     const pagosTotal = pagosDia.reduce((s, p) => s + p.monto, 0);
+    // Todos los pagos con billetes físicos (depósito, agencia, efectivo…) salen
+    // de la caja, no solo los de vía "efectivo".
     const pagosEfectivo = pagosDia
-      .filter((p) => p.via === "efectivo")
+      .filter(pagoUsaEfectivo)
       .reduce((s, p) => s + p.monto, 0);
 
     const disponible = ventas - gastosTotal - pagosTotal;
@@ -554,16 +568,40 @@ function CierreCaja({
     setCajaIniInput(String(cierre?.cajaInicial ?? 0));
   }, [cierre, cierreListo, dayTs]);
 
-  const contado = totalArqueo(arqueo);
-  const diferencia = contado - d.efectivoEsperado;
+  // AUTOSAVE del arqueo: los billetes se guardan solos mientras se cargan.
+  // Antes vivían solo en memoria y se perdían al cambiar de pestaña o recargar
+  // (la caja terminaba cerrándose en $0).
+  useEffect(() => {
+    if (!cierreListo || cerrado) return;
+    if (prefillDia.current !== dayTs) return; // aún no cargó este día
+    const t = setTimeout(() => {
+      guardarArqueoParcial(dayTs, arqueo).catch(() => {});
+    }, 600);
+    return () => clearTimeout(t);
+  }, [arqueo, cierreListo, cerrado, dayTs]);
+
+  // Caja inicial EN VIVO (lo que está tipeado), no la del snapshot: si no, al
+  // cerrar se guardaba un "esperado" sin la caja inicial recién cargada.
+  const cajaIniActual = Number(cajaIniInput) || 0;
+  const esperadoVivo =
+    cajaIniActual + d.ventaEfectivo - d.gastosEfectivo - d.pagosEfectivo;
+  const contadoVivo = totalArqueo(arqueo);
+
+  // Si la caja está CERRADA mostramos los números GUARDADOS (no recalculados),
+  // para que pantalla, reporte impreso y registro histórico coincidan siempre.
+  const esperado = cerrado ? cierre?.efectivoEsperado ?? 0 : esperadoVivo;
+  const contado = cerrado ? cierre?.efectivoContado ?? 0 : contadoVivo;
+  const diferencia = cerrado
+    ? cierre?.diferencia ?? 0
+    : contadoVivo - esperadoVivo;
 
   const cerrar = async () => {
     // Red de seguridad: no cerrar en $0 si hubo ventas en efectivo.
-    if (contado === 0 && d.efectivoEsperado > 0) {
+    if (contadoVivo === 0 && esperadoVivo > 0) {
       if (
         !confirm(
           `⚠️ Estás cerrando con $0 contado, pero se esperaban ${formatARS(
-            d.efectivoEsperado
+            esperadoVivo
           )} en efectivo.\n\n¿Cargaste los billetes? Si seguís, la caja queda en cero.\n\n¿Cerrar igual?`
         )
       )
@@ -572,9 +610,12 @@ function CierreCaja({
     if (!confirm("¿Cerrar la caja del día? Quedará bloqueada.")) return;
     setBusy(true);
     try {
+      // Persistir la caja inicial tipeada ANTES de cerrar (evita guardar un
+      // "esperado" viejo si el usuario cerró sin salir del campo).
+      await setCashInitial(dayTs, cajaIniActual, createdBy);
       await cerrarCaja(dayTs, {
         arqueo,
-        efectivoEsperado: d.efectivoEsperado,
+        efectivoEsperado: esperadoVivo,
         cerradoPor: createdBy,
       });
     } catch (e) {
@@ -609,6 +650,7 @@ function CierreCaja({
             <input
               type="number"
               min={0}
+              disabled={!cierreListo}
               value={cajaIniInput}
               onChange={(e) => setCajaIniInput(e.target.value)}
               onBlur={() =>
@@ -639,7 +681,7 @@ function CierreCaja({
               <input
                 type="number"
                 min={0}
-                disabled={cerrado}
+                disabled={cerrado || !cierreListo}
                 value={arqueo[den] || ""}
                 onChange={(e) =>
                   setArqueo((prev) => ({
@@ -668,7 +710,7 @@ function CierreCaja({
 
       {/* Totales del cierre */}
       <div className="mt-3 space-y-1 border-t border-brand-border pt-2 text-sm">
-        <Row label="Efectivo esperado" value={d.efectivoEsperado} />
+        <Row label="Efectivo esperado" value={esperado} />
         <Row label="Efectivo contado" value={contado} bold />
         <Row
           label="Diferencia"
@@ -709,10 +751,14 @@ function CierreCaja({
       ) : (
         <button
           onClick={cerrar}
-          disabled={busy}
+          disabled={busy || !cierreListo}
           className="mt-3 w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
         >
-          {busy ? "Cerrando…" : "Cerrar caja del día"}
+          {busy
+            ? "Cerrando…"
+            : !cierreListo
+            ? "Cargando caja…"
+            : "Cerrar caja del día"}
         </button>
       )}
     </div>

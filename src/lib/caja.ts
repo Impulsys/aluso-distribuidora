@@ -52,6 +52,22 @@ export async function cerrarCaja(
     },
     { merge: true }
   );
+  // ARRASTRE: la plata contada queda como CAJA INICIAL del día siguiente.
+  // Sin esto, la caja del día siguiente arrancaba en $0 y el efectivo contado
+  // daba siempre "SOBRA" (la plata del día anterior no estaba contemplada).
+  // Si depositan esa plata, ajustan la caja inicial a mano.
+  const sigRef = doc(db, "cashClosings", dayKey(dayTs + 86_400_000));
+  const sigSnap = await getDoc(sigRef);
+  if (!sigSnap.exists() || !sigSnap.data()?.cerrado) {
+    const sig = new Date(dayTs + 86_400_000);
+    sig.setHours(0, 0, 0, 0);
+    await setDoc(
+      sigRef,
+      { fecha: sig.getTime(), cajaInicial: contado },
+      { merge: true }
+    );
+  }
+
   logActivity("Cerró la caja", {
     detalle: `${fechaDia(dayTs)} · contado ${formatARS(contado)} · dif. ${formatARS(
       contado - input.efectivoEsperado
@@ -59,6 +75,24 @@ export async function cerrarCaja(
     entidad: "caja",
     entidadId: dayKey(dayTs),
   });
+}
+
+/**
+ * Guarda el arqueo EN PROGRESO (autosave). Sin esto, los billetes vivían solo
+ * en memoria y se perdían al cambiar de pestaña o recargar → la caja se cerraba
+ * en $0. No marca la caja como cerrada.
+ */
+export async function guardarArqueoParcial(
+  dayTs: number,
+  arqueo: Record<string, number>
+): Promise<void> {
+  const d = new Date(dayTs);
+  d.setHours(0, 0, 0, 0);
+  await setDoc(
+    doc(db, "cashClosings", dayKey(dayTs)),
+    { fecha: d.getTime(), arqueo },
+    { merge: true }
+  );
 }
 
 /** Reabre la caja de un día (vuelve a editable). */
