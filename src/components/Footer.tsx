@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
@@ -8,7 +11,13 @@ const PHONE_DISPLAY = process.env.NEXT_PUBLIC_BUSINESS_PHONE || "";
 const ADDRESS = process.env.NEXT_PUBLIC_BUSINESS_ADDRESS || "";
 
 export default function Footer() {
+  const pathname = usePathname();
   const year = new Date().getFullYear();
+
+  // La pantalla de inicio entra JUSTA en el viewport y trae su propio pie
+  // (dirección + WhatsApp + mapa). Este footer largo la haría scrollear.
+  if (pathname === "/") return null;
+
   return (
     <footer className="mt-auto border-t border-brand-border bg-landing-navy text-white">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
