@@ -599,6 +599,14 @@ function CierreCaja({
     return () => clearTimeout(t);
   }, [arqueo, cierreListo, cerrado, dayTs]);
 
+  // Arranque del día de HOY. ¿El día que estoy mirando todavía no llegó?
+  const hoy0 = useMemo(() => {
+    const h = new Date();
+    h.setHours(0, 0, 0, 0);
+    return h.getTime();
+  }, []);
+  const esFuturo = dayTs > hoy0;
+
   // Caja inicial EN VIVO (lo que está tipeado), no la del snapshot: si no, al
   // cerrar se guardaba un "esperado" sin la caja inicial recién cargada.
   const cajaIniActual = Number(cajaIniInput) || 0;
@@ -615,6 +623,17 @@ function CierreCaja({
     : contadoVivo - esperadoVivo;
 
   const cerrar = async () => {
+    // NO se cierra la caja de un día que todavía no pasó. El 13/07/2026 el
+    // cliente apretó "Abrir la caja del día siguiente" y cerró ahí mismo el 14
+    // (vacío, en $0): al otro día la caja aparecía CERRADA y no podía cargar
+    // los billetes.
+    if (esFuturo) {
+      alert(
+        "Ese día todavía no llegó: no se puede cerrar la caja de un día futuro.\n\n" +
+          "Volvé al día de hoy con el selector de arriba."
+      );
+      return;
+    }
     // Red de seguridad: no cerrar en $0 si hubo ventas en efectivo.
     if (contadoVivo === 0 && esperadoVivo > 0) {
       if (
@@ -749,12 +768,17 @@ function CierreCaja({
             Caja cerrada
             {cierre?.cerradoAt ? ` el ${formatDate(cierre.cerradoAt)}` : ""}.
           </p>
-          <button
-            onClick={() => onIrADia(isoDeTs(dayTs + 86_400_000))}
-            className="mt-2 w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Abrir la caja del día siguiente →
-          </button>
+          {/* Solo si ese "día siguiente" ya llegó. Si cerrás la caja de HOY,
+              este botón te llevaba a MAÑANA — y ahí se podía cerrar una caja
+              vacía por adelantado, dejándola bloqueada al otro día. */}
+          {dayTs + 86_400_000 <= hoy0 && (
+            <button
+              onClick={() => onIrADia(isoDeTs(dayTs + 86_400_000))}
+              className="mt-2 w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Abrir la caja del día siguiente →
+            </button>
+          )}
           <p className="mt-1 text-center text-[10px] text-brand-dark/45">
             También podés elegir cualquier fecha con el selector de arriba.
           </p>
@@ -770,11 +794,16 @@ function CierreCaja({
       ) : (
         <button
           onClick={cerrar}
-          disabled={busy || !cierreListo}
-          className="mt-3 w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
+          disabled={busy || !cierreListo || esFuturo}
+          title={
+            esFuturo ? "Ese día todavía no llegó" : "Cerrar la caja de este día"
+          }
+          className="mt-3 w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy
             ? "Cerrando…"
+            : esFuturo
+            ? "Este día todavía no llegó"
             : !cierreListo
             ? "Cargando caja…"
             : "Cerrar caja del día"}
