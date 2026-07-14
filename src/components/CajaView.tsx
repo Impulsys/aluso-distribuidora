@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -57,6 +57,9 @@ export default function CajaView() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [gastos, setGastos] = useState<DailyExpense[]>([]);
   const [cierre, setCierre] = useState<DailyCashInitial | null>(null);
+  // true cuando ya llegó el primer snapshot del cierre de ESE día (para no
+  // pisar los billetes que el usuario está cargando).
+  const [cierreListo, setCierreListo] = useState(false);
 
   // Rango del día (con componentes para evitar problemas de zona horaria)
   const { start, end, dayTs } = useMemo(() => {
@@ -70,10 +73,14 @@ export default function CajaView() {
   // Solo los movimientos del día seleccionado (no toda la colección).
   useEffect(() => {
     const finDia = start + 86_400_000;
+    setCierreListo(false);
     const u1 = subscribeRemitosRange(start, finDia, setRemitos);
     const u2 = subscribeSupplierPaymentsRange(start, finDia, setPagos);
     const u3 = subscribeExpensesRange(start, finDia, setGastos);
-    const u4 = subscribeCierre(dayTs, setCierre);
+    const u4 = subscribeCierre(dayTs, (c) => {
+      setCierre(c);
+      setCierreListo(true);
+    });
     return () => {
       u1();
       u2();
@@ -240,6 +247,7 @@ export default function CajaView() {
           <CierreCaja
             d={d}
             cierre={cierre}
+            cierreListo={cierreListo}
             cerrado={cerrado}
             isSuperadmin={isSuperadmin}
             dayTs={dayTs}
@@ -508,6 +516,7 @@ function GastoDelDia({
 function CierreCaja({
   d,
   cierre,
+  cierreListo,
   cerrado,
   isSuperadmin,
   dayTs,
@@ -522,6 +531,7 @@ function CierreCaja({
     efectivoEsperado: number;
   };
   cierre: DailyCashInitial | null;
+  cierreListo: boolean;
   cerrado: boolean;
   isSuperadmin: boolean;
   dayTs: number;
@@ -531,17 +541,34 @@ function CierreCaja({
   const [arqueo, setArqueo] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [cajaIniInput, setCajaIniInput] = useState("");
+  const prefillDia = useRef<number | null>(null);
 
-  // Prefill arqueo y caja inicial desde el cierre guardado
+  // Prefill del arqueo/caja inicial: SOLO la primera vez que carga el día.
+  // ANTES se re-ejecutaba con cada cambio del doc (ej. al guardar la caja
+  // inicial) y BORRABA los billetes que el usuario estaba cargando.
   useEffect(() => {
+    if (!cierreListo) return;
+    if (prefillDia.current === dayTs) return;
+    prefillDia.current = dayTs;
     setArqueo(cierre?.arqueo ?? {});
     setCajaIniInput(String(cierre?.cajaInicial ?? 0));
-  }, [cierre, dayTs]);
+  }, [cierre, cierreListo, dayTs]);
 
   const contado = totalArqueo(arqueo);
   const diferencia = contado - d.efectivoEsperado;
 
   const cerrar = async () => {
+    // Red de seguridad: no cerrar en $0 si hubo ventas en efectivo.
+    if (contado === 0 && d.efectivoEsperado > 0) {
+      if (
+        !confirm(
+          `⚠️ Estás cerrando con $0 contado, pero se esperaban ${formatARS(
+            d.efectivoEsperado
+          )} en efectivo.\n\n¿Cargaste los billetes? Si seguís, la caja queda en cero.\n\n¿Cerrar igual?`
+        )
+      )
+        return;
+    }
     if (!confirm("¿Cerrar la caja del día? Quedará bloqueada.")) return;
     setBusy(true);
     try {
