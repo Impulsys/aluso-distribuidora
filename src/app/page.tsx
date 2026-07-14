@@ -70,24 +70,24 @@ export default function LandingPage() {
             campo blanco. Se superponen un poco para ganar tamaño: los JPG son
             cuadrados y traen aire propio alrededor del pack.
           */}
-          <div className="flex items-center justify-center">
-            <div className="relative aspect-square w-[56%] -rotate-3">
+          <div className="flex w-full items-center justify-center overflow-visible">
+            <div className="relative aspect-square w-[50%] shrink-0">
               <Image
                 src="/productos/7790940216212.jpg"
                 alt="Doncella Normal dúo pack — tela suave con alas, sin perfume"
                 fill
                 priority
-                sizes="(max-width: 768px) 50vw, 420px"
+                sizes="(max-width: 768px) 50vw, 400px"
                 className="object-contain"
               />
             </div>
-            <div className="relative -ml-[10%] aspect-square w-[56%] rotate-3">
+            <div className="relative -ml-[6%] aspect-square w-[50%] shrink-0">
               <Image
                 src="/productos/7790940216229.jpg"
                 alt="Doncella Normal dúo pack — tela suave con alas, con perfume"
                 fill
                 priority
-                sizes="(max-width: 768px) 50vw, 420px"
+                sizes="(max-width: 768px) 50vw, 400px"
                 className="object-contain"
               />
             </div>
