@@ -69,14 +69,15 @@ export interface CierreInput {
 /**
  * Cierra la caja del día: guarda arqueo, contado, esperado, diferencia y bloquea.
  *
- * CADA DÍA CIERRA SOLO. No se arrastra nada al día siguiente.
+ * ⚠️ REGLA DEL DUEÑO (confirmada el 16/07/2026): TODOS LOS DÍAS LA CAJA ARRANCA
+ * EN $0. NO SE TRAE NADA DEL DÍA ANTERIOR. Cada día se cierra solo y cuenta
+ * únicamente sus propias ventas.
  *
- * Acá la recaudación se retira al terminar el día (banco / caja fuerte), así que
- * el cajón arranca vacío. El 14/07/2026 puse un arrastre (contado → caja inicial
- * de mañana) y fue un error: el 15 la caja arrancó esperando los $12.418.000 que
- * el 14 YA había contado y cerrado → los contaba dos veces y marcaba un faltante
- * exacto por ese monto. Si algún día dejan plata en el cajón, se escribe a mano
- * en "Caja inicial del día".
+ * NO VUELVAS A AGREGAR UN ARRASTRE ACÁ. Ya se probó y salió caro: el 14/07/2026
+ * puse "contado → caja inicial de mañana" y el 15 la caja arrancó esperando los
+ * $12.418.000 que el 14 YA había contado y cerrado → los contaba dos veces y le
+ * marcó al cliente un faltante exacto por ese monto. El síntoma delator es que
+ * la diferencia da EXACTAMENTE igual a la caja inicial.
  */
 export async function cerrarCaja(
   dayTs: number,

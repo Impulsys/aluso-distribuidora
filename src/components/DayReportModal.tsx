@@ -12,6 +12,7 @@ import {
 } from "@/lib/config";
 import { subscribeCierre, efectivoEsperadoDelDia } from "@/lib/caja";
 import { subscribeSupplierPaymentsRange } from "@/lib/cuentas";
+import { useProducts } from "@/hooks/useProducts";
 import type { DailyCashInitial } from "@/lib/cash-initial";
 import {
   EXPENSE_LABELS,
@@ -63,6 +64,7 @@ export default function DayReportModal({
   remitos,
 }: Props) {
   const { user } = useAuth();
+  const productos = useProducts();
   const [expenses, setExpenses] = useState<DailyExpense[]>([]);
   const [loadingExp, setLoadingExp] = useState(false);
   const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
@@ -158,7 +160,7 @@ export default function DayReportModal({
     // Detalle de productos vendidos (agrupado) desde los remitos
     const itemsMap = new Map<
       string,
-      { nombre: string; cantidad: number; total: number }
+      { productId: string; nombre: string; cantidad: number; total: number }
     >();
     dayRemitos.forEach((r) =>
       r.items.forEach((it) => {
@@ -168,6 +170,7 @@ export default function DayReportModal({
           cur.total += it.cantidad * it.precioVenta;
         } else {
           itemsMap.set(it.productId, {
+            productId: it.productId,
             nombre: it.nombre,
             cantidad: it.cantidad,
             total: it.cantidad * it.precioVenta,
@@ -175,9 +178,66 @@ export default function DayReportModal({
         }
       })
     );
-    const items = Array.from(itemsMap.values()).sort(
-      (a, b) => b.cantidad - a.cantidad
-    );
+
+    /*
+     * STOCK DEL DÍA: inicial → vendido → final, para poder controlar.
+     *
+     * El stock guardado en el producto es el de AHORA, así que para un día
+     * pasado hay que "rebobinar": deshacer las ventas y las recepciones
+     * POSTERIORES a ese día. Después, el inicial sale del final del día.
+     *
+     *   final del día = stock de hoy + vendido después − recibido después
+     *   inicial       = final del día + vendido ese día − recibido ese día
+     *
+     * Ojo: solo contempla ventas (remitos) y recepciones de camión. Si alguien
+     * corrige el stock a mano desde Productos, ese ajuste no se ve acá.
+     */
+    const vendidoDespues = new Map<string, number>();
+    remitos
+      .filter((r) => r.fecha > end && !r.anulado)
+      .forEach((r) =>
+        r.items.forEach((it) =>
+          vendidoDespues.set(
+            it.productId,
+            (vendidoDespues.get(it.productId) ?? 0) + it.cantidad
+          )
+        )
+      );
+
+    const recibidoEnElDia = new Map<string, number>();
+    const recibidoDespues = new Map<string, number>();
+    trucks.forEach((t) => {
+      const destino =
+        t.fechaIngreso >= start && t.fechaIngreso <= end
+          ? recibidoEnElDia
+          : t.fechaIngreso > end
+          ? recibidoDespues
+          : null;
+      if (!destino) return;
+      (t.carga ?? []).forEach((c) =>
+        destino.set(
+          c.productId,
+          (destino.get(c.productId) ?? 0) + c.cantidadUnidades
+        )
+      );
+    });
+
+    const items = Array.from(itemsMap.values())
+      .map((it) => {
+        const stockHoy = productos.find((p) => p.id === it.productId)?.stock ?? 0;
+        const stockFinal =
+          stockHoy +
+          (vendidoDespues.get(it.productId) ?? 0) -
+          (recibidoDespues.get(it.productId) ?? 0);
+        const recibido = recibidoEnElDia.get(it.productId) ?? 0;
+        return {
+          ...it,
+          recibido,
+          stockFinal,
+          stockInicial: stockFinal + it.cantidad - recibido,
+        };
+      })
+      .sort((a, b) => b.cantidad - a.cantidad);
 
     // Gastos por tipo + por forma de pago
     const gastosPorTipo: Record<string, number> = {};
@@ -216,9 +276,12 @@ export default function DayReportModal({
         ? (ventaRemitos * truck.porcentajeGanancia) / 100
         : 0;
 
+    const totalUnidades = items.reduce((s, it) => s + it.cantidad, 0);
+
     return {
       truck,
       items,
+      totalUnidades,
       date,
       expenses,
       totalGastos,
@@ -236,7 +299,7 @@ export default function DayReportModal({
       ventaTransferencia,
       ventaCheque,
     };
-  }, [dayTs, trucks, expenses, remitos, cajaInicial, pagos]);
+  }, [dayTs, trucks, expenses, remitos, cajaInicial, pagos, productos]);
 
   if (dayTs === null || !data) return null;
 
@@ -323,12 +386,18 @@ export default function DayReportModal({
               </p>
             ) : (
               <>
-                <div className="rounded-xl border border-brand-border bg-surface">
+                <div className="overflow-x-auto rounded-xl border border-brand-border bg-surface">
                   <table className="w-full text-sm">
                     <thead className="bg-primary-light/40 text-xs uppercase text-primary">
                       <tr>
                         <th className="px-3 py-2 text-left">Producto</th>
-                        <th className="px-3 py-2 text-right">Cant.</th>
+                        <th className="px-3 py-2 text-right" title="Unidades que había al empezar el día">
+                          St. inicial
+                        </th>
+                        <th className="px-3 py-2 text-right">Vend.</th>
+                        <th className="px-3 py-2 text-right" title="Unidades que quedaron al terminar el día">
+                          St. final
+                        </th>
                         <th className="px-3 py-2 text-right">Subtotal</th>
                       </tr>
                     </thead>
@@ -338,9 +407,31 @@ export default function DayReportModal({
                           key={i}
                           className="border-t border-brand-border first:border-t-0"
                         >
-                          <td className="px-3 py-2">{it.nombre}</td>
-                          <td className="px-3 py-2 text-right font-medium">
+                          <td className="px-3 py-2">
+                            {it.nombre}
+                            {it.recibido > 0 && (
+                              <span
+                                className="ml-1.5 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-800"
+                                title="Entraron por camión ese día"
+                              >
+                                +{it.recibido} camión
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-brand-dark/60">
+                            {it.stockInicial}
+                          </td>
+                          <td className="px-3 py-2 text-right font-bold tabular-nums">
                             {it.cantidad}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                              it.stockFinal === 0
+                                ? "text-rose-700"
+                                : "text-brand-dark/60"
+                            }`}
+                          >
+                            {it.stockFinal}
                           </td>
                           <td className="px-3 py-2 text-right">
                             {it.total > 0 ? formatARS(it.total) : "—"}
@@ -348,8 +439,26 @@ export default function DayReportModal({
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-brand-border bg-primary-light/30 font-bold">
+                        <td className="px-3 py-2">Total</td>
+                        <td />
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {data.totalUnidades} u.
+                        </td>
+                        <td />
+                        <td className="px-3 py-2 text-right">
+                          {formatARS(data.ventaRemitos)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
+                <p className="mt-1 text-[10px] text-brand-dark/45">
+                  Stock inicial = stock final + vendido − lo que entró por camión
+                  ese día. No contempla correcciones de stock hechas a mano desde
+                  Productos.
+                </p>
                 <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2">
                   <span className="text-sm font-medium text-emerald-900">
                     Total ventas (Caja Fidel)
@@ -363,7 +472,8 @@ export default function DayReportModal({
                 <p className="mt-1 text-[11px] text-brand-dark/45">
                   {data.dayRemitos.length} venta
                   {data.dayRemitos.length === 1 ? "" : "s"} (remito
-                  {data.dayRemitos.length === 1 ? "" : "s"}) del día
+                  {data.dayRemitos.length === 1 ? "" : "s"}) ·{" "}
+                  <b>{data.totalUnidades} unidades</b> vendidas en el día
                 </p>
               </>
             )}

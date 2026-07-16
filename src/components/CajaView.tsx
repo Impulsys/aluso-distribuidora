@@ -573,7 +573,6 @@ function CierreCaja({
 }) {
   const [arqueo, setArqueo] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
-  const [cajaIniInput, setCajaIniInput] = useState("");
   const prefillDia = useRef<number | null>(null);
 
   // Prefill del arqueo/caja inicial: SOLO la primera vez que carga el día.
@@ -584,7 +583,6 @@ function CierreCaja({
     if (prefillDia.current === dayTs) return;
     prefillDia.current = dayTs;
     setArqueo(cierre?.arqueo ?? {});
-    setCajaIniInput(String(cierre?.cajaInicial ?? 0));
   }, [cierre, cierreListo, dayTs]);
 
   // AUTOSAVE del arqueo: los billetes se guardan solos mientras se cargan.
@@ -609,7 +607,8 @@ function CierreCaja({
 
   // Caja inicial EN VIVO (lo que está tipeado), no la del snapshot: si no, al
   // cerrar se guardaba un "esperado" sin la caja inicial recién cargada.
-  const cajaIniActual = Number(cajaIniInput) || 0;
+  // La caja inicial sale del doc, no de un input: la regla es arrancar en $0.
+  const cajaIniActual = d.cajaInicial;
   const esperadoVivo =
     cajaIniActual + d.ventaEfectivo - d.gastosEfectivo - d.pagosEfectivo;
   const contadoVivo = totalArqueo(arqueo);
@@ -648,9 +647,6 @@ function CierreCaja({
     if (!confirm("¿Cerrar la caja del día? Quedará bloqueada.")) return;
     setBusy(true);
     try {
-      // Persistir la caja inicial tipeada ANTES de cerrar (evita guardar un
-      // "esperado" viejo si el usuario cerró sin salir del campo).
-      await setCashInitial(dayTs, cajaIniActual, createdBy);
       await cerrarCaja(dayTs, {
         arqueo,
         efectivoEsperado: esperadoVivo,
@@ -677,28 +673,24 @@ function CierreCaja({
     <div className="rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary-light/30 to-surface p-4">
       <h3 className="mb-3 font-serif text-lg text-primary">🏦 Cierre de caja</h3>
 
-      {/* Caja inicial */}
+      {/*
+        Caja inicial: SIEMPRE $0. Regla del dueño (16/07/2026) — todos los días
+        se arranca en cero y no se trae nada del día anterior. Queda como dato
+        informativo, no editable: era la puerta por la que volvía a colarse la
+        plata del día anterior y le marcaba faltantes/sobras falsas.
+      */}
       <div className="mb-3 flex items-center justify-between text-sm">
         <span className="text-brand-dark/70">Caja inicial del día</span>
-        {cerrado ? (
-          <span className="font-medium">{formatARS(d.cajaInicial)}</span>
-        ) : (
-          <div className="flex items-center gap-1">
-            <span className="text-brand-dark/50">$</span>
-            <input
-              type="number"
-              min={0}
-              disabled={!cierreListo}
-              value={cajaIniInput}
-              onChange={(e) => setCajaIniInput(e.target.value)}
-              onBlur={() =>
-                setCashInitial(dayTs, Number(cajaIniInput) || 0, createdBy)
-              }
-              className="w-28 rounded-md border border-brand-border bg-white px-2 py-1 text-right text-sm outline-none focus:border-primary"
-            />
-          </div>
-        )}
+        <span className="font-medium tabular-nums">
+          {formatARS(d.cajaInicial)}
+        </span>
       </div>
+      {d.cajaInicial !== 0 && !cerrado && (
+        <p className="mb-3 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 ring-1 ring-amber-200">
+          ⚠️ Este día tiene caja inicial cargada. La regla es arrancar en $0:
+          avisale al programador.
+        </p>
+      )}
 
       {/* Arqueo por denominación */}
       <p className="mb-1 text-[11px] font-bold uppercase text-brand-dark/55">
