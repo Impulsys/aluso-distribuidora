@@ -454,11 +454,6 @@ export default function DayReportModal({
                     </tfoot>
                   </table>
                 </div>
-                <p className="mt-1 text-[10px] text-brand-dark/45">
-                  Stock inicial = stock final + vendido − lo que entró por camión
-                  ese día. No contempla correcciones de stock hechas a mano desde
-                  Productos.
-                </p>
                 <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2">
                   <span className="text-sm font-medium text-emerald-900">
                     Total ventas (Caja Fidel)

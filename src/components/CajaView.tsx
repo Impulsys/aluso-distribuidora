@@ -685,12 +685,6 @@ function CierreCaja({
           {formatARS(d.cajaInicial)}
         </span>
       </div>
-      {d.cajaInicial !== 0 && !cerrado && (
-        <p className="mb-3 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 ring-1 ring-amber-200">
-          ⚠️ Este día tiene caja inicial cargada. La regla es arrancar en $0:
-          avisale al programador.
-        </p>
-      )}
 
       {/* Arqueo por denominación */}
       <p className="mb-1 text-[11px] font-bold uppercase text-brand-dark/55">
