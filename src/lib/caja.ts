@@ -63,16 +63,21 @@ export function efectivoEsperadoDelDia(args: {
 export interface CierreInput {
   arqueo: Record<string, number>;
   efectivoEsperado: number;
-  /**
-   * Cuánto EFECTIVO queda físicamente en el cajón para mañana. El resto se
-   * considera RETIRADO (banco, caja fuerte, se lo lleva el dueño) y es la caja
-   * inicial del día siguiente.
-   */
-  quedaEnCaja: number;
   cerradoPor?: string;
 }
 
-/** Cierra la caja del día: guarda arqueo, contado, esperado, diferencia y bloquea. */
+/**
+ * Cierra la caja del día: guarda arqueo, contado, esperado, diferencia y bloquea.
+ *
+ * CADA DÍA CIERRA SOLO. No se arrastra nada al día siguiente.
+ *
+ * Acá la recaudación se retira al terminar el día (banco / caja fuerte), así que
+ * el cajón arranca vacío. El 14/07/2026 puse un arrastre (contado → caja inicial
+ * de mañana) y fue un error: el 15 la caja arrancó esperando los $12.418.000 que
+ * el 14 YA había contado y cerrado → los contaba dos veces y marcaba un faltante
+ * exacto por ese monto. Si algún día dejan plata en el cajón, se escribe a mano
+ * en "Caja inicial del día".
+ */
 export async function cerrarCaja(
   dayTs: number,
   input: CierreInput
@@ -80,8 +85,6 @@ export async function cerrarCaja(
   const d = new Date(dayTs);
   d.setHours(0, 0, 0, 0);
   const contado = totalArqueo(input.arqueo);
-  const queda = Math.max(0, Math.min(input.quedaEnCaja, contado));
-  const retirado = contado - queda;
 
   await setDoc(
     doc(db, "cashClosings", dayKey(dayTs)),
@@ -91,8 +94,6 @@ export async function cerrarCaja(
       efectivoContado: contado,
       efectivoEsperado: input.efectivoEsperado,
       diferencia: contado - input.efectivoEsperado,
-      quedaEnCaja: queda,
-      retirado,
       cerrado: true,
       cerradoPor: input.cerradoPor ?? null,
       cerradoAt: Date.now(),
@@ -100,32 +101,10 @@ export async function cerrarCaja(
     { merge: true }
   );
 
-  // ARRASTRE: al día siguiente pasa SOLO lo que queda físicamente en el cajón.
-  //
-  // Antes se arrastraba TODO lo contado a ciegas. Pero acá la recaudación se
-  // retira casi todos los días (banco / caja fuerte), y la app no tenía forma
-  // de registrarlo: el 15/07/2026 la caja arrancó esperando los $12.418.000 del
-  // día anterior, que ya no estaban → marcó un faltante exacto por ese monto.
-  const sigRef = doc(db, "cashClosings", dayKey(dayTs + 86_400_000));
-  const sigSnap = await getDoc(sigRef);
-  if (!sigSnap.exists() || !sigSnap.data()?.cerrado) {
-    const sig = new Date(dayTs + 86_400_000);
-    sig.setHours(0, 0, 0, 0);
-    await setDoc(
-      sigRef,
-      { fecha: sig.getTime(), cajaInicial: queda },
-      { merge: true }
-    );
-  }
-
   logActivity("Cerró la caja", {
-    detalle:
-      `${fechaDia(dayTs)} · contado ${formatARS(contado)} · dif. ${formatARS(
-        contado - input.efectivoEsperado
-      )}` +
-      (retirado > 0
-        ? ` · retiró ${formatARS(retirado)} · queda ${formatARS(queda)}`
-        : ` · queda todo en caja`),
+    detalle: `${fechaDia(dayTs)} · contado ${formatARS(contado)} · dif. ${formatARS(
+      contado - input.efectivoEsperado
+    )}`,
     entidad: "caja",
     entidadId: dayKey(dayTs),
   });

@@ -574,9 +574,6 @@ function CierreCaja({
   const [arqueo, setArqueo] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [cajaIniInput, setCajaIniInput] = useState("");
-  // Cuánto queda en el cajón para mañana. Acá la recaudación se retira casi
-  // siempre (banco / caja fuerte), así que el default es $0.
-  const [quedaInput, setQuedaInput] = useState("0");
   const prefillDia = useRef<number | null>(null);
 
   // Prefill del arqueo/caja inicial: SOLO la primera vez que carga el día.
@@ -588,7 +585,6 @@ function CierreCaja({
     prefillDia.current = dayTs;
     setArqueo(cierre?.arqueo ?? {});
     setCajaIniInput(String(cierre?.cajaInicial ?? 0));
-    setQuedaInput(String(cierre?.quedaEnCaja ?? 0));
   }, [cierre, cierreListo, dayTs]);
 
   // AUTOSAVE del arqueo: los billetes se guardan solos mientras se cargan.
@@ -617,8 +613,6 @@ function CierreCaja({
   const esperadoVivo =
     cajaIniActual + d.ventaEfectivo - d.gastosEfectivo - d.pagosEfectivo;
   const contadoVivo = totalArqueo(arqueo);
-  const quedaActual = Math.max(0, Math.min(Number(quedaInput) || 0, contadoVivo));
-  const retiroActual = contadoVivo - quedaActual;
 
   // Si la caja está CERRADA mostramos los números GUARDADOS (no recalculados),
   // para que pantalla, reporte impreso y registro histórico coincidan siempre.
@@ -651,15 +645,7 @@ function CierreCaja({
       )
         return;
     }
-    if (
-      !confirm(
-        `¿Cerrar la caja del día? Quedará bloqueada.\n\n` +
-          `Contado: ${formatARS(contadoVivo)}\n` +
-          `Queda en el cajón para mañana: ${formatARS(quedaActual)}\n` +
-          `Se retira (banco / caja fuerte): ${formatARS(retiroActual)}`
-      )
-    )
-      return;
+    if (!confirm("¿Cerrar la caja del día? Quedará bloqueada.")) return;
     setBusy(true);
     try {
       // Persistir la caja inicial tipeada ANTES de cerrar (evita guardar un
@@ -668,7 +654,6 @@ function CierreCaja({
       await cerrarCaja(dayTs, {
         arqueo,
         efectivoEsperado: esperadoVivo,
-        quedaEnCaja: quedaActual,
         cerradoPor: createdBy,
       });
     } catch (e) {
@@ -777,59 +762,11 @@ function CierreCaja({
         en efectivo.
       </p>
 
-      {/* ¿Qué se hace con la plata contada? Lo que NO queda en el cajón se
-          considera retirado (banco / caja fuerte) y NO se arrastra a mañana. */}
-      {!cerrado ? (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/70 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-900">
-            ¿Cuánta plata queda en el cajón para mañana?
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-sm font-semibold text-amber-900">$</span>
-            <input
-              type="number"
-              min={0}
-              disabled={!cierreListo}
-              value={quedaInput}
-              onChange={(e) => setQuedaInput(e.target.value)}
-              className="w-36 rounded border border-amber-300 bg-white px-2 py-1 text-right text-sm font-semibold outline-none focus:border-amber-500 disabled:bg-slate-50"
-              placeholder="0"
-            />
-            <button
-              type="button"
-              onClick={() => setQuedaInput("0")}
-              className="rounded-lg bg-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-300"
-            >
-              No queda nada
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuedaInput(String(contadoVivo))}
-              className="rounded-lg bg-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-300"
-            >
-              Queda todo
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-amber-900/80">
-            Se retira (banco / caja fuerte):{" "}
-            <b className="tabular-nums">{formatARS(retiroActual)}</b> · Mañana la
-            caja arranca con <b className="tabular-nums">{formatARS(quedaActual)}</b>.
-          </p>
-        </div>
-      ) : null}
-
       {cerrado ? (
         <div className="mt-3">
           <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">
             Caja cerrada
             {cierre?.cerradoAt ? ` el ${formatDate(cierre.cerradoAt)}` : ""}.
-            {(cierre?.retirado ?? 0) > 0 && (
-              <>
-                {" "}
-                Se retiraron <b>{formatARS(cierre?.retirado ?? 0)}</b> y quedaron{" "}
-                <b>{formatARS(cierre?.quedaEnCaja ?? 0)}</b> en el cajón.
-              </>
-            )}
           </p>
           {/* Solo si ese "día siguiente" ya llegó. Si cerrás la caja de HOY,
               este botón te llevaba a MAÑANA — y ahí se podía cerrar una caja

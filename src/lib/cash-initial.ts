@@ -23,10 +23,6 @@ export interface DailyCashInitial {
   efectivoContado?: number;
   efectivoEsperado?: number;
   diferencia?: number;
-  // Qué se hizo con la plata contada al cerrar: cuánto quedó en el cajón (pasa
-  // como caja inicial de mañana) y cuánto se retiró (banco / caja fuerte).
-  quedaEnCaja?: number;
-  retirado?: number;
   cerrado?: boolean;
   cerradoPor?: string;
   cerradoAt?: number;
