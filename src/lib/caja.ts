@@ -63,6 +63,12 @@ export function efectivoEsperadoDelDia(args: {
 export interface CierreInput {
   arqueo: Record<string, number>;
   efectivoEsperado: number;
+  /**
+   * Cuánto EFECTIVO queda físicamente en el cajón para mañana. El resto se
+   * considera RETIRADO (banco, caja fuerte, se lo lleva el dueño) y es la caja
+   * inicial del día siguiente.
+   */
+  quedaEnCaja: number;
   cerradoPor?: string;
 }
 
@@ -74,6 +80,9 @@ export async function cerrarCaja(
   const d = new Date(dayTs);
   d.setHours(0, 0, 0, 0);
   const contado = totalArqueo(input.arqueo);
+  const queda = Math.max(0, Math.min(input.quedaEnCaja, contado));
+  const retirado = contado - queda;
+
   await setDoc(
     doc(db, "cashClosings", dayKey(dayTs)),
     {
@@ -82,16 +91,21 @@ export async function cerrarCaja(
       efectivoContado: contado,
       efectivoEsperado: input.efectivoEsperado,
       diferencia: contado - input.efectivoEsperado,
+      quedaEnCaja: queda,
+      retirado,
       cerrado: true,
       cerradoPor: input.cerradoPor ?? null,
       cerradoAt: Date.now(),
     },
     { merge: true }
   );
-  // ARRASTRE: la plata contada queda como CAJA INICIAL del día siguiente.
-  // Sin esto, la caja del día siguiente arrancaba en $0 y el efectivo contado
-  // daba siempre "SOBRA" (la plata del día anterior no estaba contemplada).
-  // Si depositan esa plata, ajustan la caja inicial a mano.
+
+  // ARRASTRE: al día siguiente pasa SOLO lo que queda físicamente en el cajón.
+  //
+  // Antes se arrastraba TODO lo contado a ciegas. Pero acá la recaudación se
+  // retira casi todos los días (banco / caja fuerte), y la app no tenía forma
+  // de registrarlo: el 15/07/2026 la caja arrancó esperando los $12.418.000 del
+  // día anterior, que ya no estaban → marcó un faltante exacto por ese monto.
   const sigRef = doc(db, "cashClosings", dayKey(dayTs + 86_400_000));
   const sigSnap = await getDoc(sigRef);
   if (!sigSnap.exists() || !sigSnap.data()?.cerrado) {
@@ -99,15 +113,19 @@ export async function cerrarCaja(
     sig.setHours(0, 0, 0, 0);
     await setDoc(
       sigRef,
-      { fecha: sig.getTime(), cajaInicial: contado },
+      { fecha: sig.getTime(), cajaInicial: queda },
       { merge: true }
     );
   }
 
   logActivity("Cerró la caja", {
-    detalle: `${fechaDia(dayTs)} · contado ${formatARS(contado)} · dif. ${formatARS(
-      contado - input.efectivoEsperado
-    )}`,
+    detalle:
+      `${fechaDia(dayTs)} · contado ${formatARS(contado)} · dif. ${formatARS(
+        contado - input.efectivoEsperado
+      )}` +
+      (retirado > 0
+        ? ` · retiró ${formatARS(retirado)} · queda ${formatARS(queda)}`
+        : ` · queda todo en caja`),
     entidad: "caja",
     entidadId: dayKey(dayTs),
   });
