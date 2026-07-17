@@ -169,7 +169,13 @@ const totOtros = dias.reduce((s, d) => s + d.otros, 0);
 const totRemitos = dias.reduce((s, d) => s + d.remitos, 0);
 
 // ==================== PDF ====================
-const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
+// Paginamos a mano (controlamos la `y` en todo el documento). Sin este margen
+// en 0, pdfkit corta solo apenas un texto roza el pie y mete hojas en blanco.
+const doc = new PDFDocument({
+  size: "A4",
+  margins: { top: 40, left: 40, right: 40, bottom: 0 },
+  bufferPages: true,
+});
 doc.pipe(createWriteStream(OUT));
 
 const W = doc.page.width - 80; // ancho útil
@@ -429,9 +435,12 @@ dias.forEach((d) => {
 });
 
 // ---------- Pie en todas las páginas ----------
+// OJO: el pie va DEBAJO del margen inferior. Si no anulamos el margen, pdfkit
+// considera que el texto se desbordó y agrega una hoja en blanco por cada pie.
 const rango = doc.bufferedPageRange();
 for (let i = 0; i < rango.count; i++) {
   doc.switchToPage(i);
+  doc.page.margins.bottom = 0;
   const py = doc.page.height - 34;
   doc.moveTo(X, py).lineTo(X + W, py).lineWidth(0.5).strokeColor(REGLA).stroke();
   doc
@@ -447,6 +456,13 @@ for (let i = 0; i < rango.count; i++) {
   doc.text(`${i + 1} / ${rango.count}`, X + W - 60, py + 8, { width: 60, align: "right" });
 }
 
+// Releemos DESPUÉS de escribir los pies: si alguno hubiera desbordado, acá
+// aparecerían las hojas de más.
+const finales = doc.bufferedPageRange().count;
+if (finales !== rango.count) {
+  console.warn(`⚠️  Los pies agregaron ${finales - rango.count} hoja(s) en blanco.`);
+}
+
 doc.end();
 console.log(`✓ PDF generado: ${OUT}`);
-console.log(`  ${dias.length} días · ${totRemitos} remitos · ${num(totUnidades)} unidades · ${ars(totEfectivo + totOtros)}`);
+console.log(`  ${finales} páginas · ${dias.length} días · ${totRemitos} remitos · ${num(totUnidades)} unidades · ${ars(totEfectivo + totOtros)}`);
