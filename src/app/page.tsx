@@ -37,9 +37,9 @@ export default function LandingPage() {
             </p>
 
             <h1 className="mt-3 font-serif text-4xl font-light leading-[1.05] text-brand-dark sm:text-5xl md:mt-4 lg:text-6xl">
-              Distribuidora
+              ALUSO
               <br />
-              Los Amigos
+              DISTRIBUIDORA
             </h1>
 
             <p className="mt-4 flex items-center gap-3 text-base font-medium text-brand-dark/80 sm:mt-5 sm:text-lg">
