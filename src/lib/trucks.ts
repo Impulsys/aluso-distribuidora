@@ -96,12 +96,25 @@ export interface RecibirCamionInput {
   transporte?: string;
   transporteOtro?: string;
   descripcion?: string;
-  // Proveedor (OBLIGATORIO — toda compra corresponde a un camión)
+  // Proveedor del camión (OBLIGATORIO — toda compra corresponde a un camión).
+  // Es el que se usa por defecto para los comprobantes.
   proveedorId: string;
   proveedorNombre: string;
-  // Comprobantes — al menos UNO con monto > 0
-  facturaA?: { numero: string; monto: number }; // modalidad A (facturado)
-  remitoB?: { numero: string; monto: number }; // modalidad B (sin facturar)
+  // Comprobantes — al menos UNO con monto > 0.
+  // Cada uno puede ir a un proveedor DISTINTO: es normal que lo facturado vaya
+  // a una razón social y lo no facturado a otra. Si no se indica, va al del camión.
+  facturaA?: {
+    numero: string;
+    monto: number;
+    proveedorId?: string;
+    proveedorNombre?: string;
+  };
+  remitoB?: {
+    numero: string;
+    monto: number;
+    proveedorId?: string;
+    proveedorNombre?: string;
+  };
   // Logística (opcional): gasto del camión que baja la ganancia real
   logistica?: number;
   logisticaDetalle?: string;
@@ -174,19 +187,21 @@ export async function recibirCamion(
   );
 
   const base = {
-    proveedorId: input.proveedorId,
-    proveedorNombre: input.proveedorNombre,
     fecha: input.fechaIngreso,
     camionId: truckRef.id,
     camionNombre: input.nombre,
     createdBy: input.createdBy,
     createdAt: Date.now(),
   };
+  // Cada comprobante puede tener SU proveedor. Antes los dos iban al del camión
+  // y lo no facturado terminaba en la cuenta equivocada.
   if (tieneA) {
     batch.set(
       doc(collection(db, "purchases")),
       stripUndefined({
         ...base,
+        proveedorId: input.facturaA!.proveedorId || input.proveedorId,
+        proveedorNombre: input.facturaA!.proveedorNombre || input.proveedorNombre,
         modalidad: "A",
         numero: input.facturaA!.numero,
         monto: input.facturaA!.monto,
@@ -198,6 +213,8 @@ export async function recibirCamion(
       doc(collection(db, "purchases")),
       stripUndefined({
         ...base,
+        proveedorId: input.remitoB!.proveedorId || input.proveedorId,
+        proveedorNombre: input.remitoB!.proveedorNombre || input.proveedorNombre,
         modalidad: "B",
         numero: input.remitoB!.numero,
         monto: input.remitoB!.monto,

@@ -117,17 +117,26 @@ export default function BitacoraPage() {
                     <span className="font-medium text-brand-dark">{fecha}</span>{" "}
                     <span className="tabular-nums">{hora}</span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-brand-dark">
-                      {e.nombre}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        ROLE_CHIP[e.role] ?? "bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {ROLE_LABELS[e.role] ?? e.role}
-                    </span>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-brand-dark">
+                        {e.nombre}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          ROLE_CHIP[e.role] ?? "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {ROLE_LABELS[e.role] ?? e.role}
+                      </span>
+                    </div>
+                    {/* El mail identifica sin ambigüedad: dos personas pueden
+                        tener el mismo nombre para mostrar. */}
+                    {e.email && e.email !== e.nombre && (
+                      <span className="text-[11px] text-brand-dark/45">
+                        {e.email}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span className="font-semibold text-brand-dark">

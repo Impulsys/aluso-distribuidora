@@ -92,8 +92,10 @@ export default function AdminCuentasPage() {
   const [cDescripcion, setCDescripcion] = useState("");
   const [cNumFacturaA, setCNumFacturaA] = useState("");
   const [cMontoA, setCMontoA] = useState(0);
+  const [cProvA, setCProvA] = useState(""); // vacío = el proveedor del camión
   const [cNumRemitoB, setCNumRemitoB] = useState("");
   const [cMontoB, setCMontoB] = useState(0);
+  const [cProvB, setCProvB] = useState(""); // lo NO facturado suele ir a otra razón social
   const [cShowLogistica, setCShowLogistica] = useState(false);
   const [cLogistica, setCLogistica] = useState(0);
   const [cLogisticaDetalle, setCLogisticaDetalle] = useState("");
@@ -159,6 +161,13 @@ export default function AdminCuentasPage() {
     }
   };
 
+  // Proveedor propio de un comprobante. Vacío = va al del camión.
+  const provComprobante = (id: string) => {
+    const p = proveedores.find((x) => x.id === id);
+    return p ? { proveedorId: p.id, proveedorNombre: p.nombre } : {};
+  };
+  const cProvNombre = proveedores.find((p) => p.id === cProv)?.nombre ?? "";
+
   const handleRecibirCamion = async (e: React.FormEvent) => {
     e.preventDefault();
     const prov = proveedores.find((p) => p.id === cProv);
@@ -182,11 +191,19 @@ export default function AdminCuentasPage() {
         proveedorNombre: prov.nombre,
         facturaA:
           cNumFacturaA.trim() && cMontoA > 0
-            ? { numero: cNumFacturaA.trim(), monto: Number(cMontoA) }
+            ? {
+                numero: cNumFacturaA.trim(),
+                monto: Number(cMontoA),
+                ...provComprobante(cProvA),
+              }
             : undefined,
         remitoB:
           cNumRemitoB.trim() && cMontoB > 0
-            ? { numero: cNumRemitoB.trim(), monto: Number(cMontoB) }
+            ? {
+                numero: cNumRemitoB.trim(),
+                monto: Number(cMontoB),
+                ...provComprobante(cProvB),
+              }
             : undefined,
         logistica: cShowLogistica && cLogistica > 0 ? Number(cLogistica) : undefined,
         logisticaDetalle: cShowLogistica
@@ -565,12 +582,16 @@ export default function AdminCuentasPage() {
               )}
             </div>
 
-            {/* Comprobantes (al menos uno) */}
+            {/* Comprobantes (al menos uno). Cada uno puede ir a un proveedor
+                DISTINTO: lo facturado a una razón social y lo no facturado a
+                otra. Antes los dos iban al proveedor del camión. */}
             <div className="rounded-lg border border-brand-border bg-primary-light/20 p-3">
               <p className="mb-2 text-[11px] font-semibold text-brand-dark">
                 Comprobante de la compra (al menos uno)
               </p>
-              <div className="grid grid-cols-[1fr_110px] gap-2">
+
+              {/* Factura A */}
+              <div className="mb-3 grid grid-cols-[1fr_110px] gap-2">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
                     Nº Factura (A · facturado)
@@ -596,6 +617,30 @@ export default function AdminCuentasPage() {
                     className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
                   />
                 </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+                    La factura va a nombre de
+                  </label>
+                  <select
+                    value={cProvA}
+                    onChange={(e) => setCProvA(e.target.value)}
+                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                  >
+                    <option value="">
+                      El proveedor del camión
+                      {cProvNombre ? ` (${cProvNombre})` : ""}
+                    </option>
+                    {proveedores.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Remito B */}
+              <div className="grid grid-cols-[1fr_110px] gap-2 border-t border-brand-border/60 pt-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
                     Nº Remito (B · sin facturar)
@@ -621,7 +666,32 @@ export default function AdminCuentasPage() {
                     className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
                   />
                 </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
+                    El remito va a nombre de
+                  </label>
+                  <select
+                    value={cProvB}
+                    onChange={(e) => setCProvB(e.target.value)}
+                    className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                  >
+                    <option value="">
+                      El proveedor del camión
+                      {cProvNombre ? ` (${cProvNombre})` : ""}
+                    </option>
+                    {proveedores.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              <p className="mt-2 text-[10px] text-brand-dark/55">
+                La deuda va a la cuenta que elijas acá. Si lo facturado y lo no
+                facturado son de razones sociales distintas, elegí una en cada uno.
+              </p>
             </div>
 
             {/* Logística (opcional) */}

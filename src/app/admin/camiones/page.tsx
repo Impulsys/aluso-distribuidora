@@ -370,7 +370,7 @@ function CargoEditor({
       for (const [id, v] of Object.entries(draft)) {
         const anterior = dbMap.get(id)?.cantidadUnidades ?? 0;
         const delta = (v.cantidad || 0) - anterior;
-        if (delta !== 0) await incrementStock(id, delta);
+        if (delta !== 0) await incrementStock(id, delta, `carga del camión ${truck.nombre}`);
         if (v.cantidad > 0 && v.costo > 0) await setProductCost(id, v.costo);
       }
 

@@ -7,6 +7,8 @@ import {
   setDoc,
   updateDoc,
   increment,
+  getDoc,
+  runTransaction,
   query,
   limit,
 } from "firebase/firestore";
@@ -78,13 +80,34 @@ export async function setProductOverride(
   id: string,
   patch: ProductOverride
 ): Promise<void> {
+  // Si tocan el STOCK a mano, leemos el valor previo ANTES de pisarlo: el
+  // registro tiene que decir de cuánto a cuánto, no solo que "editaron algo".
+  let stockAntes: number | null = null;
+  if (typeof patch.stock === "number") {
+    const prev = await getDoc(doc(db, "products", id));
+    stockAntes = (prev.data()?.stock as number) ?? 0;
+  }
+
   await setDoc(doc(db, "products", id), patch, { merge: true });
+
   // No registrar el borrado lógico acá (deleteProduct ya lo loguea).
   if (!("eliminado" in patch)) {
+    if (stockAntes !== null && stockAntes !== patch.stock) {
+      const delta = (patch.stock as number) - stockAntes;
+      logActivity("Ajustó stock a mano", {
+        detalle:
+          `${patch.nombre ?? id} · ${stockAntes} → ${patch.stock} ` +
+          `(${delta > 0 ? "+" : ""}${delta})`,
+        entidad: "producto",
+        entidadId: id,
+      });
+    }
+    const otros = Object.keys(patch).filter((k) => k !== "stock");
+    if (otros.length === 0) return;
     logActivity("Editó producto", {
       detalle: patch.nombre
-        ? `${patch.nombre} (${Object.keys(patch).join(", ")})`
-        : Object.keys(patch).join(", "),
+        ? `${patch.nombre} (${otros.join(", ")})`
+        : otros.join(", "),
       entidad: "producto",
       entidadId: id,
     });
@@ -176,13 +199,38 @@ export async function createProduct(input: NewProductInput): Promise<string> {
   return ref.id;
 }
 
-/** Suma (o resta) unidades al stock de un producto de forma atómica. */
-export async function incrementStock(id: string, delta: number): Promise<void> {
-  await setDoc(
-    doc(db, "products", id),
-    { stock: increment(delta) },
-    { merge: true }
-  );
+/**
+ * Suma (o resta) unidades al stock y lo DEJA ASENTADO en la bitácora con el
+ * antes y el después.
+ *
+ * Va en transacción (y no con `increment()`) justamente para poder leer el valor
+ * previo: sin eso el registro diría "sumó 50" pero no desde cuánto, que es el
+ * dato que sirve para controlar. La transacción sigue siendo atómica.
+ *
+ * @param motivo de dónde viene el movimiento (recepción, camión, ajuste…).
+ */
+export async function incrementStock(
+  id: string,
+  delta: number,
+  motivo?: string
+): Promise<void> {
+  const ref = doc(db, "products", id);
+  const res = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const antes = (snap.data()?.stock as number) ?? 0;
+    const despues = antes + delta;
+    tx.set(ref, { stock: despues }, { merge: true });
+    return { antes, despues, nombre: (snap.data()?.nombre as string) ?? id };
+  });
+
+  logActivity(delta >= 0 ? "Sumó stock" : "Descontó stock", {
+    detalle:
+      `${res.nombre} · ${res.antes} → ${res.despues} ` +
+      `(${delta > 0 ? "+" : ""}${delta})` +
+      (motivo ? ` · ${motivo}` : ""),
+    entidad: "producto",
+    entidadId: id,
+  });
 }
 
 // ==================== PRODUCT COSTS (admin-only) ====================

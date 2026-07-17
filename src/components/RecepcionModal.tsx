@@ -119,7 +119,11 @@ export default function RecepcionModal({ proveedorNombre, onClose }: Props) {
           );
         }
         if (!id) continue;
-        await incrementStock(id, l.cantidad);
+        await incrementStock(
+          id,
+          l.cantidad,
+          `recepción de mercadería${proveedorNombre ? ` · ${proveedorNombre}` : ""}`
+        );
         if (l.costo > 0) await setProductCost(id, l.costo);
         hechos++;
         setLines((prev) =>
