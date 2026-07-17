@@ -129,9 +129,11 @@ for (const r of remitos) {
       prod: new Map(),
       recibido: new Map(),
       stockFin: new Map(),
+      tickets: [],
     });
   }
   const dd = dias[dias.length - 1];
+  const uTicket = [...vend.values()].reduce((s, x) => s + x, 0);
   if (r.anulado) dd.anulados++;
   else {
     dd.remitos++;
@@ -147,6 +149,17 @@ for (const r of remitos) {
       dd.prod.set(id, cur);
     });
   }
+  // Cada ticket (remito) con su hora, unidades, renglones e importe.
+  dd.tickets.push({
+    numero: r.numero ?? "",
+    hora: `${p(d.getHours())}:${p(d.getMinutes())}`,
+    cliente: r.clienteNombre ?? "",
+    unidades: uTicket,
+    renglones: (r.items ?? []).length,
+    formaPago: r.formaPago ?? "efectivo",
+    total: r.total || 0,
+    anulado: !!r.anulado,
+  });
   cols.forEach((id) => dd.stockFin.set(id, stock.get(id) ?? 0));
 }
 
@@ -299,7 +312,9 @@ doc.font("Helvetica-Bold").fontSize(13).fillColor(TEAL).text("Detalle por día",
 y += 22;
 
 dias.forEach((d) => {
-  const alto = 30 + d.prod.size * 14;
+  // Que el encabezado del día no quede solo al pie: pedimos lugar para la
+  // cabecera + los productos + las primeras filas de tickets.
+  const alto = 80 + d.prod.size * 14;
   if (y + alto > doc.page.height - 60) {
     doc.addPage();
     y = 50;
@@ -350,7 +365,67 @@ dias.forEach((d) => {
       doc.font("Helvetica").fillColor(TINTA).text(ars(v.plata), X + 466, y, { width: 49, align: "right" });
       y += 14;
     });
+  y += 12;
+
+  // ----- Tickets (remitos) de ese día, uno por uno -----
+  if (y + 40 > doc.page.height - 60) {
+    doc.addPage();
+    y = 50;
+  }
+  doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TEAL).text(`Tickets del día  ·  ${d.tickets.length}`, X + 8, y);
+  y += 12;
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(GRIS);
+  doc.text("TICKET", X + 8, y, { width: 54 });
+  doc.text("HORA", X + 64, y, { width: 30 });
+  doc.text("CLIENTE", X + 98, y, { width: 150 });
+  doc.text("RENGL.", X + 252, y, { width: 40, align: "right" });
+  doc.text("UNID.", X + 296, y, { width: 40, align: "right" });
+  doc.text("PAGO", X + 340, y, { width: 70 });
+  doc.text("IMPORTE", X + 452, y, { width: 63, align: "right" });
   y += 10;
+  doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.5).strokeColor(REGLA).stroke();
+  y += 4;
+
+  d.tickets.forEach((t, i) => {
+    if (y > doc.page.height - 56) {
+      doc.addPage();
+      y = 50;
+      doc.font("Helvetica-Bold").fontSize(7).fillColor(GRIS).text(`${d.titulo} · tickets (cont.)`, X + 8, y);
+      y += 14;
+    }
+    if (i % 2 === 0) doc.rect(X + 8, y - 2.5, W - 16, 13).fill(BANDA);
+    const c = t.anulado ? GRIS : TINTA;
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(t.anulado ? GRIS : TEAL).text(t.numero, X + 8, y, { width: 54 });
+    doc.font("Helvetica").fontSize(7.5).fillColor(GRIS).text(t.hora, X + 64, y, { width: 30 });
+    doc.fillColor(c).text(t.cliente || "—", X + 98, y, { width: 150, ellipsis: true });
+    doc.text(t.anulado ? "—" : String(t.renglones), X + 252, y, { width: 40, align: "right" });
+    doc.font("Helvetica-Bold").fillColor(c).text(t.anulado ? "—" : num(t.unidades), X + 296, y, { width: 40, align: "right" });
+    doc.font("Helvetica").fontSize(7).fillColor(GRIS).text(t.anulado ? "" : t.formaPago, X + 340, y + 0.5, { width: 70 });
+    if (t.anulado) {
+      doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ROJO).text("ANULADO", X + 452, y + 0.5, { width: 63, align: "right" });
+    } else {
+      doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA).text(ars(t.total), X + 452, y, { width: 63, align: "right" });
+    }
+    y += 13;
+  });
+
+  y += 2;
+  doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.7).strokeColor(TINTA).stroke();
+  y += 4;
+  doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA);
+  doc.text(`Total ${d.remitos} tickets`, X + 8, y, { width: 240 });
+  doc.text(num(d.unidades), X + 296, y, { width: 40, align: "right" });
+  doc.text(ars(d.efectivo + d.otros), X + 452, y, { width: 63, align: "right" });
+  y += 12;
+  if (d.otros > 0) {
+    doc
+      .font("Helvetica")
+      .fontSize(6.5)
+      .fillColor(GRIS)
+      .text(`Efectivo ${ars(d.efectivo)} · Otras formas de pago ${ars(d.otros)}`, X + 8, y, { width: W - 16, align: "right" });
+    y += 10;
+  }
+  y += 14;
 });
 
 // ---------- Pie en todas las páginas ----------
