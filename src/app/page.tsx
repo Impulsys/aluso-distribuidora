@@ -76,17 +76,10 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos de las marcas - ENORMES, pegados y centrados */}
-          <div className="w-full flex flex-col items-center justify-center" style={{ gap: '0px' }}>
-            {/* Logo Nonisec - Turquesa con filtro de inversión */}
-            <div
-              className="w-full"
-              style={{
-                filter: 'invert(1) hue-rotate(190deg) saturate(1.8) brightness(1.1)',
-                lineHeight: 0,
-                maxWidth: '600px'
-              }}
-            >
+          {/* Logos de las marcas - Nonisec arriba, Doncella abajo, pegados */}
+          <div className="w-full flex flex-col items-center justify-center gap-0">
+            {/* Logo Nonisec - Turquesa real */}
+            <div className="w-full" style={{ lineHeight: 0, maxWidth: '600px' }}>
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec - Protección adulta"
@@ -98,7 +91,7 @@ export default function LandingPage() {
             </div>
 
             {/* Logo Doncella - justo debajo */}
-            <div className="w-full" style={{ lineHeight: 0, marginTop: '-50px', maxWidth: '600px' }}>
+            <div className="w-full" style={{ lineHeight: 0, marginTop: '-60px', maxWidth: '600px' }}>
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella - Línea femenina"
