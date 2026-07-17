@@ -128,6 +128,7 @@ for (const r of remitos) {
       otros: 0,
       prod: new Map(),
       recibido: new Map(),
+      stockIni: new Map(),
       stockFin: new Map(),
       tickets: [],
     });
@@ -149,7 +150,8 @@ for (const r of remitos) {
       dd.prod.set(id, cur);
     });
   }
-  // Cada ticket (remito) con su hora, unidades, renglones e importe.
+  // Cada ticket: qué se llevó de cada producto y con qué stock quedó DESPUÉS.
+  // Así se ve el stock bajando ticket por ticket desde el inicial del día.
   dd.tickets.push({
     numero: r.numero ?? "",
     hora: `${p(d.getHours())}:${p(d.getMinutes())}`,
@@ -159,7 +161,11 @@ for (const r of remitos) {
     formaPago: r.formaPago ?? "efectivo",
     total: r.total || 0,
     anulado: !!r.anulado,
+    cols: cols.map((id) => ({ vend: vend.get(id) ?? 0, stock: stock.get(id) ?? 0 })),
   });
+  // Stock ANTES del primer ticket del día = el inicial cargado de ese día.
+  if (dd.tickets.length === 1)
+    cols.forEach((id) => dd.stockIni.set(id, (stock.get(id) ?? 0) + (vend.get(id) ?? 0)));
   cols.forEach((id) => dd.stockFin.set(id, stock.get(id) ?? 0));
 }
 
@@ -378,35 +384,79 @@ dias.forEach((d) => {
     doc.addPage();
     y = 50;
   }
-  doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TEAL).text(`Tickets del día  ·  ${d.tickets.length}`, X + 8, y);
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(7.5)
+    .fillColor(TEAL)
+    .text(`Tickets del día  ·  ${d.tickets.length}`, X + 8, y);
+  doc
+    .font("Helvetica")
+    .fontSize(6.5)
+    .fillColor(GRIS)
+    .text("Qué se llevó cada uno y cómo va bajando el stock", X + 100, y + 1);
   y += 12;
-  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(GRIS);
-  doc.text("TICKET", X + 8, y, { width: 54 });
-  doc.text("HORA", X + 64, y, { width: 30 });
-  doc.text("CLIENTE", X + 98, y, { width: 150 });
-  doc.text("RENGL.", X + 252, y, { width: 40, align: "right" });
-  doc.text("UNID.", X + 296, y, { width: 40, align: "right" });
-  doc.text("PAGO", X + 340, y, { width: 70 });
-  doc.text("IMPORTE", X + 452, y, { width: 63, align: "right" });
-  y += 10;
-  doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.5).strokeColor(REGLA).stroke();
-  y += 4;
+
+  // Columnas: ticket · hora · [por producto: unidades | stock] · importe
+  const CX = (i) => X + 100 + i * 74;
+  const encTickets = () => {
+    doc.font("Helvetica-Bold").fontSize(6.5).fillColor(GRIS);
+    doc.text("TICKET", X + 8, y + 4, { width: 54 });
+    doc.text("HORA", X + 64, y + 4, { width: 30 });
+    cols.forEach((id, i) => {
+      doc.fillColor(TINTA).fontSize(6).text(corto(nombres.get(id)).toUpperCase(), CX(i), y - 3, {
+        width: 70,
+        align: "center",
+      });
+      doc.fillColor(GRIS).fontSize(6.5);
+      doc.text("unid.", CX(i), y + 4, { width: 32, align: "right" });
+      doc.text("stock", CX(i) + 34, y + 4, { width: 36, align: "right" });
+    });
+    doc.fillColor(GRIS).text("IMPORTE", X + 452, y + 4, { width: 63, align: "right" });
+    y += 14;
+    doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.5).strokeColor(REGLA).stroke();
+    y += 4;
+  };
+  encTickets();
+
+  // Punto de partida: el stock cargado con el que arrancó el día.
+  doc.rect(X + 8, y - 2.5, W - 16, 13).fill(TEAL_CLARO);
+  doc.font("Helvetica-Bold").fontSize(7).fillColor(TEAL).text("Stock inicial del día", X + 8, y, { width: 90 });
+  cols.forEach((id, i) => {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(7.5)
+      .fillColor(TEAL)
+      .text(num(d.stockIni.get(id) ?? 0), CX(i) + 34, y, { width: 36, align: "right" });
+  });
+  y += 15;
 
   d.tickets.forEach((t, i) => {
     if (y > doc.page.height - 56) {
       doc.addPage();
       y = 50;
-      doc.font("Helvetica-Bold").fontSize(7).fillColor(GRIS).text(`${d.titulo} · tickets (cont.)`, X + 8, y);
-      y += 14;
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(7)
+        .fillColor(GRIS)
+        .text(`${d.titulo.replace(/^\w/, (c) => c.toUpperCase())} · tickets (cont.)`, X + 8, y);
+      y += 16;
+      encTickets();
     }
     if (i % 2 === 0) doc.rect(X + 8, y - 2.5, W - 16, 13).fill(BANDA);
     const c = t.anulado ? GRIS : TINTA;
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor(t.anulado ? GRIS : TEAL).text(t.numero, X + 8, y, { width: 54 });
     doc.font("Helvetica").fontSize(7.5).fillColor(GRIS).text(t.hora, X + 64, y, { width: 30 });
-    doc.fillColor(c).text(t.cliente || "—", X + 98, y, { width: 150, ellipsis: true });
-    doc.text(t.anulado ? "—" : String(t.renglones), X + 252, y, { width: 40, align: "right" });
-    doc.font("Helvetica-Bold").fillColor(c).text(t.anulado ? "—" : num(t.unidades), X + 296, y, { width: 40, align: "right" });
-    doc.font("Helvetica").fontSize(7).fillColor(GRIS).text(t.anulado ? "" : t.formaPago, X + 340, y + 0.5, { width: 70 });
+    t.cols.forEach((cc, i2) => {
+      doc
+        .font(cc.vend ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(7.5)
+        .fillColor(cc.vend ? c : REGLA)
+        .text(cc.vend ? `−${num(cc.vend)}` : "·", CX(i2), y, { width: 32, align: "right" });
+      doc
+        .font(cc.stock === 0 ? "Helvetica-Bold" : "Helvetica")
+        .fillColor(cc.stock === 0 ? ROJO : GRIS)
+        .text(num(cc.stock), CX(i2) + 34, y, { width: 36, align: "right" });
+    });
     if (t.anulado) {
       doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ROJO).text("ANULADO", X + 452, y + 0.5, { width: 63, align: "right" });
     } else {
@@ -419,9 +469,14 @@ dias.forEach((d) => {
   doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.7).strokeColor(TINTA).stroke();
   y += 4;
   doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA);
-  doc.text(`Total ${d.remitos} tickets`, X + 8, y, { width: 240 });
-  doc.text(num(d.unidades), X + 296, y, { width: 40, align: "right" });
-  doc.text(ars(d.efectivo + d.otros), X + 452, y, { width: 63, align: "right" });
+  doc.text(`${d.remitos} tickets · ${num(d.unidades)} u.`, X + 8, y, { width: 90 });
+  cols.forEach((id, i) => {
+    const v = d.prod.get(id)?.u ?? 0;
+    const sf = d.stockFin.get(id) ?? 0;
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA).text(v ? `−${num(v)}` : "·", CX(i), y, { width: 32, align: "right" });
+    doc.fillColor(sf === 0 ? ROJO : TINTA).text(num(sf), CX(i) + 34, y, { width: 36, align: "right" });
+  });
+  doc.fillColor(TINTA).text(ars(d.efectivo + d.otros), X + 452, y, { width: 63, align: "right" });
   y += 12;
   if (d.otros > 0) {
     doc
