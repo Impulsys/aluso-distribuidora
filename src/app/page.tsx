@@ -38,10 +38,10 @@ export default function LandingPage() {
       {/* Contenido relativo al overlay */}
       <div className="relative z-10 flex flex-1 flex-col">
       {/* ============ PRESENTACIÓN ============ */}
-      <section className="flex flex-1 items-center justify-center">
-        <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6 sm:py-8 flex flex-col items-center gap-8">
-          {/* Texto a la izquierda / arriba en mobile */}
-          <div className="max-w-2xl">
+      <section className="flex flex-1 items-center">
+        <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
+          {/* Texto a la izquierda */}
+          <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300 sm:text-[11px] sm:tracking-[0.22em]">
               Distribuidora mayorista · Noroeste argentino
             </p>
@@ -76,27 +76,27 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos de las marcas - Nonisec arriba, Doncella abajo, pegados */}
-          <div className="w-full flex flex-col items-center justify-center gap-0">
+          {/* Logos a la derecha - Nonisec arriba, Doncella abajo, pegados */}
+          <div className="flex flex-col items-center justify-center gap-0">
             {/* Logo Nonisec - Turquesa real */}
-            <div className="w-full" style={{ lineHeight: 0, maxWidth: '600px' }}>
+            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec - Protección adulta"
-                width={600}
-                height={300}
+                width={500}
+                height={250}
                 priority
                 className="w-full h-auto object-contain drop-shadow-2xl"
               />
             </div>
 
             {/* Logo Doncella - justo debajo */}
-            <div className="w-full" style={{ lineHeight: 0, marginTop: '-60px', maxWidth: '600px' }}>
+            <div style={{ lineHeight: 0, marginTop: '-60px', width: '100%', maxWidth: '500px' }}>
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella - Línea femenina"
-                width={600}
-                height={300}
+                width={500}
+                height={250}
                 priority
                 className="w-full h-auto object-contain drop-shadow-2xl"
               />
