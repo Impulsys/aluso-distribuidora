@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALUSO DISTRIBUIDORA — Formulario de datos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #0055cc 0%, #003d99 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 700px;
+      width: 100%;
+      padding: 40px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+      background: #0055cc;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      font-weight: bold;
+      color: white;
+      margin: 0 auto 15px;
+    }
+    h1 {
+      color: #1a1a1a;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .section-title {
+      background: #f5f7fa;
+      color: #0055cc;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d6e4f5;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #0055cc;
+      box-shadow: 0 0 0 3px rgba(0, 85, 204, 0.1);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 600px) {
+      .two-cols {
+        grid-template-columns: 1fr;
+      }
+    }
+    .note {
+      background: #e6f0ff;
+      border-left: 4px solid #0055cc;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #003d99;
+      margin-bottom: 16px;
+    }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 30px;
+    }
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-send {
+      background: #0055cc;
+      color: white;
+    }
+    .btn-send:hover {
+      background: #003d99;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 85, 204, 0.3);
+    }
+    .btn-clear {
+      background: #f0f0f0;
+      color: #666;
+    }
+    .btn-clear:hover {
+      background: #e0e0e0;
+    }
+    .required::after {
+      content: " *";
+      color: #e74c3c;
+    }
+    .success-message {
+      display: none;
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .success-message.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">AD</div>
+      <h1>ALUSO DISTRIBUIDORA</h1>
+      <p class="subtitle">Formulario de datos — Configuración inicial</p>
+    </div>
+
+    <div class="success-message" id="successMsg">
+      ✅ Datos enviados correctamente. Axel recibirá esta información en su email.
+    </div>
+
+    <form id="dataForm" onsubmit="handleSubmit(event)">
+
+      <!-- DATOS DE CONTACTO -->
+      <div class="section">
+        <div class="section-title">📞 Datos de contacto</div>
+
+        <div class="form-group">
+          <label class="required">Teléfono WhatsApp</label>
+          <input type="tel" name="whatsapp" placeholder="+54 9 11 2759-7572" required>
+          <div class="note">Incluir código de país. Este número aparecerá en la app para que clientes se comuniquen</div>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Teléfono para mostrar</label>
+          <input type="tel" name="phone" placeholder="+54 9 11 2759-7572" required>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Email de contacto</label>
+          <input type="email" name="email" placeholder="contacto@aluso.com.ar" required>
+          <div class="note">Este email se usará en facturación y notificaciones de pedidos</div>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Dirección física</label>
+          <textarea name="address" placeholder="Calle, número, ciudad, provincia, código postal" required></textarea>
+        </div>
+      </div>
+
+      <!-- FACTURACIÓN AFIP -->
+      <div class="section">
+        <div class="section-title">🧾 Facturación AFIP</div>
+
+        <div class="form-group">
+          <label class="required">CUIT de la empresa</label>
+          <input type="text" name="cuit" placeholder="20-12345678-9" required>
+          <div class="note">Formato: XX-XXXXXXXX-X (con guiones)</div>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Razón social oficial</label>
+          <input type="text" name="razonSocial" placeholder="ALUSO DISTRIBUIDORA S.A." required>
+          <div class="note">Tal como está registrada en AFIP/ARCA</div>
+        </div>
+
+        <div class="form-group">
+          <label>Código de punto de venta AFIP</label>
+          <input type="text" name="puntoVenta" placeholder="0001 (si ya existe)">
+          <div class="note">Opcional: si ya tienen un punto de venta asignado</div>
+        </div>
+
+        <div class="form-group">
+          <label>¿Tienen certificado digital AFIP?</label>
+          <select name="tieneNFECert">
+            <option value="">-- Seleccionar --</option>
+            <option value="si">Sí, tenemos</option>
+            <option value="no">No, necesitamos generar uno</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Usuario AFIP</label>
+          <input type="text" name="afipUser" placeholder="(si existe)">
+        </div>
+
+        <div class="form-group">
+          <label>Rubro/Actividad</label>
+          <input type="text" name="rubro" placeholder="Distribuidora mayorista, Comercio, etc.">
+        </div>
+      </div>
+
+      <!-- DATOS DE DUEÑOS -->
+      <div class="section">
+        <div class="section-title">👥 Usuarios administradores</div>
+
+        <div class="two-cols">
+          <div class="form-group">
+            <label class="required">Nombre Dueño 1</label>
+            <input type="text" name="owner1Name" placeholder="Anabela" required>
+          </div>
+          <div class="form-group">
+            <label class="required">Email Dueño 1</label>
+            <input type="email" name="owner1Email" placeholder="anabela@aluso.com.ar" required>
+          </div>
+        </div>
+
+        <div class="two-cols">
+          <div class="form-group">
+            <label class="required">Nombre Dueño 2</label>
+            <input type="text" name="owner2Name" placeholder="Luciano" required>
+          </div>
+          <div class="form-group">
+            <label class="required">Email Dueño 2</label>
+            <input type="email" name="owner2Email" placeholder="luciano@aluso.com.ar" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUCTOS Y PRECIOS -->
+      <div class="section">
+        <div class="section-title">💰 Productos y precios</div>
+
+        <div class="form-group">
+          <label>¿Venden SÓLO productos Lenterdit (Nonisec + Doncella)?</label>
+          <select name="soloLenterdit">
+            <option value="">-- Seleccionar --</option>
+            <option value="si" selected>Sí, solo Lenterdit</option>
+            <option value="no">No, vendemos otros productos también</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Si venden otros productos, ¿cuáles?</label>
+          <textarea name="otrosProductos" placeholder="Ej: Azúcar, Aceite, Arroz, etc."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="required">¿Tienen disponible un Excel con precios de los 82 productos Lenterdit?</label>
+          <select name="tieneExcelPrecios" required>
+            <option value="">-- Seleccionar --</option>
+            <option value="si">Sí, lo tenemos listo</option>
+            <option value="no">No, necesitamos ayuda para cargarlo</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- CONDICIONES COMERCIALES (después) -->
+      <div class="section">
+        <div class="section-title">📊 Condiciones comerciales (completar después)</div>
+
+        <div class="note">
+          Estos datos los cargaremos después en el sistema. Por ahora es referencia:
+        </div>
+
+        <div class="form-group">
+          <label>¿Tienen distintos niveles de vendedores?</label>
+          <textarea name="nivelesVendedores" placeholder="Ej: Vendedor Base, Vendedor Premium, Gerente, etc."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>¿Tienen listas de precios por cliente/zona?</label>
+          <textarea name="listasPrecios" placeholder="Ej: Lista A (clientes mayoristas), Lista B (comercios), etc."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>¿Cómo cobran? (condiciones de pago)</label>
+          <textarea name="condicionesPago" placeholder="Ej: 30% efectivo, 40% cheque, 30% transferencia. Plazo: 30 días a clientes especiales, etc."></textarea>
+        </div>
+      </div>
+
+      <!-- OBSERVACIONES -->
+      <div class="section">
+        <div class="section-title">💬 Observaciones o comentarios</div>
+        <div class="form-group">
+          <textarea name="comentarios" placeholder="¿Hay algo más que Axel deba saber para configurar el sistema?"></textarea>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button type="button" class="btn-clear" onclick="document.getElementById('dataForm').reset(); document.getElementById('successMsg').classList.remove('show');">
+          Limpiar
+        </button>
+        <button type="submit" class="btn-send">
+          📧 Enviar datos
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function handleSubmit(event) {
+      event.preventDefault();
+
+      const form = document.getElementById('dataForm');
+      const formData = new FormData(form);
+
+      // Crear el cuerpo del email
+      const body = `
+ALUSO DISTRIBUIDORA — Datos de configuración
+═══════════════════════════════════════════
+
+📞 DATOS DE CONTACTO
+─────────────────
+WhatsApp: ${formData.get('whatsapp')}
+Teléfono: ${formData.get('phone')}
+Email: ${formData.get('email')}
+Dirección: ${formData.get('address')}
+
+🧾 FACTURACIÓN AFIP
+─────────────────
+CUIT: ${formData.get('cuit')}
+Razón social: ${formData.get('razonSocial')}
+Punto de venta: ${formData.get('puntoVenta') || '(no especificado)'}
+Certificado: ${formData.get('tieneNFECert') || '(no especificado)'}
+Usuario AFIP: ${formData.get('afipUser') || '(no especificado)'}
+Rubro: ${formData.get('rubro') || '(no especificado)'}
+
+👥 ADMINISTRADORES
+──────────────────
+Dueño 1: ${formData.get('owner1Name')} (${formData.get('owner1Email')})
+Dueño 2: ${formData.get('owner2Name')} (${formData.get('owner2Email')})
+
+💰 PRODUCTOS
+─────────────
+Solo Lenterdit: ${formData.get('soloLenterdit')}
+Otros productos: ${formData.get('otrosProductos') || '(ninguno)'}
+Excel con precios: ${formData.get('tieneExcelPrecios')}
+
+📊 CONDICIONES COMERCIALES (DESPUÉS)
+──────────────────────────────────
+Niveles de vendedores:
+${formData.get('nivelesVendedores') || '(no especificado)'}
+
+Listas de precios:
+${formData.get('listasPrecios') || '(no especificado)'}
+
+Condiciones de pago:
+${formData.get('condicionesPago') || '(no especificado)'}
+
+💬 COMENTARIOS
+──────────────
+${formData.get('comentarios') || '(ninguno)'}
+      `;
+
+      // Crear mailto link
+      const subject = encodeURIComponent('ALUSO DISTRIBUIDORA — Datos de configuración');
+      const mailtoLink = `mailto:axelfaber@gmail.com?subject=${subject}&body=${encodeURIComponent(body)}`;
+
+      // Abrir cliente de email
+      window.location.href = mailtoLink;
+
+      // Mostrar mensaje de éxito
+      setTimeout(() => {
+        document.getElementById('successMsg').classList.add('show');
+      }, 500);
+    }
+  </script>
+</body>
+</html>
