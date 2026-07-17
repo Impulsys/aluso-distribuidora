@@ -39,8 +39,8 @@ export default function LandingPage() {
       <div className="relative z-10 flex flex-1 flex-col">
       {/* ============ PRESENTACIÓN ============ */}
       <section className="flex flex-1 items-center">
-        {/* En el celular va todo apilado (texto arriba, packs abajo). */}
-        <div className="mx-auto grid w-full max-w-7xl items-center gap-6 px-5 py-6 sm:px-6 md:grid-cols-[1fr_1.25fr] md:gap-8 md:py-8">
+        {/* En el celular va todo apilado (texto arriba, logos abajo). */}
+        <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300 sm:text-[11px] sm:tracking-[0.22em]">
               Distribuidora mayorista · Noroeste argentino
@@ -76,30 +76,29 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/*
-            Las dos presentaciones de Doncella (rosa y verde), centradas en el
-            campo blanco. Se superponen un poco para ganar tamaño: los JPG son
-            cuadrados y traen aire propio alrededor del pack.
-          */}
-          <div className="mx-auto flex w-full max-w-[560px] items-center justify-center md:max-w-none">
-            <div className="relative aspect-square w-[50%] shrink-0">
+          {/* Logos de las marcas - verticales */}
+          <div className="mx-auto flex flex-col items-center justify-center gap-6 md:gap-8">
+            {/* Logo Nonisec */}
+            <div className="w-full max-w-xs">
               <Image
-                src="/productos/7790940216212.jpg"
-                alt="Doncella Normal dúo pack — tela suave con alas, sin perfume"
-                fill
+                src="/brand/nonisec.png"
+                alt="Nonisec - Protección adulta"
+                width={400}
+                height={200}
                 priority
-                sizes="(max-width: 768px) 50vw, 400px"
-                className="object-contain"
+                className="w-full h-auto object-contain drop-shadow-xl"
               />
             </div>
-            <div className="relative -ml-[6%] aspect-square w-[50%] shrink-0">
+
+            {/* Logo Doncella */}
+            <div className="w-full max-w-xs">
               <Image
-                src="/productos/7790940216229.jpg"
-                alt="Doncella Normal dúo pack — tela suave con alas, con perfume"
-                fill
+                src="/brand/doncella.png"
+                alt="Doncella - Línea femenina"
+                width={400}
+                height={200}
                 priority
-                sizes="(max-width: 768px) 50vw, 400px"
-                className="object-contain"
+                className="w-full h-auto object-contain drop-shadow-xl"
               />
             </div>
           </div>
