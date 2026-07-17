@@ -77,7 +77,7 @@ export default function LandingPage() {
           </div>
 
           {/* Logos a la derecha - Nonisec alineado con subtítulo, Doncella pegado */}
-          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '20px' }}>
+          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '80px' }}>
             {/* Logo Nonisec - Turquesa real, sin fondo */}
             <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
               <Image
