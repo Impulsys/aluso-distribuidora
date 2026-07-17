@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
-/* ===== Paleta de marca — tomada de conexionesguex.com ===== */
+/* ===== Paleta de marca ALUSO — tonos azules vibrantes ===== */
 :root {
-  --background: #f5f5f5;
+  --background: #f5f7fa;
   --foreground: #1a1a1a;
 
-  --brand-primary: #006081;        /* petróleo/teal */
-  --brand-primary-dark: #004a63;
-  --brand-secondary: #6fd4e6;      /* cyan claro */
-  --brand-accent: #f51818;         /* rojo CTA */
+  --brand-primary: #0055cc;        /* azul corporativo profundo */
+  --brand-primary-dark: #003d99;
+  --brand-secondary: #5bb3ff;      /* azul claro luminoso */
+  --brand-accent: #0078e4;         /* azul saturado para CTAs */
   --brand-dark: #1a1a1a;
-  --brand-light: #f5f5f5;
-  --brand-primary-light: #e8f4f8;
+  --brand-light: #f5f7fa;
+  --brand-primary-light: #e6f0ff;
   --brand-surface: #ffffff;
-  --brand-border: #e2e8ec;
+  --brand-border: #d6e4f5;
 
   /* Tonos premium para landing oscuro */
-  --landing-navy: #0a1530;
-  --landing-deep: #0d1e3f;
-  --landing-purple: #2c1b4d;
+  --landing-navy: #0a2463;
+  --landing-deep: #0d2f7f;
+  --landing-purple: #1a3d6d;
   --landing-coral: #ff7e87;
   --landing-coral-soft: #ffd6d9;
   --landing-gold: #e6c89f;
