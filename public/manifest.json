@@ -1,6 +1,6 @@
-{
-  "name": "Distribuidora Los Amigos NOA",
-  "short_name": "Los Amigos NOA",
+﻿{
+  "name": "ALUSO DISTRIBUIDORA",
+  "short_name": "ALUSO",
   "description": "Distribuidora mayorista del NOA — Doncella & Nonisec. Catálogo, pedidos por WhatsApp y panel B2B.",
   "start_url": "/",
   "scope": "/",
@@ -51,3 +51,4 @@
     }
   ]
 }
+

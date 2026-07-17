@@ -1,8 +1,8 @@
-// Base compartida para comprobantes en impresora térmica de 80mm.
+﻿// Base compartida para comprobantes en impresora térmica de 80mm.
 // Remito, factura y reporte de caja usan este formato/ancho.
 
 export const EMPRESA = {
-  nombre: "Distribuidora Los Amigos",
+  nombre: "ALUSO DISTRIBUIDORA",
   cuit: "20250642114",
   domicilio: "Balcarce 836 · La Quiaca, Jujuy",
   subtitulo: "NOA · Distribuidora mayorista",
@@ -128,3 +128,4 @@ export function ticketHeader(): string {
   <div class="sub">${EMPRESA.domicilio}</div>
   <div class="sub">${EMPRESA.subtitulo}</div>`;
 }
+

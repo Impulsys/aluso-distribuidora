@@ -1,6 +1,6 @@
-import type { Product } from "@/lib/types";
+﻿import type { Product } from "@/lib/types";
 
-// Catálogo REAL — datos del cliente (Distribuidora Los Amigos NOA).
+// Catálogo REAL — datos del cliente (ALUSO DISTRIBUIDORA).
 // Generado automáticamente por scripts/build-products.mjs.
 // Marcas: Doncella (femenino / bebé) y Nonisec (adultos / incontinencia), proveedor Lenterdit.
 // precioVenta=0 → la UI muestra "Consultar precio" (Maxi carga los precios reales desde Admin).
@@ -89,3 +89,4 @@ export const PRODUCTOS_SEED: Product[] = [
   { id: "7790940801234", ean: "7790940801234", marca: "doncella", categoria: "Accesorios", nombre: "Emulsión oleo calcáreo con avena x500 ml", descripcion: "Emulsión oleo calcáreo enriquecida con avena, especialmente formulada para la higiene y el cuidado diario de la piel del bebé. Inspirada en recetas tradicionales, esta emulsión combina aceites naturales con agua calcárea, formando una textura cremosa que limpia de manera suave y eficaz sin necesidad de enjuague.  La avena aporta propiedades calmantes y suavizantes que ayudan a proteger la piel delicada del bebé contra irritaciones y enrojecimientos. Además, forma una película protectora que preserva la hidratación natural, dejando la piel tersa y saludable.  Ideal para el cambio de pañales, ya que facilita la remoción de impurezas respetando la barrera cutánea. resentación en botella de 500 ml con tapa segura. Uso unisex. Apto desde recién nacidos.", imagen: "/productos/7790940801234.jpg", precioVenta: 0, precioCosto: 0, stock: 0, activo: true },
   { id: "7790940801227", ean: "7790940801227", marca: "doncella", categoria: "Accesorios", nombre: "Emulsión oleo calcáreo con avena x1000 ml", descripcion: "Emulsión oleo calcáreo enriquecida con avena, especialmente formulada para la higiene y el cuidado diario de la piel del bebé. Inspirada en recetas tradicionales, esta emulsión combina aceites naturales con agua calcárea, formando una textura cremosa que limpia de manera suave y eficaz sin necesidad de enjuague.  La avena aporta propiedades calmantes y suavizantes que ayudan a proteger la piel delicada del bebé contra irritaciones y enrojecimientos. Además, forma una película protectora que preserva la hidratación natural, dejando la piel tersa y saludable.  Ideal para el cambio de pañales, ya que facilita la remoción de impurezas respetando la barrera cutánea. resentación en botella de 500 ml con tapa segura. Uso unisex. Apto desde recién nacidos. Presentación en botella de 1000 ml con tapa segura. Uso unisex. Apto desde recién nacidos.", imagen: "/productos/7790940801227.jpg", precioVenta: 0, precioCosto: 0, stock: 0, activo: true },
 ];
+

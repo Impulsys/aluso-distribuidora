@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Términos y condiciones · Distribuidora Los Amigos NOA",
+  title: "Términos y condiciones · ALUSO DISTRIBUIDORA",
 };
 
 export default function TerminosPage() {
@@ -23,7 +23,7 @@ export default function TerminosPage() {
         <section>
           <h2 className="font-serif text-xl text-brand-dark">1. Quiénes somos</h2>
           <p>
-            Esta plataforma pertenece a <b>Distribuidora Los Amigos NOA</b>,
+            Esta plataforma pertenece a <b>ALUSO DISTRIBUIDORA</b>,
             con domicilio comercial en el Noroeste argentino. Es un canal
             digital de catálogo y pedidos mayoristas. El sitio es operado y
             mantenido por Impulsys en nombre de la distribuidora.
@@ -141,3 +141,4 @@ export default function TerminosPage() {
     </div>
   );
 }
+

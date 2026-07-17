@@ -1,5 +1,5 @@
-/**
- * Cloud Functions — gestión de usuarios para Distribuidora Los Amigos NOA.
+﻿/**
+ * Cloud Functions — gestión de usuarios para ALUSO DISTRIBUIDORA.
  *
  * Estas funciones corren con el Admin SDK (privilegios de servidor), lo único
  * que permite: (a) crear cuentas sin desloguear al admin, y (b) cambiar la
@@ -17,7 +17,7 @@ import { requestCAE, buildAfipQrUrl, fechaHoyAfip, type IvaEntry } from "./afip"
 
 initializeApp();
 
-// ===== Config AFIP (producción) — Distribuidora Los Amigos =====
+// ===== Config AFIP (producción) — ALUSO DISTRIBUIDORA =====
 const AFIP_CUIT = 20250642114;
 const AFIP_PTO_VENTA = 6;
 const AFIP_CERT = defineSecret("AFIP_CERT"); // .crt en base64
@@ -420,3 +420,4 @@ export const emitirFactura = onCall(
     return { id: facturaRef.id, ...facturaDoc };
   }
 );
+

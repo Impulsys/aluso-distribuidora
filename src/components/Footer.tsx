@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -25,11 +25,11 @@ export default function Footer() {
         <div>
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-full bg-secondary font-bold text-primary">
-              LA
+              AD
             </span>
             <div className="leading-tight">
               <p className="font-serif text-lg font-medium">
-                Distribuidora Los Amigos
+                ALUSO DISTRIBUIDORA
               </p>
               <p className="text-xs text-white/60">NOA · Argentina</p>
             </div>
@@ -176,7 +176,7 @@ export default function Footer() {
       {/* Línea inferior */}
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-4 text-xs text-white/55 sm:flex-row">
-          <p>© {year} Distribuidora Los Amigos NOA</p>
+          <p>© {year} ALUSO DISTRIBUIDORA</p>
           <p>
             Hecho por <span className="font-medium text-white/85">Impulsys</span>
           </p>
@@ -185,3 +185,4 @@ export default function Footer() {
     </footer>
   );
 }
+

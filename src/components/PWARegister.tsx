@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
@@ -107,7 +107,7 @@ export default function PWARegister() {
         />
         <div className="flex-1">
           <p className="font-semibold text-brand-dark">
-            Instalar Los Amigos NOA
+            Instalar ALUSO
           </p>
           <p className="mt-0.5 text-xs text-brand-dark/65">
             Agregá la app al inicio de tu celular. Carga rápido y funciona
@@ -132,3 +132,4 @@ export default function PWARegister() {
     </div>
   );
 }
+

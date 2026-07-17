@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
@@ -101,7 +101,7 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-6xl gap-4 px-5 py-5 sm:px-6 sm:py-6 md:grid-cols-[1fr_340px] md:items-center md:gap-6">
           <div>
             <p className="font-serif text-base font-medium sm:text-lg">
-              Distribuidora Los Amigos
+              ALUSO DISTRIBUIDORA
             </p>
 
             <ul className="mt-3 space-y-2 text-[13px] text-white/85 sm:text-sm">
@@ -147,7 +147,7 @@ export default function LandingPage() {
           <div className="overflow-hidden rounded-xl ring-1 ring-white/15">
             <iframe
               src={MAPA_SRC}
-              title="Ubicación de Distribuidora Los Amigos"
+              title="Ubicación de ALUSO DISTRIBUIDORA"
               className="h-[130px] w-full border-0 sm:h-[150px]"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
@@ -159,3 +159,4 @@ export default function LandingPage() {
     </div>
   );
 }
+

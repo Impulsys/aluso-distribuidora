@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Política de privacidad · Distribuidora Los Amigos NOA",
+  title: "Política de privacidad · ALUSO DISTRIBUIDORA",
 };
 
 export default function PrivacidadPage() {
@@ -129,3 +129,4 @@ export default function PrivacidadPage() {
     </div>
   );
 }
+

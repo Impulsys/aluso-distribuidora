@@ -1,4 +1,4 @@
-// ===== Tipos del dominio — Distribuidora Los Amigos NOA =====
+﻿// ===== Tipos del dominio — ALUSO DISTRIBUIDORA =====
 
 export type Role = "cliente" | "vendedor" | "socio" | "superadmin" | "contador";
 
@@ -410,3 +410,4 @@ export interface CashClosing {
   cerradoPor: string;
   createdAt: number;
 }
+

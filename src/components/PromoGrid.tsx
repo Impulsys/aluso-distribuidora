@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "@/hooks/useProducts";
@@ -18,7 +18,7 @@ function Placeholder() {
         LA
       </span>
       <p className="text-sm font-medium text-brand-dark/50">
-        Distribuidora Los Amigos
+        ALUSO DISTRIBUIDORA
       </p>
       <p className="text-xs text-brand-dark/35">Espacio para promoción</p>
     </div>
@@ -83,3 +83,4 @@ export default function PromoGrid() {
     </section>
   );
 }
+

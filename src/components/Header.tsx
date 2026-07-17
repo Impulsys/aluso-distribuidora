@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -88,11 +88,11 @@ export default function Header() {
           onClick={() => setOpen(false)}
         >
           <span className="grid h-10 w-10 place-items-center rounded-full bg-secondary font-bold text-primary">
-            LA
+            AD
           </span>
           <div className="leading-tight">
             <p className="text-sm font-bold sm:text-base">
-              Distribuidora Los Amigos
+              ALUSO DISTRIBUIDORA
             </p>
             <p className="text-[10px] text-secondary sm:text-xs">
               NOA · Distribuidora mayorista
@@ -230,3 +230,4 @@ export default function Header() {
     </header>
   );
 }
+

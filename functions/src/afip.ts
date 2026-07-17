@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Integración AFIP/ARCA (WSAA + WSFEv1) para facturación electrónica.
- * Producción. Distribuidora Los Amigos — CUIT 20250642114 (RI), Pto vta 6.
+ * Producción. ALUSO DISTRIBUIDORA — CUIT 20250642114 (RI), Pto vta 6.
  *
  * Flujo: WSAA (firma CMS con cert+clave → Ticket de Acceso, cacheado) →
  * WSFE FECompUltimoAutorizado (próx. número) → FECAESolicitar (pide CAE) →
@@ -285,3 +285,4 @@ export function buildAfipQrUrl(data: {
   const b64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
   return `https://www.afip.gob.ar/fe/qr/?p=${b64}`;
 }
+

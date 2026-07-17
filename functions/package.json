@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "functions",
-  "description": "Cloud Functions — Distribuidora Los Amigos NOA (gestión de usuarios)",
+  "description": "Cloud Functions — ALUSO DISTRIBUIDORA (gestión de usuarios)",
   "main": "lib/index.js",
   "private": true,
   "engines": {
@@ -25,3 +25,4 @@
     "typescript": "^5.5.0"
   }
 }
+

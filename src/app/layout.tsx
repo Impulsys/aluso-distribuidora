@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
@@ -18,10 +18,10 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://distribuidoralosamigosnoa.com.ar"),
+  metadataBase: new URL("https://alusodistribuidora.web.app"),
   title: {
-    default: "Distribuidora Los Amigos NOA · Mayorista del NOA",
-    template: "%s · Distribuidora Los Amigos NOA",
+    default: "ALUSO DISTRIBUIDORA · Mayorista del NOA",
+    template: "%s · ALUSO DISTRIBUIDORA",
   },
   description:
     "Distribuidora mayorista del Noroeste argentino. Doncella y Nonisec (Lenterdit): cuidado adulto, incontinencia, higiene femenina y bebé para farmacias, geriátricos y comercios.",
@@ -40,17 +40,17 @@ export const metadata: Metadata = {
     "geriátrico",
   ],
   manifest: "/manifest.json",
-  applicationName: "Los Amigos NOA",
+  applicationName: "ALUSO",
   appleWebApp: {
     capable: true,
-    title: "Los Amigos NOA",
+    title: "ALUSO",
     statusBarStyle: "default",
   },
   openGraph: {
     type: "website",
     locale: "es_AR",
-    siteName: "Distribuidora Los Amigos NOA",
-    title: "Distribuidora Los Amigos NOA · Mayorista del NOA",
+    siteName: "ALUSO DISTRIBUIDORA",
+    title: "ALUSO DISTRIBUIDORA · Mayorista del NOA",
     description:
       "Doncella y Nonisec al mejor precio mayorista del NOA. Pedidos por WhatsApp en segundos.",
     images: [
@@ -58,13 +58,13 @@ export const metadata: Metadata = {
         url: "/icons/icon-512.png",
         width: 512,
         height: 512,
-        alt: "Distribuidora Los Amigos NOA",
+        alt: "ALUSO DISTRIBUIDORA",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Distribuidora Los Amigos NOA",
+    title: "ALUSO DISTRIBUIDORA",
     description:
       "Doncella y Nonisec al mejor precio mayorista del NOA.",
     images: ["/icons/icon-512.png"],
@@ -110,3 +110,4 @@ export default function RootLayout({
     </html>
   );
 }
+
