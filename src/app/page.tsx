@@ -76,8 +76,8 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos a la derecha - Nonisec abajo, Doncella sube un poco */}
-          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '150px' }}>
+          {/* Logos a la derecha - Nonisec nivel ALUSO, Doncella nivel botón catálogo */}
+          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '80px' }}>
             {/* Logo Nonisec - Turquesa real, sin fondo */}
             <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
               <Image
@@ -90,8 +90,8 @@ export default function LandingPage() {
               />
             </div>
 
-            {/* Logo Doncella - un poco separado de Nonisec */}
-            <div style={{ lineHeight: 0, marginTop: '-30px', width: '100%', maxWidth: '500px' }}>
+            {/* Logo Doncella - nivel botón catálogo */}
+            <div style={{ lineHeight: 0, marginTop: '-10px', width: '100%', maxWidth: '500px' }}>
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella - Línea femenina"
