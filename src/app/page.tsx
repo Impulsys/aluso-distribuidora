@@ -78,11 +78,11 @@ export default function LandingPage() {
 
           {/* Logos de las marcas - ENORMES, pegados y centrados */}
           <div className="w-full flex flex-col items-center justify-center" style={{ gap: '0px' }}>
-            {/* Logo Nonisec - Turquesa con filtro más fuerte */}
+            {/* Logo Nonisec - Turquesa con filtro de inversión */}
             <div
               className="w-full"
               style={{
-                filter: 'hue-rotate(160deg) saturate(2) brightness(1.15) contrast(1.1)',
+                filter: 'invert(1) hue-rotate(190deg) saturate(1.8) brightness(1.1)',
                 lineHeight: 0,
                 maxWidth: '600px'
               }}
