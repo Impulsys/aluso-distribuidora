@@ -68,11 +68,23 @@ const cols = [...vol.entries()]
   .sort((a, b) => b[1] - a[1])
   .map(([id]) => id);
 
+// OJO: las fuentes estándar del PDF (Helvetica) solo tienen Latin-1. Cualquier
+// caracter fuera de ahí (−, →, ✓) sale como basura tipo `"&`. Solo ASCII/Latin-1.
 const corto = (n) =>
   n
     .replace(/TOALLA DONCELLA /i, "Doncella ")
     .replace(/ CLASICA 50x8/i, "")
     .replace(/ACEITE MEZCLA FINCA DEL LAZO 4 x 5 LITROS/i, "Aceite Finca del Lazo")
+    .replace(/ S\/D$/i, " s/d")
+    .replace(/ C\/D$/i, " c/d")
+    .trim();
+
+// Nombre corto para los encabezados de columna (si no, se montan entre ellos).
+const cortito = (n) =>
+  n
+    .replace(/TOALLA DONCELLA /i, "")
+    .replace(/ CLASICA 50x8/i, "")
+    .replace(/ACEITE MEZCLA FINCA DEL LAZO 4 x 5 LITROS/i, "ACEITE")
     .replace(/ S\/D$/i, " s/d")
     .replace(/ C\/D$/i, " c/d")
     .trim();
@@ -184,6 +196,18 @@ const doc = new PDFDocument({
 });
 doc.pipe(createWriteStream(OUT));
 
+// GUARDARRAÍL: las fuentes estándar del PDF (Helvetica) solo tienen Latin-1.
+// Un − (menos tipográfico), una → o un ✓ salen impresos como basura (`"&40`).
+// Envolvemos .text() para que avise en vez de arruinar el PDF en silencio.
+const _text = doc.text.bind(doc);
+const malos = new Set();
+doc.text = (str, ...rest) => {
+  if (typeof str === "string") {
+    for (const ch of str) if (ch.charCodeAt(0) > 255) malos.add(ch);
+  }
+  return _text(str, ...rest);
+};
+
 const W = doc.page.width - 80; // ancho útil
 const X = 40;
 
@@ -247,7 +271,7 @@ cols.forEach((id, i) => {
   doc.roundedRect(cx, y, pw - 8, 52, 3).lineWidth(0.7).strokeColor(REGLA).stroke();
   doc.font("Helvetica-Bold").fontSize(8).fillColor(TINTA).text(corto(nombres.get(id)), cx + 10, y + 9, { width: pw - 26 });
   doc.font("Helvetica").fontSize(12).fillColor(GRIS).text(num(ini), cx + 10, y + 28, { continued: true });
-  doc.fillColor(GRIS).fontSize(9).text("   →   ", { continued: true });
+  doc.fillColor(GRIS).fontSize(9).text("   >   ", { continued: true });
   doc.font("Helvetica-Bold").fontSize(14).fillColor(fin === 0 ? ROJO : TINTA).text(num(fin));
 });
 y += 72;
@@ -386,98 +410,105 @@ dias.forEach((d) => {
   }
   doc
     .font("Helvetica-Bold")
-    .fontSize(7.5)
+    .fontSize(8.5)
     .fillColor(TEAL)
     .text(`Tickets del día  ·  ${d.tickets.length}`, X + 8, y);
+  y += 13;
   doc
     .font("Helvetica")
-    .fontSize(6.5)
+    .fontSize(7)
     .fillColor(GRIS)
-    .text("Qué se llevó cada uno y cómo va bajando el stock", X + 100, y + 1);
-  y += 12;
+    .text("Qué se llevó cada uno y cómo va bajando el stock.", X + 8, y);
+  y += 14;
 
   // Columnas: ticket · hora · [por producto: unidades | stock] · importe
-  const CX = (i) => X + 100 + i * 74;
+  const CX = (i) => X + 100 + i * 92;
+  const FIL = 14.5; // alto de fila
   const encTickets = () => {
-    doc.font("Helvetica-Bold").fontSize(6.5).fillColor(GRIS);
-    doc.text("TICKET", X + 8, y + 4, { width: 54 });
-    doc.text("HORA", X + 64, y + 4, { width: 30 });
+    // Franja con el nombre de cada producto, arriba de sus dos columnas.
     cols.forEach((id, i) => {
-      doc.fillColor(TINTA).fontSize(6).text(corto(nombres.get(id)).toUpperCase(), CX(i), y - 3, {
-        width: 70,
-        align: "center",
-      });
-      doc.fillColor(GRIS).fontSize(6.5);
-      doc.text("unid.", CX(i), y + 4, { width: 32, align: "right" });
-      doc.text("stock", CX(i) + 34, y + 4, { width: 36, align: "right" });
+      doc.rect(CX(i) - 4, y, 88, 12).fill(TEAL_CLARO);
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(6.5)
+        .fillColor(TEAL)
+        .text(cortito(nombres.get(id)).toUpperCase(), CX(i) - 4, y + 3.5, { width: 88, align: "center" });
     });
-    doc.fillColor(GRIS).text("IMPORTE", X + 452, y + 4, { width: 63, align: "right" });
     y += 14;
-    doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.5).strokeColor(REGLA).stroke();
-    y += 4;
+    doc.font("Helvetica-Bold").fontSize(6.5).fillColor(GRIS);
+    doc.text("TICKET", X + 8, y, { width: 54 });
+    doc.text("HORA", X + 64, y, { width: 30 });
+    cols.forEach((_, i) => {
+      doc.text("SE LLEVÓ", CX(i), y, { width: 38, align: "right" });
+      doc.text("QUEDAN", CX(i) + 40, y, { width: 44, align: "right" });
+    });
+    doc.text("IMPORTE", X + 420, y, { width: 95, align: "right" });
+    y += 10;
+    doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.8).strokeColor(TINTA).stroke();
+    y += 5;
   };
   encTickets();
 
   // Punto de partida: el stock cargado con el que arrancó el día.
-  doc.rect(X + 8, y - 2.5, W - 16, 13).fill(TEAL_CLARO);
-  doc.font("Helvetica-Bold").fontSize(7).fillColor(TEAL).text("Stock inicial del día", X + 8, y, { width: 90 });
+  doc.rect(X + 8, y - 3, W - 16, FIL).fill(TEAL_CLARO);
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(TEAL).text("Stock inicial del día", X + 8, y, { width: 92 });
   cols.forEach((id, i) => {
     doc
       .font("Helvetica-Bold")
-      .fontSize(7.5)
+      .fontSize(9)
       .fillColor(TEAL)
-      .text(num(d.stockIni.get(id) ?? 0), CX(i) + 34, y, { width: 36, align: "right" });
+      .text(num(d.stockIni.get(id) ?? 0), CX(i) + 40, y - 0.5, { width: 44, align: "right" });
   });
-  y += 15;
+  y += FIL + 2;
 
   d.tickets.forEach((t, i) => {
-    if (y > doc.page.height - 56) {
+    if (y > doc.page.height - 60) {
       doc.addPage();
       y = 50;
       doc
         .font("Helvetica-Bold")
-        .fontSize(7)
-        .fillColor(GRIS)
-        .text(`${d.titulo.replace(/^\w/, (c) => c.toUpperCase())} · tickets (cont.)`, X + 8, y);
-      y += 16;
+        .fontSize(8)
+        .fillColor(TEAL)
+        .text(`${d.titulo.replace(/^\w/, (c) => c.toUpperCase())} · tickets (continúa)`, X + 8, y);
+      y += 14;
       encTickets();
     }
-    if (i % 2 === 0) doc.rect(X + 8, y - 2.5, W - 16, 13).fill(BANDA);
+    if (i % 2 === 0) doc.rect(X + 8, y - 3, W - 16, FIL).fill(BANDA);
     const c = t.anulado ? GRIS : TINTA;
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(t.anulado ? GRIS : TEAL).text(t.numero, X + 8, y, { width: 54 });
-    doc.font("Helvetica").fontSize(7.5).fillColor(GRIS).text(t.hora, X + 64, y, { width: 30 });
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(t.anulado ? GRIS : TEAL).text(t.numero, X + 8, y, { width: 54 });
+    doc.font("Helvetica").fontSize(8).fillColor(GRIS).text(t.hora, X + 64, y, { width: 30 });
     t.cols.forEach((cc, i2) => {
       doc
         .font(cc.vend ? "Helvetica-Bold" : "Helvetica")
-        .fontSize(7.5)
+        .fontSize(8)
         .fillColor(cc.vend ? c : REGLA)
-        .text(cc.vend ? `−${num(cc.vend)}` : "·", CX(i2), y, { width: 32, align: "right" });
+        .text(cc.vend ? `-${num(cc.vend)}` : ".", CX(i2), y, { width: 38, align: "right" });
       doc
         .font(cc.stock === 0 ? "Helvetica-Bold" : "Helvetica")
         .fillColor(cc.stock === 0 ? ROJO : GRIS)
-        .text(num(cc.stock), CX(i2) + 34, y, { width: 36, align: "right" });
+        .text(num(cc.stock), CX(i2) + 40, y, { width: 44, align: "right" });
     });
     if (t.anulado) {
-      doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ROJO).text("ANULADO", X + 452, y + 0.5, { width: 63, align: "right" });
+      doc.font("Helvetica-Bold").fontSize(7).fillColor(ROJO).text("ANULADO", X + 420, y + 0.5, { width: 95, align: "right" });
     } else {
-      doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA).text(ars(t.total), X + 452, y, { width: 63, align: "right" });
+      doc.font("Helvetica-Bold").fontSize(8).fillColor(TINTA).text(ars(t.total), X + 420, y, { width: 95, align: "right" });
     }
-    y += 13;
+    y += FIL;
   });
 
-  y += 2;
-  doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.7).strokeColor(TINTA).stroke();
-  y += 4;
-  doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA);
-  doc.text(`${d.remitos} tickets · ${num(d.unidades)} u.`, X + 8, y, { width: 90 });
+  y += 3;
+  doc.moveTo(X + 8, y).lineTo(X + W - 8, y).lineWidth(0.8).strokeColor(TINTA).stroke();
+  y += 6;
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(TINTA);
+  doc.text(`${d.remitos} tickets · ${num(d.unidades)} u.`, X + 8, y, { width: 92 });
   cols.forEach((id, i) => {
     const v = d.prod.get(id)?.u ?? 0;
     const sf = d.stockFin.get(id) ?? 0;
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(TINTA).text(v ? `−${num(v)}` : "·", CX(i), y, { width: 32, align: "right" });
-    doc.fillColor(sf === 0 ? ROJO : TINTA).text(num(sf), CX(i) + 34, y, { width: 36, align: "right" });
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(TINTA).text(v ? `-${num(v)}` : ".", CX(i), y, { width: 38, align: "right" });
+    doc.fillColor(sf === 0 ? ROJO : TINTA).text(num(sf), CX(i) + 40, y, { width: 44, align: "right" });
   });
-  doc.fillColor(TINTA).text(ars(d.efectivo + d.otros), X + 452, y, { width: 63, align: "right" });
-  y += 12;
+  doc.fillColor(TINTA).text(ars(d.efectivo + d.otros), X + 420, y, { width: 95, align: "right" });
+  y += 13;
   if (d.otros > 0) {
     doc
       .font("Helvetica")
@@ -516,6 +547,13 @@ for (let i = 0; i < rango.count; i++) {
 const finales = doc.bufferedPageRange().count;
 if (finales !== rango.count) {
   console.warn(`⚠️  Los pies agregaron ${finales - rango.count} hoja(s) en blanco.`);
+}
+
+if (malos.size) {
+  console.warn(
+    `⚠️  Caracteres que Helvetica NO imprime (van a salir como basura): ${[...malos].join(" ")}`
+  );
+  console.warn(`    Reemplazalos por ASCII/Latin-1 (− → "-", → → ">").`);
 }
 
 doc.end();
