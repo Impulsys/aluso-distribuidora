@@ -78,8 +78,8 @@ export default function LandingPage() {
 
           {/* Logos a la derecha - Nonisec arriba, Doncella abajo, pegados */}
           <div className="flex flex-col items-center justify-center gap-0">
-            {/* Logo Nonisec - Turquesa real */}
-            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
+            {/* Logo Nonisec - Turquesa real, sin fondo blanco */}
+            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px', backgroundColor: 'transparent' }}>
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec - Protección adulta"
@@ -87,6 +87,7 @@ export default function LandingPage() {
                 height={250}
                 priority
                 className="w-full h-auto object-contain drop-shadow-2xl"
+                style={{ mixBlendMode: 'screen' }}
               />
             </div>
 
