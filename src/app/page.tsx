@@ -26,31 +26,41 @@ const MAPA_LINK = `https://www.google.com/maps/search/?api=1&query=${encodeURICo
 export default function LandingPage() {
   return (
     // 4rem = alto del header. Con esto la página entra JUSTO en la pantalla.
-    <div className="flex min-h-[calc(100dvh-4rem)] flex-col overflow-x-hidden bg-white">
+    <div
+      className="flex min-h-[calc(100dvh-4rem)] flex-col overflow-x-hidden bg-cover bg-center bg-no-repeat relative"
+      style={{
+        backgroundImage: 'url(/bg-warehouse.png)',
+      }}
+    >
+      {/* Overlay oscuro para legibilidad de texto */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/40 pointer-events-none"></div>
+
+      {/* Contenido relativo al overlay */}
+      <div className="relative z-10 flex flex-1 flex-col">
       {/* ============ PRESENTACIÓN ============ */}
       <section className="flex flex-1 items-center">
         {/* En el celular va todo apilado (texto arriba, packs abajo). */}
         <div className="mx-auto grid w-full max-w-7xl items-center gap-6 px-5 py-6 sm:px-6 md:grid-cols-[1fr_1.25fr] md:gap-8 md:py-8">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary sm:text-[11px] sm:tracking-[0.22em]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300 sm:text-[11px] sm:tracking-[0.22em]">
               Distribuidora mayorista · Noroeste argentino
             </p>
 
-            <h1 className="mt-3 font-serif text-4xl font-light leading-[1.05] text-brand-dark sm:text-5xl md:mt-4 lg:text-6xl">
+            <h1 className="mt-3 font-serif text-4xl font-light leading-[1.05] text-white sm:text-5xl md:mt-4 lg:text-6xl">
               ALUSO
               <br />
               DISTRIBUIDORA
             </h1>
 
-            <p className="mt-4 flex items-center gap-3 text-base font-medium text-brand-dark/80 sm:mt-5 sm:text-lg">
+            <p className="mt-4 flex items-center gap-3 text-base font-medium text-white/90 sm:mt-5 sm:text-lg">
               Doncella
-              <span className="h-1 w-1 rounded-full bg-brand-dark/25" />
+              <span className="h-1 w-1 rounded-full bg-white/40" />
               Nonisec
             </p>
 
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-brand-dark/70 sm:mt-6 sm:text-[15px] md:text-base">
-              Distribuimos las marcas <strong className="font-semibold text-brand-dark">Doncella</strong> y{" "}
-              <strong className="font-semibold text-brand-dark">Nonisec</strong> en
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/80 sm:mt-6 sm:text-[15px] md:text-base">
+              Distribuimos las marcas <strong className="font-semibold text-white">Doncella</strong> y{" "}
+              <strong className="font-semibold text-white">Nonisec</strong> en
               farmacias, geriátricos, comercios y autoservicios del Noroeste
               argentino. Cuidado adulto, incontinencia, higiene femenina y
               algodón, con stock permanente y logística propia. Atención directa
@@ -156,6 +166,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 }
