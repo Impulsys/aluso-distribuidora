@@ -1,15 +1,12 @@
 {
   "projects": {
-    "default": "distribuidora-los-amigos-noa"
+    "default": "aluso-distribuidora"
   },
   "targets": {
-    "distribuidora-los-amigos-noa": {
+    "aluso-distribuidora": {
       "hosting": {
         "main": [
-          "distribuidora-los-amigos-noa"
-        ],
-        "construccion": [
-          "losamigos-construccion"
+          "alusodistribuidora"
         ]
       }
     }

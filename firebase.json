@@ -6,13 +6,6 @@
       "cleanUrls": true,
       "trailingSlash": false,
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
-    },
-    {
-      "target": "construccion",
-      "public": "out",
-      "cleanUrls": true,
-      "trailingSlash": false,
-      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
     }
   ],
   "firestore": {
