@@ -32,8 +32,8 @@ export default function LandingPage() {
         backgroundImage: 'url(/bg-warehouse.png)',
       }}
     >
-      {/* Overlay oscuro para legibilidad de texto */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/40 pointer-events-none"></div>
+      {/* Overlay sutil para legibilidad de texto */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/20 to-transparent pointer-events-none"></div>
 
       {/* Contenido relativo al overlay */}
       <div className="relative z-10 flex flex-1 flex-col">
