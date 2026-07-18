@@ -68,32 +68,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos - Posición final */}
-          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '78px' }}>
-            {/* Logo Nonisec */}
-            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
-              <Image
-                src="/brand/nonisec.png"
-                alt="Nonisec - Protección adulta"
-                width={500}
-                height={250}
-                priority
-                className="w-full h-auto object-contain drop-shadow-2xl"
-              />
-            </div>
-
-            {/* Logo Doncella */}
-            <div style={{ lineHeight: 0, marginTop: '-230px', width: '100%', maxWidth: '500px' }}>
-              <Image
-                src="/brand/doncella.png"
-                alt="Doncella - Línea femenina"
-                width={500}
-                height={250}
-                priority
-                className="w-full h-auto object-contain drop-shadow-2xl"
-              />
-            </div>
-          </div>
         </div>
       </section>
 
