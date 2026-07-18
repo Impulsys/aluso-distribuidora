@@ -69,7 +69,7 @@ export default function LandingPage() {
           </div>
 
           {/* Logos - Posiciones finales */}
-          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '230px' }}>
+          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '193px' }}>
             {/* Logo Nonisec */}
             <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
               <Image
