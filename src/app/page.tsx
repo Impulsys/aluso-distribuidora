@@ -45,15 +45,9 @@ export default function LandingPage() {
               />
             </div>
 
-            <p className="mt-3 flex items-center gap-3 text-base font-medium sm:mt-4 sm:text-lg">
-              <span className="text-rose-400">Doncella</span>
-              <span className="h-1 w-1 rounded-full bg-slate-400" />
-              <span className="text-teal-400">Nonisec</span>
-            </p>
-
             <p className="mt-4 max-w-xl text-lg leading-relaxed text-blue-600 font-semibold sm:mt-6 sm:text-xl md:text-2xl">
-              Distribuimos las marcas <strong className="font-semibold text-white">Doncella</strong> y{" "}
-              <strong className="font-semibold text-white">Nonisec</strong> en
+              Distribuimos las marcas <strong className="font-semibold text-rose-400">Doncella</strong> y{" "}
+              <strong className="font-semibold text-teal-400">Nonisec</strong> en
               farmacias, geriátricos, comercios y autoservicios del Noroeste
               argentino. Cuidado adulto, incontinencia, higiene femenina y
               algodón, con stock permanente y logística propia. Atención directa
