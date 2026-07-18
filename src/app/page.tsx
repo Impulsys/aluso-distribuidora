@@ -34,10 +34,6 @@ export default function LandingPage() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
           {/* Texto a la izquierda */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300 sm:text-[11px] sm:tracking-[0.22em]">
-              Distribuidora mayorista · Noroeste argentino
-            </p>
-
             <div className="mt-3 w-full max-w-2xl">
               <Image
                 src="/logo-aluso.png"
