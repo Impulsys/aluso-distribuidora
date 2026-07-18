@@ -34,23 +34,28 @@ export default function LandingPage() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
           {/* Texto a la izquierda */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300 sm:text-[11px] sm:tracking-[0.22em]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-300 sm:text-[11px] sm:tracking-[0.22em]">
               Distribuidora mayorista · Noroeste argentino
             </p>
 
-            <h1 className="mt-3 font-serif text-4xl font-light leading-[1.05] text-white sm:text-5xl md:mt-4 lg:text-6xl">
-              ALUSO
-              <br />
-              DISTRIBUIDORA
-            </h1>
+            <div className="mt-4 w-full max-w-sm">
+              <Image
+                src="/logo-aluso.png"
+                alt="ALUSO DISTRIBUIDORA"
+                width={600}
+                height={200}
+                priority
+                className="w-full h-auto object-contain"
+              />
+            </div>
 
-            <p className="mt-4 flex items-center gap-3 text-base font-medium text-white/90 sm:mt-5 sm:text-lg">
+            <p className="mt-4 flex items-center gap-3 text-base font-medium text-blue-100 sm:mt-5 sm:text-lg">
               Doncella
-              <span className="h-1 w-1 rounded-full bg-white/40" />
+              <span className="h-1 w-1 rounded-full bg-blue-300" />
               Nonisec
             </p>
 
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/80 sm:mt-6 sm:text-[15px] md:text-base">
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-blue-50 sm:mt-6 sm:text-[15px] md:text-base">
               Distribuimos las marcas <strong className="font-semibold text-white">Doncella</strong> y{" "}
               <strong className="font-semibold text-white">Nonisec</strong> en
               farmacias, geriátricos, comercios y autoservicios del Noroeste
