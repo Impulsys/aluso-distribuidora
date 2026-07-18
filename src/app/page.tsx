@@ -38,12 +38,12 @@ export default function LandingPage() {
               Distribuidora mayorista · Noroeste argentino
             </p>
 
-            <div className="mt-3 w-full max-w-sm">
+            <div className="mt-3 w-full max-w-2xl">
               <Image
                 src="/logo-aluso.png"
                 alt="ALUSO DISTRIBUIDORA"
-                width={600}
-                height={200}
+                width={900}
+                height={300}
                 priority
                 className="w-full h-auto object-contain"
               />
