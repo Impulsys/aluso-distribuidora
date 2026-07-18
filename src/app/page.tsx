@@ -34,11 +34,11 @@ export default function LandingPage() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
           {/* Texto a la izquierda */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-300 sm:text-[11px] sm:tracking-[0.22em]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300 sm:text-[11px] sm:tracking-[0.22em]">
               Distribuidora mayorista · Noroeste argentino
             </p>
 
-            <div className="mt-4 w-full max-w-sm">
+            <div className="mt-3 w-full max-w-sm">
               <Image
                 src="/logo-aluso.png"
                 alt="ALUSO DISTRIBUIDORA"
@@ -49,10 +49,10 @@ export default function LandingPage() {
               />
             </div>
 
-            <p className="mt-4 flex items-center gap-3 text-base font-medium text-blue-100 sm:mt-5 sm:text-lg">
-              Doncella
-              <span className="h-1 w-1 rounded-full bg-blue-300" />
-              Nonisec
+            <p className="mt-3 flex items-center gap-3 text-base font-medium sm:mt-4 sm:text-lg">
+              <span className="text-rose-400">Doncella</span>
+              <span className="h-1 w-1 rounded-full bg-slate-400" />
+              <span className="text-teal-400">Nonisec</span>
             </p>
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-blue-50 sm:mt-6 sm:text-[15px] md:text-base">
