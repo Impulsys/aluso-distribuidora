@@ -1,24 +1,12 @@
-﻿"use client";
-
-import React from "react";
-import Image from "next/image";
+﻿import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
-
-/*
- * Pantalla de inicio: UNA sola pantalla, sin scroll.
- * Pedido del cliente (14/07/2026): nombre, las dos marcas, una descripción corta
- * y una imagen. Abajo, en el pie de ESA MISMA pantalla, dirección + WhatsApp +
- * mapa. Nada más: sin botones de catálogo, sin secciones para deslizar.
- * Fondo BLANCO plano — el violeta con degradé se fue.
- */
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
 const EMAIL = process.env.NEXT_PUBLIC_BUSINESS_EMAIL || "";
 const PHONE = process.env.NEXT_PUBLIC_BUSINESS_PHONE || "";
 const ADDRESS = process.env.NEXT_PUBLIC_BUSINESS_ADDRESS || "";
 
-// Mapa embebido de Google (no necesita API key).
 const MAPA_SRC = `https://www.google.com/maps?q=${encodeURIComponent(
   ADDRESS
 )}&z=16&output=embed`;
@@ -27,35 +15,6 @@ const MAPA_LINK = `https://www.google.com/maps/search/?api=1&query=${encodeURICo
 )}`;
 
 export default function LandingPage() {
-  const NONISEC_FIXED = 230; // ← Nonisec fijado
-  const [doncellaNegMargin, setDoncellaNegMargin] = React.useState(-59);
-  const [dragging, setDragging] = React.useState(false);
-  const [startY, setStartY] = React.useState(0);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setDragging(true);
-    setStartY(e.clientY);
-  };
-
-  React.useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragging) return;
-      const delta = e.clientY - startY;
-      setDoncellaNegMargin(prev => prev + delta);
-      setStartY(e.clientY);
-    };
-
-    const handleMouseUp = () => setDragging(false);
-
-    if (dragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [dragging, startY]);
 
   return (
     // 4rem = alto del header. Con esto la página entra JUSTO en la pantalla.
@@ -109,9 +68,9 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos - Nonisec fijado, Doncella DRAGGABLE */}
-          <div className="flex flex-col items-center justify-start gap-0 relative" style={{ marginTop: `${NONISEC_FIXED}px` }}>
-            {/* Logo Nonisec - FIJADO */}
+          {/* Logos - Posiciones finales */}
+          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '230px' }}>
+            {/* Logo Nonisec */}
             <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
               <Image
                 src="/brand/nonisec.png"
@@ -123,35 +82,16 @@ export default function LandingPage() {
               />
             </div>
 
-            {/* Logo Doncella - DRAGGABLE */}
-            <div
-              style={{ lineHeight: 0, marginTop: `${doncellaNegMargin}px`, width: '100%', maxWidth: '500px', cursor: 'grab', userSelect: 'none' }}
-              onMouseDown={handleMouseDown}
-            >
+            {/* Logo Doncella */}
+            <div style={{ lineHeight: 0, marginTop: '-230px', width: '100%', maxWidth: '500px' }}>
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella - Línea femenina"
                 width={500}
                 height={250}
                 priority
-                draggable={false}
-                className="w-full h-auto object-contain drop-shadow-2xl pointer-events-none"
+                className="w-full h-auto object-contain drop-shadow-2xl"
               />
-            </div>
-
-            {/* Panel de posiciones */}
-            <div className="fixed bottom-4 right-4 bg-black/80 text-white p-3 rounded text-xs font-mono">
-              <div>Nonisec: <strong className="text-green-400">{NONISEC_FIXED}px (FIJADO)</strong></div>
-              <div>Doncella marginTop: <strong>{doncellaNegMargin}px</strong></div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`${doncellaNegMargin}`);
-                  alert('Doncella: ' + doncellaNegMargin);
-                }}
-                className="mt-2 bg-blue-600 px-2 py-1 rounded text-xs w-full"
-              >
-                Copiar Doncella
-              </button>
             </div>
           </div>
         </div>
