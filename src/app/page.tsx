@@ -27,13 +27,13 @@ const MAPA_LINK = `https://www.google.com/maps/search/?api=1&query=${encodeURICo
 )}`;
 
 export default function LandingPage() {
-  const [nonisecTop, setNonisecTop] = React.useState(80);
-  const [doncellaNegMargin, setDoncellaNegMargin] = React.useState(-10);
-  const [dragging, setDragging] = React.useState<'nonisec' | 'doncella' | null>(null);
+  const NONISEC_FIXED = 230; // ← Nonisec fijado
+  const [doncellaNegMargin, setDoncellaNegMargin] = React.useState(-59);
+  const [dragging, setDragging] = React.useState(false);
   const [startY, setStartY] = React.useState(0);
 
-  const handleMouseDown = (logo: 'nonisec' | 'doncella', e: React.MouseEvent) => {
-    setDragging(logo);
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setDragging(true);
     setStartY(e.clientY);
   };
 
@@ -41,16 +41,11 @@ export default function LandingPage() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragging) return;
       const delta = e.clientY - startY;
-
-      if (dragging === 'nonisec') {
-        setNonisecTop(prev => Math.max(0, prev + delta));
-      } else {
-        setDoncellaNegMargin(prev => prev + delta);
-      }
+      setDoncellaNegMargin(prev => prev + delta);
       setStartY(e.clientY);
     };
 
-    const handleMouseUp = () => setDragging(null);
+    const handleMouseUp = () => setDragging(false);
 
     if (dragging) {
       window.addEventListener('mousemove', handleMouseMove);
@@ -114,28 +109,24 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos draggable - Nonisec y Doncella */}
-          <div className="flex flex-col items-center justify-start gap-0 relative" style={{ marginTop: `${nonisecTop}px` }}>
-            {/* Logo Nonisec - DRAGGABLE */}
-            <div
-              style={{ lineHeight: 0, width: '100%', maxWidth: '500px', cursor: 'grab', userSelect: 'none' }}
-              onMouseDown={(e) => handleMouseDown('nonisec', e)}
-            >
+          {/* Logos - Nonisec fijado, Doncella DRAGGABLE */}
+          <div className="flex flex-col items-center justify-start gap-0 relative" style={{ marginTop: `${NONISEC_FIXED}px` }}>
+            {/* Logo Nonisec - FIJADO */}
+            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec - Protección adulta"
                 width={500}
                 height={250}
                 priority
-                draggable={false}
-                className="w-full h-auto object-contain drop-shadow-2xl pointer-events-none"
+                className="w-full h-auto object-contain drop-shadow-2xl"
               />
             </div>
 
             {/* Logo Doncella - DRAGGABLE */}
             <div
               style={{ lineHeight: 0, marginTop: `${doncellaNegMargin}px`, width: '100%', maxWidth: '500px', cursor: 'grab', userSelect: 'none' }}
-              onMouseDown={(e) => handleMouseDown('doncella', e)}
+              onMouseDown={handleMouseDown}
             >
               <Image
                 src="/brand/doncella.png"
@@ -148,18 +139,18 @@ export default function LandingPage() {
               />
             </div>
 
-            {/* Panel de posiciones (solo en dev/admin) */}
+            {/* Panel de posiciones */}
             <div className="fixed bottom-4 right-4 bg-black/80 text-white p-3 rounded text-xs font-mono">
-              <div>Nonisec marginTop: <strong>{nonisecTop}px</strong></div>
+              <div>Nonisec: <strong className="text-green-400">{NONISEC_FIXED}px (FIJADO)</strong></div>
               <div>Doncella marginTop: <strong>{doncellaNegMargin}px</strong></div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${nonisecTop}, ${doncellaNegMargin}`);
-                  alert('Valores copiados: ' + nonisecTop + ', ' + doncellaNegMargin);
+                  navigator.clipboard.writeText(`${doncellaNegMargin}`);
+                  alert('Doncella: ' + doncellaNegMargin);
                 }}
-                className="mt-2 bg-blue-600 px-2 py-1 rounded text-xs"
+                className="mt-2 bg-blue-600 px-2 py-1 rounded text-xs w-full"
               >
-                Copiar valores
+                Copiar Doncella
               </button>
             </div>
           </div>
