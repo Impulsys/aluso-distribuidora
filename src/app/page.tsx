@@ -1,4 +1,7 @@
-﻿import Image from "next/image";
+﻿"use client";
+
+import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
@@ -15,6 +18,34 @@ const MAPA_LINK = `https://www.google.com/maps/search/?api=1&query=${encodeURICo
 )}`;
 
 export default function LandingPage() {
+  const [logosTop, setLogosTop] = React.useState(193);
+  const [dragging, setDragging] = React.useState(false);
+  const [startY, setStartY] = React.useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setDragging(true);
+    setStartY(e.clientY);
+  };
+
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const delta = e.clientY - startY;
+      setLogosTop(prev => Math.max(0, prev + delta));
+      setStartY(e.clientY);
+    };
+
+    const handleMouseUp = () => setDragging(false);
+
+    if (dragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [dragging, startY]);
 
   return (
     // 4rem = alto del header. Con esto la página entra JUSTO en la pantalla.
@@ -68,31 +99,51 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Logos - Posiciones finales */}
-          <div className="flex flex-col items-center justify-start gap-0" style={{ marginTop: '193px' }}>
+          {/* Bloque de Logos DRAGGABLE */}
+          <div
+            className="flex flex-col items-center justify-start gap-0 cursor-grab active:cursor-grabbing"
+            style={{ marginTop: `${logosTop}px`, userSelect: 'none' }}
+            onMouseDown={handleMouseDown}
+          >
             {/* Logo Nonisec */}
-            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px' }}>
+            <div style={{ lineHeight: 0, width: '100%', maxWidth: '500px', pointerEvents: 'none' }}>
               <Image
                 src="/brand/nonisec.png"
                 alt="Nonisec - Protección adulta"
                 width={500}
                 height={250}
                 priority
+                draggable={false}
                 className="w-full h-auto object-contain drop-shadow-2xl"
               />
             </div>
 
             {/* Logo Doncella */}
-            <div style={{ lineHeight: 0, marginTop: '-230px', width: '100%', maxWidth: '500px' }}>
+            <div style={{ lineHeight: 0, marginTop: '-230px', width: '100%', maxWidth: '500px', pointerEvents: 'none' }}>
               <Image
                 src="/brand/doncella.png"
                 alt="Doncella - Línea femenina"
                 width={500}
                 height={250}
                 priority
+                draggable={false}
                 className="w-full h-auto object-contain drop-shadow-2xl"
               />
             </div>
+          </div>
+
+          {/* Panel posición */}
+          <div className="fixed bottom-4 right-4 bg-black/80 text-white p-3 rounded text-xs font-mono">
+            <div>Logos marginTop: <strong>{logosTop}px</strong></div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(logosTop.toString());
+                alert('Valor: ' + logosTop);
+              }}
+              className="mt-2 bg-blue-600 px-2 py-1 rounded w-full"
+            >
+              Copiar
+            </button>
           </div>
         </div>
       </section>
