@@ -19,7 +19,7 @@ export default function LandingPage() {
   return (
     // 4rem = alto del header. Con esto la página entra JUSTO en la pantalla.
     <div
-      className="flex min-h-[calc(100dvh-4rem)] flex-col overflow-x-hidden bg-cover bg-center bg-no-repeat relative"
+      className="flex h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-cover bg-center bg-no-repeat relative"
       style={{
         backgroundImage: 'url(/bg-warehouse.png)',
       }}
