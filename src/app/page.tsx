@@ -55,8 +55,8 @@ export default function LandingPage() {
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-blue-600 font-semibold sm:text-base md:text-lg">
               Distribuimos las marcas <strong className="font-semibold text-rose-400">Doncella</strong> y{" "}
               <strong className="font-semibold text-teal-400">Nonisec</strong> en
-              farmacias, geriátricos, comercios y autoservicios del Noroeste
-              argentino. Cuidado adulto, incontinencia, higiene femenina y
+              farmacias, geriátricos, comercios y autoservicios de Argentina.
+              Cuidado adulto, incontinencia, higiene femenina y
               algodón, con stock permanente y logística propia. Atención directa
               con el fabricante y precios mayoristas para tu negocio.
             </p>
