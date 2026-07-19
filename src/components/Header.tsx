@@ -87,13 +87,11 @@ export default function Header() {
           className="flex items-center gap-3"
           onClick={() => setOpen(false)}
         >
-          <span className="grid h-11 place-items-center rounded-md bg-white px-2 py-1">
-            <img
-              src="/logo-aluso.png"
-              alt="ALUSO DISTRIBUIDORA"
-              className="h-9 w-auto object-contain"
-            />
-          </span>
+          <img
+            src="/logo-aluso.png"
+            alt="ALUSO DISTRIBUIDORA"
+            className="h-24 w-auto object-contain"
+          />
         </Link>
 
         {/* Desktop nav */}
