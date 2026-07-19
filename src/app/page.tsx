@@ -45,7 +45,7 @@ export default function LandingPage() {
               />
             </div>
 
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-blue-600 font-semibold sm:mt-6 sm:text-xl md:text-2xl">
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-blue-600 font-semibold sm:text-base md:text-lg">
               Distribuimos las marcas <strong className="font-semibold text-rose-400">Doncella</strong> y{" "}
               <strong className="font-semibold text-teal-400">Nonisec</strong> en
               farmacias, geriátricos, comercios y autoservicios del Noroeste
