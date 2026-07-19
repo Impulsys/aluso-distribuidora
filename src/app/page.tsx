@@ -1,7 +1,4 @@
-﻿"use client";
-
-import React from "react";
-import Image from "next/image";
+﻿import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
@@ -18,36 +15,6 @@ const MAPA_LINK = `https://www.google.com/maps/search/?api=1&query=${encodeURICo
 )}`;
 
 export default function LandingPage() {
-  // Herramienta de posicionamiento del logo (arrastrar + escalar)
-  const [logoX, setLogoX] = React.useState(0);
-  const [logoY, setLogoY] = React.useState(0);
-  const [logoScale, setLogoScale] = React.useState(1);
-  const [dragging, setDragging] = React.useState(false);
-  const [start, setStart] = React.useState({ x: 0, y: 0 });
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setDragging(true);
-    setStart({ x: e.clientX, y: e.clientY });
-  };
-
-  React.useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragging) return;
-      setLogoX((prev) => prev + (e.clientX - start.x));
-      setLogoY((prev) => prev + (e.clientY - start.y));
-      setStart({ x: e.clientX, y: e.clientY });
-    };
-    const handleMouseUp = () => setDragging(false);
-    if (dragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
-  }, [dragging, start]);
-
   return (
     // 4rem = alto del header. Con esto la página entra JUSTO en la pantalla.
     <div
@@ -66,15 +33,13 @@ export default function LandingPage() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
           {/* Texto a la izquierda */}
           <div>
+            {/* Logo ALUSO - posición fija (X:27 Y:0 Scale:2.05) */}
             <div className="mt-3 w-full max-w-2xl">
               <div
-                className="cursor-grab active:cursor-grabbing"
                 style={{
-                  transform: `translate(${logoX}px, ${logoY}px) scale(${logoScale})`,
+                  transform: "translate(27px, 0px) scale(2.05)",
                   transformOrigin: "left center",
-                  userSelect: "none",
                 }}
-                onMouseDown={handleMouseDown}
               >
                 <Image
                   src="/logo-aluso.png"
@@ -82,40 +47,9 @@ export default function LandingPage() {
                   width={900}
                   height={300}
                   priority
-                  draggable={false}
-                  className="w-full h-auto object-contain pointer-events-none"
+                  className="w-full h-auto object-contain"
                 />
               </div>
-            </div>
-
-            {/* Panel de control del logo */}
-            <div className="fixed bottom-4 right-4 z-50 bg-black/85 text-white p-3 rounded-lg text-xs font-mono shadow-xl">
-              <div>Logo X: <strong>{logoX}px</strong></div>
-              <div>Logo Y: <strong>{logoY}px</strong></div>
-              <div>Tamaño: <strong>{logoScale.toFixed(2)}x</strong></div>
-              <div className="mt-2 flex items-center gap-2">
-                <span>-</span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="3"
-                  step="0.05"
-                  value={logoScale}
-                  onChange={(e) => setLogoScale(parseFloat(e.target.value))}
-                  className="w-28"
-                />
-                <span>+</span>
-              </div>
-              <button
-                onClick={() => {
-                  const vals = `X:${logoX} Y:${logoY} Scale:${logoScale.toFixed(2)}`;
-                  navigator.clipboard.writeText(vals);
-                  alert("Copiado → " + vals);
-                }}
-                className="mt-2 bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded w-full"
-              >
-                Copiar valores
-              </button>
             </div>
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-blue-600 font-semibold sm:text-base md:text-lg">
