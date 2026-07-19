@@ -88,9 +88,9 @@ export default function Header() {
           onClick={() => setOpen(false)}
         >
           <img
-            src="/logo-aluso.png"
+            src="/logo-aluso-blanco.png"
             alt="ALUSO DISTRIBUIDORA"
-            className="h-24 w-auto object-contain"
+            className="h-16 w-auto object-contain"
           />
         </Link>
 
