@@ -5,7 +5,21 @@
       "public": "out",
       "cleanUrls": true,
       "trailingSlash": false,
-      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "**/@(*.html|formulario-datos-aluso|catalogo|carrito|login|contador|vendedor|reportes|terminos|privacidad)",
+          "headers": [
+            { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+          ]
+        }
+      ]
     }
   ],
   "firestore": {

@@ -117,6 +117,21 @@ service cloud.firestore {
     match /config/licencia     { allow read: if true;          allow write: if isSignedIn() && request.auth.token.email == 'axelfaber@gmail.com'; }
     match /config/{id}         { allow read: if isSignedIn();   allow write: if isSuperadmin() && id != 'licencia'; }
 
+    // ===== formularioDatos ===== (configuración inicial, la carga el cliente)
+    // Lo llenan Anabela y Luciano SIN estar logueados (todavía no tienen cuenta),
+    // así que el create es público. Solo create: nadie lee, edita ni borra desde
+    // la app — leerlo es cosa de socio/superadmin.
+    // ⚠️ Cuando terminen de cargarlo, cambiar a `allow create: if false` y el
+    //    formulario queda cerrado (evita que alguien lo spamee).
+    match /formularioDatos/{id} {
+      allow create: if request.resource.data.cuit is string
+        && request.resource.data.razonSocial is string
+        && request.resource.data.email is string
+        && request.resource.data.keys().size() <= 40;
+      allow read: if isSocioOrUp();
+      allow update, delete: if false;
+    }
+
     // Todo lo demás: denegado.
     match /{document=**} {
       allow read, write: if false;

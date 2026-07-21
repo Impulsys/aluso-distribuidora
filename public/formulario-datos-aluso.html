@@ -14,10 +14,17 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: linear-gradient(135deg, #0055cc 0%, #003d99 100%);
       min-height: 100vh;
+      /* En celular la barra del navegador cambia el alto: 100vh se pasa y deja
+         un salto raro al hacer scroll. dvh sigue el alto real. */
+      min-height: 100dvh;
       display: flex;
-      align-items: center;
+      /* Centrado vertical: con un formulario más alto que la pantalla, algunos
+         navegadores recortan la parte de arriba y no se puede scrollear hasta ella. */
+      align-items: flex-start;
       justify-content: center;
       padding: 20px;
+      /* Evita que iOS agrande el texto solo al rotar el teléfono. */
+      -webkit-text-size-adjust: 100%;
     }
     .container {
       background: white;
@@ -79,12 +86,15 @@
     }
     input, textarea, select {
       width: 100%;
-      padding: 10px 12px;
+      padding: 12px 14px;
       border: 1px solid #d6e4f5;
       border-radius: 8px;
-      font-size: 14px;
+      /* 16px NO es capricho de diseño: por debajo de 16px, Safari en iPhone hace
+         zoom automático al tocar el campo. Con 21 campos, la página salta 21
+         veces y hay que volver a achicar a mano cada vez. */
+      font-size: 16px;
       font-family: inherit;
-      transition: all 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
     input:focus, textarea:focus, select:focus {
       outline: none;
@@ -121,29 +131,64 @@
     }
     button {
       flex: 1;
-      padding: 12px;
+      /* 48px de alto mínimo: es el tamaño de objetivo táctil recomendado.
+         Antes quedaban en 41px y en el celular se erraba el toque. */
+      min-height: 48px;
+      padding: 12px 16px;
       border: none;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.2s, box-shadow 0.2s;
     }
     .btn-send {
       background: #0055cc;
       color: white;
     }
-    .btn-send:hover {
-      background: #003d99;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0, 85, 204, 0.3);
-    }
     .btn-clear {
       background: #f0f0f0;
       color: #666;
     }
-    .btn-clear:hover {
-      background: #e0e0e0;
+    /* Los :hover solo donde hay mouse. En touch se quedan "pegados" después
+       de tocar y el botón se ve activo cuando no lo está. */
+    @media (hover: hover) {
+      .btn-send:hover {
+        background: #003d99;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 85, 204, 0.3);
+      }
+      .btn-clear:hover {
+        background: #e0e0e0;
+      }
+    }
+
+    /* ===== Celular ===== */
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .container {
+        /* 40px de padding por lado se comían 80px de una pantalla de 390px. */
+        padding: 24px 18px;
+        border-radius: 12px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+      .buttons {
+        /* Apilados y con "Enviar" ARRIBA: al lado de "Limpiar" un toque errado
+           borraba todo el formulario ya cargado. */
+        flex-direction: column-reverse;
+        gap: 10px;
+      }
+      .btn-clear {
+        /* Se despinta para que no compita con el de enviar. */
+        background: transparent;
+        color: #888;
+        font-weight: 500;
+        text-decoration: underline;
+      }
     }
     .required::after {
       content: " *";
@@ -161,6 +206,23 @@
     .success-message.show {
       display: block;
     }
+    .error-message {
+      display: none;
+      background: #f8d7da;
+      border: 1px solid #f5c2c7;
+      color: #842029;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .error-message.show {
+      display: block;
+    }
+    .btn-send:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -172,10 +234,16 @@
     </div>
 
     <div class="success-message" id="successMsg">
-      ✅ Datos enviados correctamente. Axel recibirá esta información en su email.
+      ✅ <strong>Listo, los datos quedaron guardados.</strong>
+      <div style="margin-top:6px">No hace falta que hagas nada más. Podés cerrar esta ventana.</div>
+      <div style="margin-top:6px;font-size:12px;opacity:.75">Comprobante: <span id="docId"></span></div>
     </div>
 
-    <form id="dataForm" onsubmit="handleSubmit(event)">
+    <div class="error-message" id="errorMsg"></div>
+
+    <!-- El submit lo engancha el <script type="module"> del final (no puede ser
+         onsubmit inline: el módulo no expone funciones globales). -->
+    <form id="dataForm">
 
       <!-- DATOS DE CONTACTO -->
       <div class="section">
@@ -183,13 +251,13 @@
 
         <div class="form-group">
           <label class="required">Teléfono WhatsApp</label>
-          <input type="tel" name="whatsapp" placeholder="+54 9 11 2759-7572" required>
+          <input type="tel" name="whatsapp" placeholder="+54 9 11 1234-5678" required>
           <div class="note">Incluir código de país. Este número aparecerá en la app para que clientes se comuniquen</div>
         </div>
 
         <div class="form-group">
           <label class="required">Teléfono para mostrar</label>
-          <input type="tel" name="phone" placeholder="+54 9 11 2759-7572" required>
+          <input type="tel" name="phone" placeholder="+54 9 11 1234-5678" required>
         </div>
 
         <div class="form-group">
@@ -210,7 +278,9 @@
 
         <div class="form-group">
           <label class="required">CUIT de la empresa</label>
-          <input type="text" name="cuit" placeholder="20-12345678-9" required>
+          <!-- inputmode: en el celular abre el teclado numérico directamente,
+               sin tener que cambiar a números para cargar el CUIT. -->
+          <input type="text" name="cuit" inputmode="numeric" autocomplete="off" placeholder="20-12345678-9" required>
           <div class="note">Formato: XX-XXXXXXXX-X (con guiones)</div>
         </div>
 
@@ -334,24 +404,46 @@
       </div>
 
       <div class="buttons">
-        <button type="button" class="btn-clear" onclick="document.getElementById('dataForm').reset(); document.getElementById('successMsg').classList.remove('show');">
-          Limpiar
+        <!-- Pide confirmación: en el celular está a un dedo del de enviar y
+             borraba todo lo cargado sin aviso ni forma de recuperarlo. -->
+        <button type="button" class="btn-clear" onclick="if (confirm('¿Borrar todo lo que cargaste? No se puede deshacer.')) { document.getElementById('dataForm').reset(); document.getElementById('successMsg').classList.remove('show'); document.getElementById('errorMsg').classList.remove('show'); }">
+          Limpiar todo
         </button>
         <button type="submit" class="btn-send">
-          📧 Enviar datos
+          Enviar datos
         </button>
       </div>
     </form>
   </div>
 
-  <script>
-    function handleSubmit(event) {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    // Proyecto ALUSO. OJO: NO es el de Los Amigos NOA — son bases separadas
+    // y los datos de este formulario tienen que caer acá.
+    const app = initializeApp({
+      apiKey: "AIzaSyAUpRfXGGvEz14eufH72xcUVxiovPgFYkg",
+      authDomain: "aluso-distribuidora.firebaseapp.com",
+      projectId: "aluso-distribuidora",
+      storageBucket: "aluso-distribuidora.firebasestorage.app",
+      messagingSenderId: "620414958738",
+      appId: "1:620414958738:web:d944272c3f8399b0ed3a4b",
+    });
+    const db = getFirestore(app);
+
+    const form   = document.getElementById('dataForm');
+    const okMsg  = document.getElementById('successMsg');
+    const errMsg = document.getElementById('errorMsg');
+    const btn    = form.querySelector('.btn-send');
+
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const form = document.getElementById('dataForm');
       const formData = new FormData(form);
 
-      // Crear el cuerpo del email
+      // Resumen legible: para leer la respuesta de un vistazo sin ir campo por campo.
       const body = `
 ALUSO DISTRIBUIDORA — Datos de configuración
 ═══════════════════════════════════════════
@@ -399,18 +491,43 @@ ${formData.get('condicionesPago') || '(no especificado)'}
 ${formData.get('comentarios') || '(ninguno)'}
       `;
 
-      // Crear mailto link
-      const subject = encodeURIComponent('ALUSO DISTRIBUIDORA — Datos de configuración');
-      const mailtoLink = `mailto:axelfaber@gmail.com?subject=${subject}&body=${encodeURIComponent(body)}`;
+      okMsg.classList.remove('show');
+      errMsg.classList.remove('show');
+      btn.disabled = true;
+      btn.textContent = 'Guardando…';
 
-      // Abrir cliente de email
-      window.location.href = mailtoLink;
+      // Se guardan TODOS los campos del form sin enumerarlos uno por uno: si
+      // mañana se agrega una pregunta, se guarda sola y no se pierde nada.
+      const datos = Object.fromEntries(formData.entries());
 
-      // Mostrar mensaje de éxito
-      setTimeout(() => {
-        document.getElementById('successMsg').classList.add('show');
-      }, 500);
-    }
+      try {
+        const ref = await addDoc(collection(db, 'formularioDatos'), {
+          ...datos,
+          resumen: body,
+          enviadoEl: serverTimestamp(),
+          userAgent: navigator.userAgent,
+        });
+
+        document.getElementById('docId').textContent = ref.id;
+        okMsg.classList.add('show');
+        okMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        btn.textContent = '✅ Guardado';
+        form.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
+      } catch (err) {
+        // Nada de éxito falso: si no se guardó, se dice. Y no se limpia el
+        // formulario, así lo que escribieron sigue en pantalla para reintentar.
+        errMsg.innerHTML =
+          '<strong>❌ No se pudo guardar.</strong>' +
+          '<div style="margin-top:6px">NO cierres esta ventana — lo que cargaste sigue acá. ' +
+          'Probá de nuevo en un minuto; si vuelve a fallar, sacá una captura de pantalla y mandásela a Axel.</div>' +
+          '<div style="margin-top:6px;font-size:12px;opacity:.75">Detalle técnico: ' +
+          String(err && err.message ? err.message : err) + '</div>';
+        errMsg.classList.add('show');
+        errMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        btn.disabled = false;
+        btn.textContent = 'Enviar datos';
+      }
+    });
   </script>
 </body>
 </html>
