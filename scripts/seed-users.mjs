@@ -6,6 +6,21 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 const sa = JSON.parse(readFileSync(new URL("../serviceAccountKey.json", import.meta.url)));
+
+// 🛑 Candado de proyecto. La llave que había acá era la de
+// `distribuidora-los-amigos-noa` (OTRO cliente, en producción): este script le
+// habría creado/pisado usuarios. Si la llave no es la de ALUSO, no arranca.
+const PROYECTO_ESPERADO = "aluso-distribuidora";
+if (sa.project_id !== PROYECTO_ESPERADO) {
+  console.error(
+    `\n🛑 ABORTADO: serviceAccountKey.json es del proyecto "${sa.project_id}",\n` +
+      `   y este script solo puede correr contra "${PROYECTO_ESPERADO}".\n` +
+      `   Bajá la llave de ALUSO desde:\n` +
+      `   https://console.firebase.google.com/project/${PROYECTO_ESPERADO}/settings/serviceaccounts/adminsdk\n`
+  );
+  process.exit(1);
+}
+
 initializeApp({ credential: cert(sa) });
 
 const auth = getAuth();
@@ -13,9 +28,9 @@ const db = getFirestore();
 
 const PASSWORD = "987654";
 const USERS = [
-  { email: "maxi@dlanoa.com", displayName: "Maxi", role: "superadmin" },
-  { email: "socios@dlanoa.com", displayName: "Socios", role: "socio" },
-  { email: "vendedor@dlanoa.com", displayName: "Vendedor", role: "vendedor" },
+  { email: "axel@alusodistribuidora.web.app", displayName: "Axel", role: "superadmin" },
+  { email: "socios@alusodistribuidora.web.app", displayName: "Socios", role: "socio" },
+  { email: "vendedor@alusodistribuidora.web.app", displayName: "Vendedor", role: "vendedor" },
 ];
 
 for (const u of USERS) {

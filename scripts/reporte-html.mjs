@@ -145,7 +145,7 @@ const curva = (id) => {
 
 const TONOS = ["var(--accent)", "var(--accent-2)", "var(--accent-3)"];
 
-const html = `<title>Ventas y stock · Distribuidora Los Amigos NOA</title>
+const html = `<title>Ventas y stock · ALUSO DISTRIBUIDORA</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -307,7 +307,7 @@ const html = `<title>Ventas y stock · Distribuidora Los Amigos NOA</title>
 </style>
 
 <div class="doc">
-  <p class="eyebrow">Distribuidora Los Amigos NOA</p>
+  <p class="eyebrow">ALUSO DISTRIBUIDORA</p>
   <h1>Ventas y stock, remito por remito</h1>
   <p class="lede">Del martes 7 al jueves 16 de julio de 2026 · ${totRemitos} remitos emitidos</p>
 

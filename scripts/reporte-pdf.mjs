@@ -17,7 +17,7 @@ const db = getFirestore();
 
 const OUT =
   process.argv[2] ||
-  "C:/Users/Axel/Desktop/Los Amigos NOA - Ventas y Stock.pdf";
+  "C:/Users/Axel/Desktop/ALUSO - Ventas y Stock.pdf";
 const LOGO = new URL("../public/icons/icon-192.png", import.meta.url);
 
 // Branding real de la app
@@ -220,7 +220,7 @@ doc
   .fillColor("#ffffff")
   .font("Helvetica-Bold")
   .fontSize(19)
-  .text("Distribuidora Los Amigos", X + 72, 34);
+  .text("ALUSO DISTRIBUIDORA", X + 72, 34);
 doc
   .font("Helvetica")
   .fontSize(9.5)
@@ -534,7 +534,11 @@ for (let i = 0; i < rango.count; i++) {
     .fontSize(6.5)
     .fillColor(GRIS)
     .text(
-      `Distribuidora Los Amigos NOA · Balcarce 836, La Quiaca, Jujuy · Generado el ${new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })}`,
+      // El pie decía "ALUSO DISTRIBUIDORA · Balcarce 836, La Quiaca,
+      // Jujuy": los reportes de ALUSO salían firmados con el nombre y el
+      // domicilio de OTRA distribuidora. El domicilio se agrega recién cuando
+      // el cliente lo cargue (variable BUSINESS_ADDRESS).
+      `ALUSO DISTRIBUIDORA${process.env.BUSINESS_ADDRESS ? " · " + process.env.BUSINESS_ADDRESS : ""} · Generado el ${new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" })}`,
       X,
       py + 8,
       { width: W - 60 }

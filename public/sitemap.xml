@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://distribuidora-los-amigos-noa.web.app/</loc>
+    <loc>https://alusodistribuidora.web.app/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://distribuidora-los-amigos-noa.web.app/catalogo</loc>
+    <loc>https://alusodistribuidora.web.app/catalogo</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://distribuidora-los-amigos-noa.web.app/catalogo?marca=doncella</loc>
+    <loc>https://alusodistribuidora.web.app/catalogo?marca=doncella</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://distribuidora-los-amigos-noa.web.app/catalogo?marca=nonisec</loc>
+    <loc>https://alusodistribuidora.web.app/catalogo?marca=nonisec</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://distribuidora-los-amigos-noa.web.app/terminos</loc>
+    <loc>https://alusodistribuidora.web.app/terminos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://distribuidora-los-amigos-noa.web.app/privacidad</loc>
+    <loc>https://alusodistribuidora.web.app/privacidad</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

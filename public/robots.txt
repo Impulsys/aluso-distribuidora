@@ -6,4 +6,4 @@ Disallow: /reportes
 Disallow: /carrito
 Disallow: /login
 
-Sitemap: https://distribuidora-los-amigos-noa.web.app/sitemap.xml
+Sitemap: https://alusodistribuidora.web.app/sitemap.xml

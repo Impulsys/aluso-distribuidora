@@ -51,12 +51,15 @@ export default function CatalogoPage() {
             </h1>
             <p className="mt-2 text-brand-dark/70">
               Línea femenina, bebé y de incontinencia adulta. Productos
-              Lenterdit al mejor precio mayorista del NOA. Armá tu pedido y
+              Lenterdit al mejor precio mayorista. Armá tu pedido y
               enviálo por WhatsApp en segundos.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <StatPill icon="📦" label="80+ productos" iconBg="bg-emerald-500/90" />
-              <StatPill icon="🚚" label="Entrega en NOA" iconBg="bg-amber-500/90" />
+              {/* Era "Entrega en NOA", la zona de Los Amigos NOA. La de ALUSO
+                  todavía no está definida, así que se usa lo que sí afirma la
+                  landing: logística propia. */}
+              <StatPill icon="🚚" label="Logística propia" iconBg="bg-amber-500/90" />
               <StatPill
                 icon={<WhatsAppIcon className="h-4 w-4 text-white" />}
                 label="Pedido por WhatsApp"

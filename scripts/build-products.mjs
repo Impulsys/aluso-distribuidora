@@ -226,10 +226,10 @@ for (const [from, to] of logosToCopy) {
 const lines = [
   `import type { Product } from "@/lib/types";`,
   ``,
-  `// Catálogo REAL — datos del cliente (Distribuidora Los Amigos NOA).`,
+  `// Catálogo REAL — datos del cliente (ALUSO DISTRIBUIDORA).`,
   `// Generado automáticamente por scripts/build-products.mjs.`,
   `// Marcas: Doncella (femenino / bebé) y Nonisec (adultos / incontinencia), proveedor Lenterdit.`,
-  `// precioVenta=0 → la UI muestra "Consultar precio" (Maxi carga los precios reales desde Admin).`,
+  `// precioVenta=0 → la UI muestra "Consultar precio" (el cliente carga los precios reales desde Admin).`,
   ``,
   `export const PRODUCTOS_SEED: Product[] = [`,
 ];

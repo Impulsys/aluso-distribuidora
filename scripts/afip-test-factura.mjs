@@ -10,8 +10,25 @@ import soap from "soap";
 import axios from "axios";
 import { XMLParser } from "fast-xml-parser";
 
-const CUIT = 20250642114;
-const PTO_VTA = 6;
+// 🛑 Este CUIT venía HARDCODEADO con 20250642114, que es el de Distribuidora
+//    Los Amigos NOA (otro cliente). Correr esto para ALUSO operaba en ARCA
+//    contra el contribuyente equivocado. Ahora sale de una variable y si no
+//    está, el script no arranca.
+//    Uso:  AFIP_CUIT=30xxxxxxxxx node <este-script>
+const CUIT = process.env.AFIP_CUIT;
+if (!CUIT || String(CUIT).length !== 11) {
+  console.error("");
+  console.error("🛑 ABORTADO: falta AFIP_CUIT (11 dígitos, sin guiones).");
+  console.error("   Ej: AFIP_CUIT=30123456789 node " + process.argv[1]);
+  console.error("");
+  process.exit(1);
+}
+// El punto de venta 6 era el de Los Amigos NOA.
+const PTO_VTA = Number(process.env.AFIP_PTO_VENTA);
+if (!Number.isInteger(PTO_VTA) || PTO_VTA <= 0) {
+  console.error("🛑 ABORTADO: falta AFIP_PTO_VENTA.");
+  process.exit(1);
+}
 const TIPO = 6; // Factura B
 const TOTAL = 1; // $1
 const WSAA_URL = "https://wsaa.afip.gov.ar/ws/services/LoginCms?wsdl";
@@ -25,7 +42,7 @@ const httpsAgent = new https.Agent({
 const soapOpts = { request: axios.create({ httpsAgent }) };
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "afip");
-const certPem = readFileSync(join(dir, "losamigos.crt"), "utf8");
+const certPem = readFileSync(join(dir, "aluso.crt"), "utf8");
 const keyPem = readFileSync(join(dir, "private.key"), "utf8");
 
 function arDate(d) {

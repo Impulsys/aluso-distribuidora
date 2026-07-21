@@ -1,6 +1,6 @@
-// Service Worker — Distribuidora Los Amigos NOA
+// Service Worker — ALUSO DISTRIBUIDORA
 // network-first SIEMPRE (online trae lo último; cache solo como respaldo offline).
-const CACHE = "dlanoa-v3";
+const CACHE = "aluso-v1";
 const SHELL = [
   "/",
   "/catalogo",

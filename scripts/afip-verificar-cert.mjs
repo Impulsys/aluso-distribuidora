@@ -1,4 +1,4 @@
-// Verifica que el certificado (afip/losamigos.crt) corresponda a la clave
+// Verifica que el certificado (afip/aluso.crt) corresponda a la clave
 // privada (afip/private.key): compara el módulo RSA y muestra el subject/fechas.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import forge from "node-forge";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "afip");
-const certPem = readFileSync(join(dir, "losamigos.crt"), "utf8");
+const certPem = readFileSync(join(dir, "aluso.crt"), "utf8");
 const keyPem = readFileSync(join(dir, "private.key"), "utf8");
 
 const cert = forge.pki.certificateFromPem(certPem);

@@ -31,7 +31,7 @@ export default function Footer() {
               <p className="font-serif text-lg font-medium">
                 ALUSO DISTRIBUIDORA
               </p>
-              <p className="text-xs text-white/60">NOA · Argentina</p>
+              <p className="text-xs text-white/60">Argentina</p>
             </div>
           </div>
           <p className="mt-4 text-sm text-white/70">

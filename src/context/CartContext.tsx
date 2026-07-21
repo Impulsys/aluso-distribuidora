@@ -20,7 +20,7 @@ interface CartState {
 }
 
 const CartContext = createContext<CartState | undefined>(undefined);
-const STORAGE_KEY = "dlanoa_cart";
+const STORAGE_KEY = "aluso_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);

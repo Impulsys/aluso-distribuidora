@@ -35,7 +35,7 @@ const COLECCIONES_A_LIMPIAR = [
 ];
 
 async function cleanupData() {
-  console.log('🧹 Iniciando limpieza de datos de Los Amigos...\n');
+  console.log('🧹 Iniciando limpieza de datos...\n');
 
   try {
     // 1. Limpiar colecciones

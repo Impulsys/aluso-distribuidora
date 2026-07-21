@@ -1,7 +1,7 @@
-﻿{
+{
   "name": "ALUSO DISTRIBUIDORA",
   "short_name": "ALUSO",
-  "description": "Distribuidora mayorista del NOA — Doncella & Nonisec. Catálogo, pedidos por WhatsApp y panel B2B.",
+  "description": "Distribuidora mayorista — Doncella & Nonisec. Catálogo, pedidos por WhatsApp y panel B2B.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

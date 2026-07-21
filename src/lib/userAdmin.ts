@@ -6,17 +6,21 @@ import { functions } from "./firebase";
 import { logActivity } from "./bitacora";
 import { ROLE_LABELS, type Role } from "./types";
 
-// Dominio sintético: las cuentas creadas por usuario son `usuario@dlanoa.com`.
+// Dominio sintético: las cuentas creadas por usuario son
+// `usuario@alusodistribuidora.web.app`. El usuario nunca lo escribe (ingresa
+// solo "vendedor1"), pero queda visible en la consola de Auth.
+// Era `dlanoa.com`, de Distribuidora Los Amigos NOA: los usuarios de ALUSO
+// terminaban con el dominio de otro cliente. Se usa el dominio propio.
 // Debe coincidir con USER_DOMAIN en functions/src/index.ts y con el login.
-export const USER_DOMAIN = "dlanoa.com";
+export const USER_DOMAIN = "alusodistribuidora.web.app";
 
-/** "vendedor1" → "vendedor1@dlanoa.com". Un email completo se deja igual. */
+/** "vendedor1" → "vendedor1@alusodistribuidora.web.app". Un email completo se deja igual. */
 export function usernameToEmail(input: string): string {
   const v = input.trim();
   return v.includes("@") ? v : `${v.toLowerCase()}@${USER_DOMAIN}`;
 }
 
-/** "vendedor1@dlanoa.com" → "vendedor1". Otros emails se devuelven igual. */
+/** "vendedor1@alusodistribuidora.web.app" → "vendedor1". Otros emails se devuelven igual. */
 export function emailToUsername(email: string): string {
   return email.endsWith(`@${USER_DOMAIN}`)
     ? email.slice(0, -(USER_DOMAIN.length + 1))

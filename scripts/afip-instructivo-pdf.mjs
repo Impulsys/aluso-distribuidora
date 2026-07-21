@@ -3,8 +3,11 @@
 import PDFDocument from "pdfkit";
 import { createWriteStream } from "node:fs";
 
+// Antes apuntaba a "Desktop/Maximo ARCA/", carpeta de Máximo, el dueño de
+// Distribuidora Los Amigos NOA. Además fallaba con ENOENT si esa carpeta no
+// existía. Ahora va al Escritorio y se puede pisar por argumento.
 const OUT =
-  "C:/Users/Axel/Desktop/Maximo ARCA/Instructivo ARCA.pdf";
+  process.argv[2] || "C:/Users/Axel/Desktop/ALUSO - Instructivo ARCA.pdf";
 
 const VIOLETA = "#6b46a8";
 const GRIS = "#444444";
@@ -40,7 +43,7 @@ doc
   .font("Helvetica")
   .fontSize(11)
   .text(
-    "Para habilitar la facturación electrónica por Web Service (WSFE) hay que realizar estos pasos en el portal de ARCA, con la clave fiscal del titular. Se adjunta el archivo «losamigos.csr».",
+    "Para habilitar la facturación electrónica por Web Service (WSFE) hay que realizar estos pasos en el portal de ARCA, con la clave fiscal del titular. Se adjunta el archivo «aluso.csr».",
     { align: "left", lineGap: 2 }
   );
 doc.moveDown(1);
@@ -62,8 +65,8 @@ function paso(n, titulo, lineas) {
 
 paso(1, "Generar el certificado digital", [
   "Ingresar a ARCA → «Administración de Certificados Digitales».",
-  "Crear un alias (por ejemplo: losamigos).",
-  "Subir el archivo adjunto «losamigos.csr».",
+  "Crear un alias (por ejemplo: aluso).",
+  "Subir el archivo adjunto «aluso.csr».",
   "Descargar el certificado (.crt) que genera ARCA.",
 ]);
 

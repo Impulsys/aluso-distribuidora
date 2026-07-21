@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 //  Genera:
 //    afip/private.key        → clave privada RSA 2048 (SECRETA, queda con vos)
-//    afip/losamigos.csr      → pedido de certificado (ESTO se sube a ARCA)
+//    afip/aluso.csr      → pedido de certificado (ESTO se sube a ARCA)
 //
 //  Uso:
 //    node scripts/afip-generar-claves.mjs "RAZON SOCIAL LEGAL EXACTA"
@@ -18,11 +18,23 @@ import { dirname, join } from "node:path";
 import forge from "node-forge";
 
 // ---- Datos del contribuyente (Distribuidora Los Amigos) --------------------
-const CUIT = "20250642114"; // CUIT del titular (validado, dígito verificador OK)
+// 🛑 Este CUIT venía HARDCODEADO con 20250642114, que es el de Distribuidora
+//    Los Amigos NOA (otro cliente). Correr esto para ALUSO operaba en ARCA
+//    contra el contribuyente equivocado. Ahora sale de una variable y si no
+//    está, el script no arranca.
+//    Uso:  AFIP_CUIT=30xxxxxxxxx node <este-script>
+const CUIT = process.env.AFIP_CUIT;
+if (!CUIT || String(CUIT).length !== 11) {
+  console.error("");
+  console.error("🛑 ABORTADO: falta AFIP_CUIT (11 dígitos, sin guiones).");
+  console.error("   Ej: AFIP_CUIT=30123456789 node " + process.argv[1]);
+  console.error("");
+  process.exit(1);
+}
 const PAIS = "AR";
 
 const razonSocial = (process.argv[2] || "").trim();
-const alias = (process.argv[3] || "losamigos").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+const alias = (process.argv[3] || "aluso").trim().replace(/[^a-zA-Z0-9_-]/g, "");
 
 if (!razonSocial) {
   console.error(

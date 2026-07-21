@@ -206,7 +206,7 @@ export default function AdminUsuariosPage() {
               required
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Maxi Pérez"
+              placeholder="Juan Pérez"
               className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
             />
           </div>
@@ -219,7 +219,7 @@ export default function AdminUsuariosPage() {
               autoCorrect="off"
               value={usuario}
               onChange={(e) => setUsuario(e.target.value)}
-              placeholder="maxi"
+              placeholder="jperez"
               className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
             />
           </div>

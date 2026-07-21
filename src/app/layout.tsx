@@ -20,14 +20,17 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   metadataBase: new URL("https://alusodistribuidora.web.app"),
   title: {
-    default: "ALUSO DISTRIBUIDORA · Mayorista del NOA",
+    // "Mayorista del NOA" era de Distribuidora Los Amigos NOA (La Quiaca, Jujuy).
+    // ALUSO no es del NOA: la landing dice "de Argentina" y su zona todavía no
+    // está definida, así que acá no se afirma una región.
+    default: "ALUSO DISTRIBUIDORA · Distribuidora mayorista",
     template: "%s · ALUSO DISTRIBUIDORA",
   },
   description:
-    "Distribuidora mayorista del Noroeste argentino. Doncella y Nonisec (Lenterdit): cuidado adulto, incontinencia, higiene femenina y bebé para farmacias, geriátricos y comercios.",
+    "Distribuidora mayorista en Argentina. Doncella y Nonisec (Lenterdit): cuidado adulto, incontinencia, higiene femenina y bebé para farmacias, geriátricos y comercios.",
   keywords: [
     "distribuidora mayorista",
-    "NOA",
+    "Argentina",
     "Doncella",
     "Nonisec",
     "Lenterdit",
@@ -50,9 +53,9 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_AR",
     siteName: "ALUSO DISTRIBUIDORA",
-    title: "ALUSO DISTRIBUIDORA · Mayorista del NOA",
+    title: "ALUSO DISTRIBUIDORA · Distribuidora mayorista",
     description:
-      "Doncella y Nonisec al mejor precio mayorista del NOA. Pedidos por WhatsApp en segundos.",
+      "Doncella y Nonisec al mejor precio mayorista. Pedidos por WhatsApp en segundos.",
     images: [
       {
         url: "/icons/icon-512.png",
@@ -66,7 +69,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ALUSO DISTRIBUIDORA",
     description:
-      "Doncella y Nonisec al mejor precio mayorista del NOA.",
+      "Doncella y Nonisec al mejor precio mayorista.",
     images: ["/icons/icon-512.png"],
   },
   icons: {
