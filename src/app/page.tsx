@@ -18,13 +18,27 @@ export default function LandingPage() {
   return (
     // 4rem = alto del header. Con esto la página entra JUSTO en la pantalla.
     <div
-      className="flex h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-cover bg-center bg-no-repeat relative"
+      // bg-left en celular: la foto es panorámica y con bg-center el recorte
+      // dejaba el paquete de Doncella JUSTO detrás del texto, ilegible. Sobre
+      // el borde izquierdo la imagen es lisa. En desktop entra entera y va centrada.
+      // El diseño original era alto FIJO + overflow-hidden ("una sola pantalla").
+      // Eso funcionaba mientras el pie estaba vacío; al cargar la dirección real
+      // aparece el mapa, el pie crece y el overflow-hidden lo RECORTABA — se
+      // perdían dirección, WhatsApp y mail, que es justo lo que hay que mostrar.
+      // Ahora es min-height: el hero sigue ocupando la pantalla entera, pero si
+      // el contenido no entra se scrollea en vez de cortarse.
+      className="flex min-h-[calc(100dvh-4rem)] flex-col bg-cover bg-left md:bg-center bg-no-repeat relative"
       style={{
         backgroundImage: 'url(/bg-warehouse.png)',
       }}
     >
-      {/* Overlay sutil para legibilidad de texto */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/20 to-transparent pointer-events-none"></div>
+      {/* Overlay para legibilidad. El degradé horizontal servía en desktop
+          (texto a la izquierda); en celular el texto ocupa todo el ancho, así
+          que ahí se usa un velo claro parejo que sostiene el texto azul. */}
+      {/* OJO: `bg-white/70` es background-COLOR y el degradé es background-IMAGE,
+          así que NO se pisan entre sí. Sin `md:bg-transparent` el velo blanco
+          seguía aplicándose en desktop y lavaba la foto. */}
+      <div className="absolute inset-0 bg-white/70 md:bg-transparent md:bg-gradient-to-r md:from-black/40 md:via-black/20 md:to-transparent pointer-events-none"></div>
 
       {/* Contenido relativo al overlay */}
       <div className="relative z-10 flex flex-1 flex-col">
@@ -33,13 +47,13 @@ export default function LandingPage() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-5 py-6 sm:px-6 md:grid-cols-2 md:gap-12 md:py-8">
           {/* Texto a la izquierda */}
           <div>
-            {/* Logo ALUSO - posición fija (X:27 Y:0 Scale:2.05) */}
+            {/* Logo ALUSO. El scale(2.05) se ajustó a ojo en desktop, pero con
+                origen a la izquierda hacía que en un celular de 320px el logo
+                midiera el doble del ancho de pantalla y se cortara ("A... Dis").
+                Ahora el zoom aplica solo de md para arriba. */}
             <div className="mt-3 w-full max-w-2xl">
               <div
-                style={{
-                  transform: "translate(27px, 0px) scale(2.05)",
-                  transformOrigin: "left center",
-                }}
+                className="origin-left md:[transform:translate(27px,0px)_scale(2.05)]"
               >
                 <Image
                   src="/logo-aluso.png"
@@ -54,7 +68,10 @@ export default function LandingPage() {
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-blue-600 font-semibold sm:text-base md:text-lg">
               Distribuimos las marcas <strong className="font-semibold text-rose-400">Doncella</strong> y{" "}
-              <strong className="font-semibold text-teal-400">Nonisec</strong> en
+              {/* Verde de la marca Nonisec (caja Protección Adulta), el que pidió
+                  el cliente. Inclina al verde (G>B), no es el turquesa puro que
+                  había antes. Contraste sobre el fondo claro: 4,8:1, pasa AA. */}
+              <strong className="font-semibold text-[#146B60]">Nonisec</strong> en
               farmacias, geriátricos, comercios y autoservicios de Argentina.
               Cuidado adulto, incontinencia, higiene femenina y
               algodón, con stock permanente y logística propia. Atención directa
@@ -117,20 +134,30 @@ export default function LandingPage() {
                   </a>
                 </li>
               )}
+              {/* Mismo criterio que Footer.tsx: si todavía no hay datos, se dice
+                  que están pendientes en vez de dejar el bloque vacío. */}
+              {!ADDRESS && !WA_NUMBER && !EMAIL && (
+                <li className="text-xs italic text-white/45">
+                  Datos de contacto pendientes de configuración
+                </li>
+              )}
             </ul>
           </div>
 
-          {/* Mapa a la derecha */}
-          <div className="overflow-hidden rounded-xl ring-1 ring-white/15">
-            <iframe
-              src={MAPA_SRC}
-              title="Ubicación de ALUSO DISTRIBUIDORA"
-              className="h-[130px] w-full border-0 sm:h-[150px]"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-            />
-          </div>
+          {/* Mapa a la derecha. Solo si hay dirección cargada: sin ella el
+              embed queda en `maps?q=` vacío y muestra un mapa roto. */}
+          {ADDRESS && (
+            <div className="overflow-hidden rounded-xl ring-1 ring-white/15">
+              <iframe
+                src={MAPA_SRC}
+                title="Ubicación de ALUSO DISTRIBUIDORA"
+                className="h-[130px] w-full border-0 sm:h-[150px]"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+          )}
         </div>
       </footer>
       </div>

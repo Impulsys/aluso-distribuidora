@@ -13,6 +13,3 @@ export function waLink(mensaje: string): string {
   return `https://wa.me/${NUMBER}?text=${encodeURIComponent(mensaje)}`;
 }
 
-export function waNumber(): string {
-  return NUMBER;
-}

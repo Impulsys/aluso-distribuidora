@@ -4,10 +4,8 @@ import {
   collection,
   doc,
   onSnapshot,
-  getDocs,
   query,
   where,
-  limit,
   runTransaction,
   updateDoc,
 } from "firebase/firestore";
@@ -262,19 +260,6 @@ export function subscribeRemitosRange(
   });
 }
 
-export async function getRemitoByNumero(
-  numero: string
-): Promise<Remito | null> {
-  const q = query(
-    collection(db, "remitos"),
-    where("numero", "==", numero.trim()),
-    limit(1)
-  );
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { ...(d.data() as Remito), id: d.id };
-}
 
 /*
  * NO agregues acá una `crearFactura()` que escriba en `facturas` desde el

@@ -10,7 +10,6 @@ import {
   onSnapshot,
   query,
   where,
-  limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { logActivity } from "./bitacora";
@@ -66,17 +65,6 @@ export async function createProveedor(
   return ref.id;
 }
 
-export async function updateProveedor(
-  id: string,
-  patch: Partial<NewProveedorInput>
-): Promise<void> {
-  await updateDoc(doc(db, "proveedores", id), clean(patch));
-  logActivity("Editó proveedor", {
-    detalle: patch.nombre,
-    entidad: "proveedor",
-    entidadId: id,
-  });
-}
 
 export async function deleteProveedor(id: string): Promise<void> {
   await deleteDoc(doc(db, "proveedores", id));
@@ -276,19 +264,3 @@ export function deudaGlobal(
   return Object.values(porProveedor).reduce((s, deuda) => s + Math.max(0, deuda), 0);
 }
 
-/** Saldo a favor total (lo que pagamos de más, por proveedor). Informativo. */
-export function saldoAFavorGlobal(
-  purchases: Purchase[],
-  payments: SupplierPayment[]
-): number {
-  const porProveedor: Record<string, number> = {};
-  for (const p of purchases) {
-    porProveedor[p.proveedorId] =
-      (porProveedor[p.proveedorId] ?? 0) + (p.monto || 0);
-  }
-  for (const p of payments) {
-    porProveedor[p.proveedorId] =
-      (porProveedor[p.proveedorId] ?? 0) - (p.monto || 0);
-  }
-  return Object.values(porProveedor).reduce((s, deuda) => s + Math.max(0, -deuda), 0);
-}

@@ -6,15 +6,15 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { usernameToEmail } from "@/lib/userAdmin";
 
-// Usuarios de prueba (MODO DEMO)
-const DEMO_USERS = [
-  { label: "👨‍💼 Superadmin (Anabela)", email: "superadmin@aluso.test", password: "SuperAdmin123!" },
-  { label: "👔 Socio (Luciano)", email: "socio@aluso.test", password: "Socio123!" },
-  { label: "📦 Depósito (Juan)", email: "deposito@aluso.test", password: "Deposito123!" },
-  { label: "💼 Vendedor Base (Carlos)", email: "vendedor@aluso.test", password: "Vendedor123!" },
-  { label: "⭐ Vendedor Premium (María)", email: "vendedor.premium@aluso.test", password: "VendedorPremium123!" },
-  { label: "🛒 Cliente (Roberto)", email: "cliente@aluso.test", password: "Cliente123!" },
-];
+// Acá había un "MODO DEMO": una lista de usuarios de prueba con sus contraseñas
+// (superadmin@aluso.test / SuperAdmin123!, etc.) y un desplegable en el login
+// que las autocompletaba de un click. Dos problemas:
+//   1. Iba en el bundle del cliente, así que las contraseñas eran PÚBLICAS.
+//   2. Le mostraba al cliente un acceso "Superadmin (Anabela)" en la pantalla
+//      de ingreso, invitando a probarlo.
+// Las cuentas nunca llegaron a existir en Auth (se verificó), así que no hubo
+// puerta trasera abierta — pero si alguien las creaba, quedaba servida.
+// Si hace falta un usuario de prueba, se crea desde el panel de usuarios.
 
 export default function LoginPage() {
   const { signInEmail, signUpEmail, signInGoogle, resetPassword, user } =
@@ -27,11 +27,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
-
-  const handleSelectDemoUser = (demoUser: typeof DEMO_USERS[0]) => {
-    setEmail(demoUser.email);
-    setPassword(demoUser.password);
-  };
 
   if (user) {
     return (
@@ -127,27 +122,6 @@ export default function LoginPage() {
 
         {mode === "login" ? (
           <form onSubmit={handleEmail} className="mt-6 space-y-4">
-            {/* MODO DEMO: Selector de usuarios de prueba */}
-            <div className="rounded-lg bg-sky-50 p-3 border border-sky-200">
-              <label className="block text-xs font-bold uppercase tracking-wide text-sky-900 mb-2">
-                🧪 Modo Demo — Usuarios de prueba
-              </label>
-              <select
-                onChange={(e) => {
-                  const selected = DEMO_USERS.find(u => u.email === e.target.value);
-                  if (selected) handleSelectDemoUser(selected);
-                }}
-                className="w-full rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-              >
-                <option value="">← Seleccionar rol para ingresar rápido</option>
-                {DEMO_USERS.map((user) => (
-                  <option key={user.email} value={user.email}>
-                    {user.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label className="block text-sm font-medium">Usuario</label>
               <input

@@ -1,6 +1,6 @@
 // Caja diaria: cierre con arqueo por denominación.
 // El doc vive en cashClosings/{YYYY-MM-DD} (mismo que la caja inicial).
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { dayKey, type DailyCashInitial } from "./cash-initial";
 import { logActivity } from "./bitacora";
@@ -153,10 +153,3 @@ export function subscribeCierre(
   });
 }
 
-/** Lee el cierre de un día (one-shot). */
-export async function getCierre(
-  dayTs: number
-): Promise<DailyCashInitial | null> {
-  const snap = await getDoc(doc(db, "cashClosings", dayKey(dayTs)));
-  return snap.exists() ? (snap.data() as DailyCashInitial) : null;
-}

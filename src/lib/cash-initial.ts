@@ -3,8 +3,6 @@ import {
   doc,
   setDoc,
   onSnapshot,
-  query,
-  where,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -65,24 +63,3 @@ export function subscribeCierres(
   });
 }
 
-export function subscribeCashInitialRange(
-  startTs: number,
-  endTs: number,
-  cb: (map: Record<string, number>) => void
-): () => void {
-  const q = query(
-    collection(db, "cashClosings"),
-    where("fecha", ">=", startTs),
-    where("fecha", "<", endTs)
-  );
-  return onSnapshot(q, (snap) => {
-    const map: Record<string, number> = {};
-    snap.docs.forEach((d) => {
-      const data = d.data() as DailyCashInitial;
-      if (typeof data.cajaInicial === "number") {
-        map[d.id] = data.cajaInicial;
-      }
-    });
-    cb(map);
-  });
-}
