@@ -1,6 +1,7 @@
 ﻿/**
  * Integración AFIP/ARCA (WSAA + WSFEv1) para facturación electrónica.
- * Producción. ALUSO DISTRIBUIDORA — CUIT 20250642114 (RI), Pto vta 6.
+ * Producción. ALUSO DISTRIBUIDORA. CUIT y punto de venta NO van acá: vienen de
+ * los secretos AFIP_CUIT / AFIP_PTO_VENTA (antes estaba el CUIT de Los Amigos).
  *
  * Flujo: WSAA (firma CMS con cert+clave → Ticket de Acceso, cacheado) →
  * WSFE FECompUltimoAutorizado (próx. número) → FECAESolicitar (pide CAE) →

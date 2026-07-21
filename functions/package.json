@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "functions",
   "description": "Cloud Functions — ALUSO DISTRIBUIDORA (gestión de usuarios)",
   "main": "lib/index.js",

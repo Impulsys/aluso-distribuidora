@@ -18,13 +18,25 @@ import { requestCAE, buildAfipQrUrl, fechaHoyAfip, type IvaEntry } from "./afip"
 initializeApp();
 
 // ===== Config AFIP (producción) — ALUSO DISTRIBUIDORA =====
-const AFIP_CUIT = 20250642114;
-const AFIP_PTO_VENTA = 6;
+// ⚠️ Acá había `AFIP_CUIT = 20250642114` y `AFIP_PTO_VENTA = 6` HARDCODEADOS,
+//    que son el CUIT y el punto de venta de Distribuidora Los Amigos NOA (el
+//    proyecto del que se clonó esto), pese a que el comentario decía ALUSO.
+//    Con eso, emitirFactura de ALUSO emitía comprobantes electrónicos contra el
+//    CUIT de OTRA empresa en ARCA.
+//    Ahora son secretos: si no están cargados, la función aborta y no factura.
+//    Cargar cuando el cliente devuelva el formulario y tenga su certificado:
+//      firebase functions:secrets:set AFIP_CUIT       --project aluso-distribuidora
+//      firebase functions:secrets:set AFIP_PTO_VENTA  --project aluso-distribuidora
+//      firebase functions:secrets:set AFIP_CERT       --project aluso-distribuidora
+//      firebase functions:secrets:set AFIP_KEY        --project aluso-distribuidora
+const AFIP_CUIT = defineSecret("AFIP_CUIT");
+const AFIP_PTO_VENTA = defineSecret("AFIP_PTO_VENTA");
 const AFIP_CERT = defineSecret("AFIP_CERT"); // .crt en base64
 const AFIP_KEY = defineSecret("AFIP_KEY"); // .key en base64
 
-// Debe coincidir con el dominio sintético usado en el login del front.
-const USER_DOMAIN = "dlanoa.com";
+// Debe coincidir con el dominio sintético usado en el login del front
+// (src/lib/userAdmin.ts). Era `dlanoa.com`, de Los Amigos NOA.
+const USER_DOMAIN = "alusodistribuidora.web.app";
 const ROLES = ["cliente", "vendedor", "socio", "superadmin"] as const;
 type Role = (typeof ROLES)[number];
 
@@ -238,11 +250,48 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 export const emitirFactura = onCall(
   // AFIP (WSAA + WSFE + verificación) tarda: con el timeout default de 60s la
   // función moría DESPUÉS de obtener el CAE y el reintento emitía otro.
-  { secrets: [AFIP_CERT, AFIP_KEY], timeoutSeconds: 300 },
+  {
+    secrets: [AFIP_CERT, AFIP_KEY, AFIP_CUIT, AFIP_PTO_VENTA],
+    timeoutSeconds: 300,
+  },
   async (request) => {
     await assertStaff(request);
     const db = getFirestore();
     const data = request.data ?? {};
+
+    // Identidad fiscal de ALUSO. Antes venía hardcodeada con la de Los Amigos
+    // NOA; si no está cargada se corta ACÁ, antes de tocar ARCA, en vez de
+    // emitir un comprobante a nombre de otra empresa.
+    const afipCuit = Number(AFIP_CUIT.value());
+    const afipPtoVenta = Number(AFIP_PTO_VENTA.value());
+    if (!Number.isInteger(afipCuit) || String(afipCuit).length !== 11) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Facturación sin configurar: falta el CUIT de ALUSO (secreto AFIP_CUIT). " +
+          "No se emitió ningún comprobante."
+      );
+    }
+    if (!Number.isInteger(afipPtoVenta) || afipPtoVenta <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Facturación sin configurar: falta el punto de venta (secreto AFIP_PTO_VENTA). " +
+          "No se emitió ningún comprobante."
+      );
+    }
+    // El certificado se valida ACÁ y no donde se usa: más abajo hay una reserva
+    // atómica del número de comprobante, así que fallar después de reservar
+    // QUEMA un número de la numeración fiscal. Con los secretos en "PENDIENTE"
+    // esto pasaba en cada intento.
+    const certPem = Buffer.from(AFIP_CERT.value(), "base64").toString("utf8");
+    const keyPem = Buffer.from(AFIP_KEY.value(), "base64").toString("utf8");
+    if (!certPem.includes("BEGIN CERTIFICATE") || !keyPem.includes("PRIVATE KEY")) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Facturación sin configurar: falta el certificado digital de ARCA " +
+          "(secretos AFIP_CERT / AFIP_KEY, en base64). No se emitió ningún " +
+          "comprobante ni se consumió numeración."
+      );
+    }
 
     const tipo = data.tipo === "A" ? "A" : "B";
     const remitoId = String(data.remitoId ?? "");
@@ -299,7 +348,7 @@ export const emitirFactura = onCall(
         "La Factura A requiere el CUIT del cliente (11 dígitos)."
       );
     }
-    if (docNro === AFIP_CUIT) {
+    if (docNro === afipCuit) {
       throw new HttpsError(
         "invalid-argument",
         "El CUIT del cliente no puede ser el del emisor."
@@ -311,8 +360,7 @@ export const emitirFactura = onCall(
     const iva = r2(total - neto);
     const ivaArray: IvaEntry[] = [{ Id: 5, BaseImp: neto, Importe: iva }];
 
-    const certPem = Buffer.from(AFIP_CERT.value(), "base64").toString("utf8");
-    const keyPem = Buffer.from(AFIP_KEY.value(), "base64").toString("utf8");
+    // certPem y keyPem ya se leyeron y validaron arriba, antes de la reserva.
     const fechaStr = fechaHoyAfip();
 
     // RESERVA ATÓMICA antes de pegarle a AFIP. Si dos pestañas/equipos facturan
@@ -346,8 +394,8 @@ export const emitirFactura = onCall(
       cae = await requestCAE({
         certPem,
         keyPem,
-        cuit: AFIP_CUIT,
-        puntoVenta: AFIP_PTO_VENTA,
+        cuit: afipCuit,
+        puntoVenta: afipPtoVenta,
         tipoComprobante: tipo === "A" ? 1 : 6,
         importeNeto: neto,
         importeIVA: iva,
@@ -371,7 +419,7 @@ export const emitirFactura = onCall(
       throw new HttpsError("internal", (e as Error).message);
     }
 
-    const numeroFmt = `${String(AFIP_PTO_VENTA).padStart(4, "0")}-${String(
+    const numeroFmt = `${String(afipPtoVenta).padStart(4, "0")}-${String(
       cae.numero
     ).padStart(8, "0")}`;
     const fechaISO = `${fechaStr.slice(0, 4)}-${fechaStr.slice(
@@ -380,8 +428,8 @@ export const emitirFactura = onCall(
     )}-${fechaStr.slice(6, 8)}`;
     const qrUrl = buildAfipQrUrl({
       fecha: fechaISO,
-      cuit: AFIP_CUIT,
-      ptoVta: AFIP_PTO_VENTA,
+      cuit: afipCuit,
+      ptoVta: afipPtoVenta,
       tipoCmp: tipo === "A" ? 1 : 6,
       nroCmp: cae.numero,
       importe: total,
@@ -402,7 +450,7 @@ export const emitirFactura = onCall(
       neto,
       iva,
       total,
-      puntoVenta: AFIP_PTO_VENTA,
+      puntoVenta: afipPtoVenta,
       numero: numeroFmt,
       cae: cae.cae,
       caeVto: cae.caeVto,

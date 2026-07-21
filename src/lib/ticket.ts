@@ -1,13 +1,24 @@
 ﻿// Base compartida para comprobantes en impresora térmica de 80mm.
 // Remito, factura y reporte de caja usan este formato/ancho.
 
+// Cabecera fiscal de remitos, facturas y reportes de caja.
+// Datos tomados de la CONSTANCIA DE INSCRIPCIÓN de ARCA (21/07/2026), no del
+// formulario: en la factura tiene que ir la razón social y el DOMICILIO FISCAL
+// tal como los tiene ARCA, no el nombre comercial ni el depósito.
+//   · ARCA registra el apellido primero: "VALENTINO LUCIANO ROCCO".
+//   · Domicilio fiscal: Entre Ríos Av. 1027 (CABA). El de Uspallata 935,
+//     La Tablada, que cargaron en el formulario, es el DEPÓSITO y va en la web.
+//   · Inscripto en IVA y Ganancias desde 11-2025 => Responsable Inscripto
+//     (no monotributo), por eso puede emitir factura A.
 export const EMPRESA = {
-  nombre: "ALUSO DISTRIBUIDORA",
-  cuit: "20250642114",
-  domicilio: "Balcarce 836 · La Quiaca, Jujuy",
-  subtitulo: "NOA · Distribuidora mayorista",
-  tel: "+54 9 11 2759-7572",
-  email: "distribuidoralosamigosnoa@gmail.com",
+  nombre: "ALUSO DISTRIBUIDORA", // nombre comercial, va grande arriba
+  razonSocial: "VALENTINO LUCIANO ROCCO", // el legal, el que exige el comprobante
+  cuit: "20-48038538-2",
+  condicionIva: "Responsable Inscripto",
+  domicilio: "Entre Ríos Av. 1027 P.11 Dto. B · CABA (C1080)",
+  subtitulo: "Distribuidora mayorista",
+  tel: "+54 9 11 5604-4722",
+  email: "alusodistribuidora@gmail.com",
 };
 
 export function esc(s: string): string {
@@ -122,9 +133,13 @@ export function abrirTicket(html: string): void {
 /** Encabezado común (logo violeta + datos de la empresa), estilo comprobante. */
 export function ticketHeader(): string {
   return `
-  <div class="logo"><b>LOS</b><b>AMIGOS</b><small>DISTRIBUIDORA</small></div>
+  <!-- Este logo decía LOS AMIGOS DISTRIBUIDORA: cada remito y factura impresa
+       salía con el logo del otro cliente. Partido en dos <b>, por eso no lo
+       encontraba buscar "Los Amigos". -->
+  <div class="logo"><b>ALUSO</b><small>DISTRIBUIDORA</small></div>
   <h1>${EMPRESA.nombre}</h1>
-  <div class="sub">CUIT ${EMPRESA.cuit}</div>
+  <div class="sub">${EMPRESA.razonSocial}</div>
+  <div class="sub">CUIT ${EMPRESA.cuit} · ${EMPRESA.condicionIva}</div>
   <div class="sub">${EMPRESA.domicilio}</div>
   <div class="sub">${EMPRESA.subtitulo}</div>`;
 }
