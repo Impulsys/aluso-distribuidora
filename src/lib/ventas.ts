@@ -44,28 +44,52 @@ export async function anularRemito(
   anuladoPor?: string
 ): Promise<void> {
   const remitoRef = doc(db, "remitos", remito.id);
-  const productRefs = remito.items.map((it) => doc(db, "products", it.productId));
 
   await runTransaction(db, async (tx) => {
+    // ---- LECTURAS (todas antes de cualquier escritura) ----
     const rSnap = await tx.get(remitoRef);
     if (!rSnap.exists()) throw new Error("REMITO_NO_EXISTE");
     const data = rSnap.data() as Remito;
     if (data.anulado) throw new Error("REMITO_YA_ANULADO");
     if (data.facturaId) throw new Error("REMITO_YA_FACTURADO");
 
+    // Se devuelve stock según los ítems del DOCUMENTO, no según el objeto que
+    // llegó por parámetro desde la pantalla (que puede estar desactualizado).
+    // La transacción tiene que decidir con lo que leyó ella misma.
+    const items = data.items ?? [];
+    const productRefs = items.map((it) => doc(db, "products", it.productId));
     const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
 
-    // Devolver stock de cada ítem
-    remito.items.forEach((it, i) => {
+    const orderRef = data.orderId ? doc(db, "orders", data.orderId) : null;
+    // Se lee el pedido dentro de la transacción para no pisar a ciegas.
+    if (orderRef) await tx.get(orderRef);
+
+    // ---- ESCRITURAS ----
+    items.forEach((it, i) => {
       const actual = (productSnaps[i].data()?.stock as number) ?? 0;
       tx.set(productRefs[i], { stock: actual + it.cantidad }, { merge: true });
     });
-    // Marcar anulado
+
     tx.set(
       remitoRef,
       { anulado: true, anuladoPor: anuladoPor ?? null, anuladoAt: Date.now() },
       { merge: true }
     );
+
+    // LIBERAR EL PEDIDO. Antes esto no se hacía: el pedido quedaba con
+    // `remitoId` apuntando a un remito anulado y con status "entregado", y
+    // persistRemito rechaza cualquier pedido que ya tenga remitoId
+    // (PEDIDO_YA_REMITIDO). Resultado: anulabas una venta mal cargada y ese
+    // pedido no se podía volver a remitir NUNCA — el botón encima desaparecía
+    // de la pantalla. Contradecía al propio comentario de updateRemitoMeta,
+    // que manda a "anular y rehacer" para corregir una venta.
+    if (orderRef) {
+      tx.set(
+        orderRef,
+        { status: "en_proceso", remitoId: null, entregado: false },
+        { merge: true }
+      );
+    }
   });
 
   logActivity("Anuló venta", {
@@ -199,14 +223,23 @@ export async function crearRemitoDesdePedido(
   const items: RemitoItem[] = order.items.map((it) => ({
     productId: it.productId,
     nombre: it.nombre,
-    cantidad: it.cantidad,
-    precioVenta: it.precioVenta,
+    // Faltaba el código: los remitos hechos desde el POS salían con
+    // "COD123 - Producto" y los hechos desde un pedido solo con el nombre.
+    codigo: it.codigo,
+    // Se sanea acá y no solo en la pantalla: esta función copiaba crudo lo que
+    // viniera del pedido. Una cantidad negativa llegaba al descuento de stock
+    // y, al restar, lo SUMABA.
+    cantidad: Math.max(1, Math.floor(Number(it.cantidad) || 0)),
+    precioVenta: Math.max(0, Number(it.precioVenta) || 0),
     costoUnitario: costs[it.productId] ?? 0,
   }));
   return persistRemito(items, {
     orderId: order.id,
     origin: order.origin,
     clienteNombre: order.clienteNombre,
+    // El pedido ya trae el CUIT del CRM y no se propagaba: al facturar había
+    // que retipearlo a mano, con riesgo de error en un comprobante fiscal.
+    clienteCuit: order.clienteCuit,
     formaPago: order.formaPago,
     createdBy,
   });

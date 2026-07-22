@@ -8,12 +8,48 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   calcularPrecio,
+  precioVigente,
+  estaEnOferta,
   CONFIG_PRECIOS_DEFAULT,
   type PerfilPrecioCliente,
   type CondicionesVenta,
   // Con la extensión: el runner de Node resuelve como ESM y la exige.
   // Por eso tsconfig tiene `allowImportingTsExtensions` (válido con noEmit).
 } from "./precios.ts";
+
+// ===== precioVigente: el bug de "muestro uno y cobro otro" =====
+
+test("con oferta válida, el precio vigente es el de oferta", () => {
+  assert.equal(precioVigente({ precioVenta: 25000, precioOferta: 18000 }), 18000);
+  assert.equal(estaEnOferta({ precioVenta: 25000, precioOferta: 18000 }), true);
+});
+
+test("sin oferta, el vigente es el de lista", () => {
+  assert.equal(precioVigente({ precioVenta: 25000 }), 25000);
+  assert.equal(estaEnOferta({ precioVenta: 25000 }), false);
+});
+
+test("una oferta en 0 no es oferta (es el campo vacío)", () => {
+  assert.equal(precioVigente({ precioVenta: 25000, precioOferta: 0 }), 25000);
+  assert.equal(estaEnOferta({ precioVenta: 25000, precioOferta: 0 }), false);
+});
+
+test("una 'oferta' más cara que la lista no se aplica", () => {
+  assert.equal(precioVigente({ precioVenta: 10000, precioOferta: 12000 }), 10000);
+  assert.equal(precioVigente({ precioVenta: 10000, precioOferta: 10000 }), 10000);
+});
+
+test("el motor de precios arranca del vigente, no del de lista", () => {
+  // Encadenado real: producto en oferta + cliente que paga en efectivo.
+  const p = { precioVenta: 25000, precioOferta: 18000 };
+  const d = calcularPrecio(precioVigente(p), 6000, { listaTipo: "distribuidor" }, {
+    formaPago: "efectivo",
+    retiraEnDeposito: false,
+    bultos: 1,
+  });
+  assert.equal(d.base, 18000);
+  assert.equal(d.final, 17550); // 18000 - 2,5%
+});
 
 const DISTRIBUIDOR: PerfilPrecioCliente = { listaTipo: "distribuidor" };
 const base: CondicionesVenta = {

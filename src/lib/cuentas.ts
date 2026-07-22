@@ -138,6 +138,8 @@ export interface NewPaymentInput {
   proveedorId: string;
   monto: number;
   fecha: number;
+  /** Ata los pagos de una misma operación con su comisión. Ver deletePayment. */
+  grupoPagoId?: string;
   formaPago?: SupplierPayment["formaPago"];
   purchaseId?: string; // imputado a una compra; ausente = a cuenta
   modalidad?: SupplierPayment["modalidad"];
@@ -212,8 +214,48 @@ export async function updatePayment(
   logActivity("Editó pago a proveedor", { entidad: "pago", entidadId: id });
 }
 
+/**
+ * Borra un pago a proveedor y, si era el último de su operación, también la
+ * comisión de la financiera que se había registrado como gasto.
+ *
+ * Antes esto borraba SOLO el pago. La comisión quedaba viva y sin ninguna forma
+ * de encontrarla (no se guardaba el vínculo), así que el escenario típico
+ * —borrar un pago mal cargado y volver a cargarlo— dejaba DOS comisiones y el
+ * arqueo del día marcaba un sobrante falso por ese monto.
+ *
+ * Un pago puede formar parte de un grupo (varios comprobantes imputados en una
+ * sola operación): la comisión se borra recién cuando no queda ningún pago del
+ * grupo, porque mientras quede alguno la operación sigue existiendo.
+ */
 export async function deletePayment(id: string): Promise<void> {
+  const snap = await getDocs(
+    query(collection(db, "supplierPayments"), where("__name__", "==", id))
+  );
+  const grupoPagoId = snap.docs[0]?.data()?.grupoPagoId as string | undefined;
+
   await deleteDoc(doc(db, "supplierPayments", id));
+
+  if (grupoPagoId) {
+    const hermanos = await getDocs(
+      query(
+        collection(db, "supplierPayments"),
+        where("grupoPagoId", "==", grupoPagoId)
+      )
+    );
+    if (hermanos.empty) {
+      const comisiones = await getDocs(
+        query(collection(db, "expenses"), where("grupoPagoId", "==", grupoPagoId))
+      );
+      for (const c of comisiones.docs) {
+        await deleteDoc(doc(db, "expenses", c.id));
+        logActivity("Eliminó comisión del pago borrado", {
+          entidad: "egreso",
+          entidadId: c.id,
+        });
+      }
+    }
+  }
+
   logActivity("Eliminó pago a proveedor", { entidad: "pago", entidadId: id });
 }
 

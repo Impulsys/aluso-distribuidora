@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { getPaleta, COLOR_TEXTO_DEFAULT } from "@/lib/promos";
 import { formatARS } from "@/lib/format";
+import { precioVigente, estaEnOferta } from "@/lib/precios";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import type { Product, Promocion } from "@/lib/types";
 
@@ -44,10 +45,10 @@ export default function PromoBanner({
   const paleta = getPaleta(promo.paleta);
   const color = promo.colorTexto || COLOR_TEXTO_DEFAULT;
   const titulo = (promo.titulo?.trim() || product?.nombre) ?? "Producto";
-  const enOferta =
-    !!product &&
-    (product.precioOferta ?? 0) > 0 &&
-    (product.precioOferta ?? 0) < product.precioVenta;
+  // Mismo criterio que usa el carrito para cobrar (lib/precios). Antes esto
+  // estaba duplicado acá con su propia cuenta, y por eso se pudo separar de
+  // lo que realmente se cobraba.
+  const enOferta = !!product && estaEnOferta(product);
   const cantLleva =
     promo.cantidadLleva && promo.cantidadLleva > 0 ? promo.cantidadLleva : 0;
   const cantRegalo =
@@ -149,7 +150,7 @@ export default function PromoBanner({
             </span>
           )}
           <span className="text-2xl font-extrabold sm:text-3xl">
-            {formatARS(enOferta ? product.precioOferta! : product.precioVenta)}
+            {formatARS(precioVigente(product))}
           </span>
         </p>
       )}

@@ -116,6 +116,7 @@ export default function AdminCuentasPage() {
   const [gDepCuenta, setGDepCuenta] = useState("");
   const [gDepTitular, setGDepTitular] = useState("");
   const [gMsg, setGMsg] = useState<string | null>(null);
+  const [gBusy, setGBusy] = useState(false);
   const [gPurchase, setGPurchase] = useState(""); // "" = a cuenta
 
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +269,9 @@ export default function AdminCuentasPage() {
     opts: PagoOpts
   ) => {
     const fecha = tsFromISO(gFecha);
+    // Ata todos los pagos de esta operación con su comisión, para que borrar el
+    // pago se lleve la comisión y no quede un gasto huérfano descuadrando la caja.
+    const grupoPagoId = `gp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let primera = true;
     for (const l of lineas) {
       if (l.monto <= 0) continue;
@@ -275,6 +279,7 @@ export default function AdminCuentasPage() {
         proveedorId: gProv,
         monto: l.monto,
         fecha,
+        grupoPagoId,
         modalidad: gModalidad,
         via: opts.via,
         comisionPct: opts.comisionPct,
@@ -295,8 +300,12 @@ export default function AdminCuentasPage() {
     if (opts.comisionMonto && opts.comisionMonto !== 0) {
       await createExpense({
         fecha,
+        grupoPagoId,
         tipo: "comision_agencia",
-        monto: opts.comisionMonto,
+        // Redondeado a centavos: sin esto la comisión entraba con decimales
+        // largos al efectivo esperado, y como el arqueo solo cuenta billetes
+        // (mínimo $10), la caja NUNCA podía cerrar en diferencia $0.
+        monto: Math.round(opts.comisionMonto * 100) / 100,
         // La comisión sale por la MISMA vía del pago: si fuiste con billetes a
         // la agencia, es efectivo (y tiene que bajar de la caja).
         formaPago: opts.via === "transferencia" ? "transferencia" : "efectivo",
@@ -321,6 +330,12 @@ export default function AdminCuentasPage() {
   const handleAddPago = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!gProv || gMonto <= 0) return;
+    // Sin esta guarda, un doble click con la conexión lenta disparaba DOS veces
+    // el registro: los dos leían el mismo saldo y los dos creaban el pago. La
+    // deuda del proveedor bajaba el doble y la caja marcaba un sobrante enorme.
+    // El formulario de camión de esta misma pantalla ya lo tenía (cBusy).
+    if (gBusy) return;
+    setGBusy(true);
     setError(null);
     setGMsg(null);
 
@@ -341,7 +356,7 @@ export default function AdminCuentasPage() {
             `saldado. El pago de ${formatARS(monto)} quedará a cuenta del ` +
             `proveedor. ¿Registrar el pago?`
         );
-        if (!ok) return;
+        if (!ok) { setGBusy(false); return; }
         lineas = [{ purchaseId: undefined, monto }];
       } else if (monto > saldo + 0.001) {
         // Paga más que el saldo: imputa el saldo y el resto queda a cuenta.
@@ -352,7 +367,7 @@ export default function AdminCuentasPage() {
             `comprobante y ${formatARS(excedente)} quedan a cuenta del ` +
             `proveedor. ¿Registrar el pago?`
         );
-        if (!ok) return;
+        if (!ok) { setGBusy(false); return; }
         lineas = [
           { purchaseId: compraSel.id, monto: saldo },
           { purchaseId: undefined, monto: excedente },
@@ -369,6 +384,8 @@ export default function AdminCuentasPage() {
     } catch (err) {
       console.error(err);
       setError("No se pudo registrar el pago.");
+    } finally {
+      setGBusy(false);
     }
   };
 
@@ -999,9 +1016,10 @@ export default function AdminCuentasPage() {
           )}
           <button
             type="submit"
-            className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700"
+            disabled={gBusy}
+            className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Registrar pago
+            {gBusy ? "Registrando…" : "Registrar pago"}
           </button>
         </form>
 

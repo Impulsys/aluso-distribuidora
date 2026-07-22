@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { CartItem, Product } from "@/lib/types";
+import { precioVigente } from "@/lib/precios";
 
 interface CartState {
   items: CartItem[];
@@ -53,7 +54,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         {
           productId: p.id,
           nombre: p.nombre,
-          precioVenta: p.precioVenta,
+          codigo: p.codigo,
+          // OJO: acá iba `p.precioVenta`, y por eso la promo mostraba el precio
+          // de oferta pero se cobraba el de lista. Tiene que ser el vigente.
+          precioVenta: precioVigente(p),
           cantidad,
         },
       ];

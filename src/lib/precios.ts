@@ -33,6 +33,35 @@
 
 import type { FormaPago } from "./types";
 
+/**
+ * Precio VIGENTE de un producto: la oferta si es válida, si no la de lista.
+ *
+ * Existe porque el bug más caro que tenía la app era justamente este: el banner
+ * de promociones mostraba `precioOferta` con el de lista tachado, pero el
+ * carrito guardaba `precioVenta`. El cliente veía $18.000 y terminaba pagando
+ * $25.000, y ese precio seguía viaje hasta el remito.
+ *
+ * TODO lo que muestre o cobre un precio tiene que pasar por acá. Si mañana se
+ * agrega otro lugar que muestre precios, que use esta función: es la única
+ * forma de que lo que se publica y lo que se cobra no se separen de nuevo.
+ */
+export function precioVigente(p: {
+  precioVenta: number;
+  precioOferta?: number;
+}): number {
+  const oferta = p.precioOferta ?? 0;
+  // Una "oferta" mayor o igual al precio de lista no es una oferta.
+  return oferta > 0 && oferta < p.precioVenta ? oferta : p.precioVenta;
+}
+
+/** ¿Mostrar el precio de lista tachado? Mismo criterio que precioVigente. */
+export function estaEnOferta(p: {
+  precioVenta: number;
+  precioOferta?: number;
+}): boolean {
+  return precioVigente(p) < p.precioVenta;
+}
+
 export type ListaTipo = "distribuidor" | "especial";
 
 /** Cómo se le cobra a un cliente. Vive en el documento del cliente. */

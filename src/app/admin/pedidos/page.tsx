@@ -34,9 +34,14 @@ import type {
   TipoFactura,
 } from "@/lib/types";
 
+// Faltaba "cheque", que sí existe en el tipo FormaPago, sí lo ofrece el carrito
+// del vendedor y sí lo usa la Caja. Una venta cobrada con cheque se registraba
+// como EFECTIVO: el arqueo del día cerraba con efectivo esperado inflado y el
+// cheque no quedaba trazado contra ninguna venta.
 const FORMAS_PAGO: { id: FormaPago; label: string }[] = [
   { id: "efectivo", label: "💵 Efectivo" },
   { id: "transferencia", label: "🏦 Transferencia" },
+  { id: "cheque", label: "📄 Cheque" },
 ];
 
 const STATUS_OPTIONS: OrderStatus[] = [
@@ -565,9 +570,18 @@ function PedidosView() {
     }
   };
 
+  // El POS ya tenía esta guarda con el motivo escrito; acá faltaba. Si se
+  // genera el remito antes de que llegue el primer snapshot de costos, se
+  // guarda costoUnitario 0 y el margen de esa venta queda roto PARA SIEMPRE
+  // (los ítems del remito son inmutables) — y contamina todos los reportes.
+  const [costsListo, setCostsListo] = useState(false);
+
   useEffect(() => {
     refresh();
-    const unsub = subscribeProductCosts(setCosts);
+    const unsub = subscribeProductCosts((c) => {
+      setCosts(c);
+      setCostsListo(true);
+    });
     return unsub;
   }, []);
 
@@ -589,6 +603,18 @@ function PedidosView() {
   }, [orders, filter, origen, q]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
+    // Cancelar un pedido que YA tiene remito no anulaba nada: el remito seguía
+    // vivo, el stock descontado y la venta contando en la caja y los reportes.
+    // Quedaba un pedido "cancelado" con una venta real detrás.
+    const pedido = orders.find((o) => o.id === id);
+    if (status === "cancelado" && pedido?.remitoId) {
+      alert(
+        "Este pedido ya tiene un remito generado y el stock fue descontado.\n\n" +
+          "Para cancelarlo hay que anular primero la venta desde Caja; eso " +
+          "devuelve el stock y libera el pedido."
+      );
+      return;
+    }
     setBusy(id);
     try {
       await updateOrderStatus(id, status);
@@ -604,6 +630,15 @@ function PedidosView() {
   const handleRemito = async (o: Order) => {
     if (o.remitoId) {
       alert("Este pedido ya tiene un remito generado.");
+      return;
+    }
+    if (!costsListo) {
+      alert(
+        "Todavía se están cargando los costos.\n\n" +
+          "Esperá unos segundos y volvé a intentar: si el remito se genera " +
+          "ahora, la venta queda guardada con costo 0 y el margen no se puede " +
+          "corregir después."
+      );
       return;
     }
     if (

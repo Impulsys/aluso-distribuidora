@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import { formatARS } from "@/lib/format";
+import { precioVigente, estaEnOferta } from "@/lib/precios";
 import { useCart } from "@/context/CartContext";
 import { consultaProductoLink } from "@/lib/order";
 import { coincide } from "@/lib/search";
@@ -248,8 +249,18 @@ export default function ProductCatalog() {
                 </p>
 
                 {p.precioVenta > 0 ? (
-                  <p className="mt-2 text-lg font-bold text-primary">
-                    {formatARS(p.precioVenta)}
+                  // El catálogo mostraba SIEMPRE el precio de lista, aunque el
+                  // producto tuviera oferta: quedaba más caro acá que en el
+                  // banner de promos. Ahora los dos muestran el vigente.
+                  <p className="mt-2 flex items-baseline gap-2">
+                    {estaEnOferta(p) && (
+                      <span className="text-sm text-brand-dark/45 line-through">
+                        {formatARS(p.precioVenta)}
+                      </span>
+                    )}
+                    <span className="text-lg font-bold text-primary">
+                      {formatARS(precioVigente(p))}
+                    </span>
                   </p>
                 ) : (
                   <p className="mt-2 text-sm font-semibold text-brand-dark/60">

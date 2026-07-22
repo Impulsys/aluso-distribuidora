@@ -39,6 +39,8 @@ export interface NewExpenseInput {
   monto: number;
   formaPago: FormaPago;
   detalle?: string;
+  /** Ata la comisión al pago que la generó (ver cuentas.ts → deletePayment). */
+  grupoPagoId?: string;
   createdBy?: string;
 }
 

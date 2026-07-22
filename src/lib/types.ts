@@ -111,6 +111,13 @@ export interface Product {
 export interface CartItem {
   productId: string;
   nombre: string;
+  /**
+   * Código interno (SKU). Se arrastra desde el catálogo para que el remito
+   * generado desde un PEDIDO salga igual que el generado desde el POS: antes
+   * el del pedido salía sin código y quedaban dos formatos de remito según de
+   * dónde había venido la venta.
+   */
+  codigo?: string;
   precioVenta: number;
   cantidad: number;
 }
@@ -281,6 +288,14 @@ export interface SupplierPayment {
   depositoCuenta?: string; // nº de cuenta o CBU destino
   depositoTitular?: string; // titular de la cuenta donde se deposita
   desdeCaja?: boolean; // registrado desde la Caja del día (egreso de caja)
+  /**
+   * Identifica la OPERACIÓN de pago completa: un mismo "Registrar pago" puede
+   * generar varios SupplierPayment (uno imputado a cada comprobante + uno a
+   * cuenta) y UN gasto de comisión. Sin este vínculo, borrar el pago dejaba la
+   * comisión viva y sin forma de encontrarla, y el arqueo marcaba un sobrante
+   * falso. Ver deletePayment en lib/cuentas.ts.
+   */
+  grupoPagoId?: string;
   notas?: string;
   createdBy?: string;
   createdAt: number;
@@ -344,6 +359,8 @@ export interface DailyExpense {
   monto: number;
   formaPago: FormaPago;
   detalle?: string;
+  /** Ver SupplierPayment.grupoPagoId: ata la comisión al pago que la generó. */
+  grupoPagoId?: string;
   createdBy?: string;
   createdAt: number;
 }
