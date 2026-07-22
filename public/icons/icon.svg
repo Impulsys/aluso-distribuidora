@@ -14,8 +14,10 @@
   <!-- Sparkle dorado decorativo -->
   <text x="100" y="120" font-family="serif" font-size="60" fill="url(#goldDot)" opacity="0.7">✦</text>
   <text x="400" y="440" font-family="serif" font-size="40" fill="url(#goldDot)" opacity="0.55">✦</text>
-  <!-- LA letters -->
-  <text x="256" y="330" font-family="Georgia, 'Times New Roman', serif" font-size="280" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="-8">LA</text>
-  <!-- Subtítulo NOA -->
-  <text x="256" y="410" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="600" fill="#ffffff" text-anchor="middle" letter-spacing="4" opacity="0.85">NOA</text>
+  <!-- Iniciales. Decían "LA" (Los Amigos) con subtítulo "NOA": ese es el ícono
+       que queda en la pantalla del celular al instalar la app. ALUSO está en
+       La Tablada, Buenos Aires, no en el NOA. Este script REGENERA los PNG,
+       así que si esto vuelve a decir LA/NOA, vuelve a aparecer en el teléfono. -->
+  <text x="256" y="330" font-family="Georgia, 'Times New Roman', serif" font-size="280" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="-8">AD</text>
+  <text x="256" y="410" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="600" fill="#ffffff" text-anchor="middle" letter-spacing="2" opacity="0.85">ALUSO</text>
 </svg>

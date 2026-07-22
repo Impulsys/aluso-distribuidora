@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { subscribeRemitosRange } from "@/lib/ventas";
 import { formatARS, formatDate, tsFromISO } from "@/lib/format";
+import { useAuth } from "@/context/AuthContext";
+import {
+  DEFAULT_REPORTES_CONFIG,
+  subscribeReportesConfig,
+  type ReportesConfig,
+} from "@/lib/config";
 import type { Remito } from "@/lib/types";
 
 function todayISO() {
@@ -14,6 +20,20 @@ function todayISO() {
 export default function ReportesVentasPage() {
   const [remitos, setRemitos] = useState<Remito[]>([]);
   const [dia, setDia] = useState(todayISO());
+
+  // Esta pantalla mostraba "Costo mercadería vendida" y "Margen del día" SIN
+  // consultar la configuración: apagar "mostrar ganancia a los socios" en
+  // /admin/configuracion no tenía ningún efecto acá, y el botón "Ver caja →"
+  // de /reportes —que sí está siempre visible— lleva justo a esta página.
+  // O sea que el candado se esquivaba en un clic.
+  const { user } = useAuth();
+  const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
+  useEffect(() => subscribeReportesConfig(setConfig), []);
+  const showGanancia =
+    user?.role === "superadmin" || config.mostrarGananciaASocios;
+  const cols = showGanancia
+    ? "grid-cols-[1fr_110px_110px_110px]"
+    : "grid-cols-[1fr_110px]";
 
   // Solo los remitos del día seleccionado (no toda la colección).
   useEffect(() => {
@@ -48,10 +68,16 @@ export default function ReportesVentasPage() {
       </div>
 
       {/* Totales del día */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div
+        className={`mb-5 grid gap-3 ${showGanancia ? "sm:grid-cols-3" : ""}`}
+      >
         <Kpi label="Venta del día" value={venta} tone="emerald" />
-        <Kpi label="Costo mercadería vendida" value={costo} tone="rose" />
-        <Kpi label="Margen del día" value={margen} tone="primary" />
+        {showGanancia && (
+          <>
+            <Kpi label="Costo mercadería vendida" value={costo} tone="rose" />
+            <Kpi label="Margen del día" value={margen} tone="primary" />
+          </>
+        )}
       </div>
 
       {/* Detalle */}
@@ -61,11 +87,17 @@ export default function ReportesVentasPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-brand-border bg-surface">
-          <div className="grid grid-cols-[1fr_110px_110px_110px] gap-2 bg-primary-light/40 px-4 py-2 text-[11px] font-bold uppercase text-primary">
+          <div
+            className={`grid ${cols} gap-2 bg-primary-light/40 px-4 py-2 text-[11px] font-bold uppercase text-primary`}
+          >
             <span>Remito / cliente</span>
             <span className="text-right">Venta</span>
-            <span className="text-right">Costo</span>
-            <span className="text-right">Margen</span>
+            {showGanancia && (
+              <>
+                <span className="text-right">Costo</span>
+                <span className="text-right">Margen</span>
+              </>
+            )}
           </div>
           {delDia.map((r) => {
             const c = r.items.reduce(
@@ -75,7 +107,7 @@ export default function ReportesVentasPage() {
             return (
               <div
                 key={r.id}
-                className="grid grid-cols-[1fr_110px_110px_110px] gap-2 border-t border-brand-border px-4 py-2 text-sm"
+                className={`grid ${cols} gap-2 border-t border-brand-border px-4 py-2 text-sm`}
               >
                 <span>
                   <b className="text-brand-dark">{r.numero}</b>{" "}
@@ -86,10 +118,16 @@ export default function ReportesVentasPage() {
                 <span className="text-right font-semibold text-emerald-700">
                   {formatARS(r.total)}
                 </span>
-                <span className="text-right text-rose-700">{formatARS(c)}</span>
-                <span className="text-right font-semibold text-primary">
-                  {formatARS(r.total - c)}
-                </span>
+                {showGanancia && (
+                  <>
+                    <span className="text-right text-rose-700">
+                      {formatARS(c)}
+                    </span>
+                    <span className="text-right font-semibold text-primary">
+                      {formatARS(r.total - c)}
+                    </span>
+                  </>
+                )}
               </div>
             );
           })}

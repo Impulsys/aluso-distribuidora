@@ -272,7 +272,7 @@ export default function AdminGastosPage() {
               value={detalle}
               onChange={(e) => setDetalle(e.target.value)}
               rows={2}
-              placeholder="Ej: Factura proveedor X, Sueldo Joaquín…"
+              placeholder="Ej: Factura proveedor X, Sueldo…"
               className="w-full resize-none rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </label>

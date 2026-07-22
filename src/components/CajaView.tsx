@@ -526,7 +526,7 @@ function GastoDelDia({
           <input
             value={detalle}
             onChange={(e) => setDetalle(e.target.value)}
-            placeholder="Ej: Joaquín / flete Mafe"
+            placeholder="Ej: sueldo / flete"
             className={inputCls}
           />
         </label>

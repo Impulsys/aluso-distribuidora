@@ -340,8 +340,30 @@ function CargoEditor({
       const dbCarga = await getTruckCargo(truck.id);
       const dbMap = new Map(dbCarga.map((i) => [i.productId, i]));
 
-      const merged = new Map(dbMap);
+      // ⚠️ ORDEN CRÍTICO. Antes esto guardaba la carga ENTERA primero y después
+      //    sumaba el stock producto por producto. Si se cortaba a mitad (wifi,
+      //    pestaña cerrada, error de permisos), la carga ya decía las cantidades
+      //    finales: al reintentar, el delta contra la base daba 0 para TODOS y
+      //    el stock de los productos que faltaban no entraba nunca más. El
+      //    camión figuraba recibido, el reporte lo contaba, y faltaban unidades
+      //    sin ninguna pista de dónde se había roto.
+      //
+      //    Ahora la carga se persiste DESPUÉS de cada producto, reflejando solo
+      //    lo que ya se aplicó al stock. Si se corta, la carga guardada queda
+      //    exactamente en el último producto aplicado, y reintentar retoma
+      //    desde ahí: ni se pierde ni se duplica.
+      const aplicado = new Map(dbMap);
+
       for (const [id, v] of Object.entries(draft)) {
+        const anterior = dbMap.get(id)?.cantidadUnidades ?? 0;
+        const delta = (v.cantidad || 0) - anterior;
+
+        if (delta !== 0) {
+          await incrementStock(id, delta, `carga del camión ${truck.nombre}`);
+        }
+        if (v.cantidad > 0 && v.costo > 0) await setProductCost(id, v.costo);
+
+        // Recién ahora se refleja este producto en la carga del camión.
         if (v.cantidad > 0) {
           const p = productos.find((x) => x.id === id);
           const item: TruckCargoItem = {
@@ -354,33 +376,27 @@ function CargoEditor({
           // Firestore rechaza undefined → solo incluimos descripción si tiene texto.
           const desc = v.descripcion?.trim();
           if (desc) item.descripcion = desc;
-          merged.set(id, item);
+          aplicado.set(id, item);
         } else {
-          merged.delete(id); // lo saqué a propósito
+          aplicado.delete(id); // lo saqué a propósito
         }
-      }
-      const next = Array.from(merged.values());
-
-      // 1) Guardar la carga del camión (alimenta el reporte por camión).
-      await updateTruckCargo(truck.id, next);
-
-      // 2) STOCK: la diferencia se calcula contra lo que hay EN LA BASE, no
-      //    contra el snapshot que tenía la pantalla (que puede estar viejo).
-      //    Solo tocamos los productos que están en MI draft.
-      for (const [id, v] of Object.entries(draft)) {
-        const anterior = dbMap.get(id)?.cantidadUnidades ?? 0;
-        const delta = (v.cantidad || 0) - anterior;
-        if (delta !== 0) await incrementStock(id, delta, `carga del camión ${truck.nombre}`);
-        if (v.cantidad > 0 && v.costo > 0) await setProductCost(id, v.costo);
+        await updateTruckCargo(truck.id, Array.from(aplicado.values()));
       }
 
+      const next = Array.from(aplicado.values());
       const nextMap: Record<string, number> = {};
       next.forEach((i) => (nextMap[i.productId] = i.cantidadUnidades));
       setSavedQty(nextMap);
       setDirty(false);
     } catch (e) {
       console.error(e);
-      alert("No se pudo guardar la carga.");
+      // El guardado es incremental: lo que se alcanzó a aplicar YA quedó
+      // reflejado en el stock y en la carga. Volver a guardar retoma desde ahí.
+      alert(
+        "No se pudo terminar de guardar la carga.\n\n" +
+          "Lo que ya se aplicó quedó registrado. Volvé a apretar Guardar para " +
+          "continuar desde donde se cortó — no se va a duplicar."
+      );
     } finally {
       setBusy(false);
     }

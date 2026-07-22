@@ -1,6 +1,6 @@
 # Instructivo ARCA (AFIP) — Alta de Facturación Electrónica
 
-Distribuidora Los Amigos · CUIT **20250642114** · Condición: **Responsable Inscripto** · Ambiente: **Producción**
+ALUSO DISTRIBUIDORA · VALENTINO LUCIANO ROCCO · CUIT **20480385382** · Condición: **Responsable Inscripto** · Ambiente: **Producción**
 
 Este documento describe, paso a paso, qué hay que hacer **una sola vez** en el portal de
 ARCA (con la clave fiscal del titular) para habilitar la emisión de comprobantes
@@ -12,8 +12,8 @@ electrónicos por Web Service (WSFE).
 
 | # | Paso | Dónde | Resultado |
 |---|------|-------|-----------|
-| 0 | Generar clave + CSR | En la PC (script) | `private.key` + `losamigos.csr` |
-| 1 | Subir CSR y descargar certificado | ARCA → Administración de Certificados Digitales | `losamigos.crt` |
+| 0 | Generar clave + CSR | En la PC (script) | `private.key` + `aluso.csr` |
+| 1 | Subir CSR y descargar certificado | ARCA → Administración de Certificados Digitales | `aluso.crt` |
 | 2 | Vincular el certificado al servicio WSFE | ARCA → Administrador de Relaciones | Cert autorizado a facturar |
 | 3 | (Opcional) Vincular a Padrón A13 | ARCA → Administrador de Relaciones | Autocompletar datos de clientes por CUIT |
 | 4 | Habilitar Punto de Venta "RECE / Web Services" | ARCA → Administración de Puntos de Venta | Nº de punto de venta (ej. 1, 2, 3…) |
@@ -34,7 +34,7 @@ Genera dos archivos en la carpeta `afip/` (ya está en `.gitignore`, no se sube 
 
 - **`private.key`** → la clave privada. **SECRETA.** Guardarla a resguardo (no se sube a
   ARCA ni a ningún lado). Si se pierde, hay que rehacer todo el trámite.
-- **`losamigos.csr`** → el pedido de certificado. **Esto es lo que se sube a ARCA** (paso 1).
+- **`aluso.csr`** → el pedido de certificado. **Esto es lo que se sube a ARCA** (paso 1).
 
 ---
 
@@ -43,9 +43,9 @@ Genera dos archivos en la carpeta `afip/` (ya está en `.gitignore`, no se sube 
 1. Entrar a **arca.gob.ar** con clave fiscal (nivel 3).
 2. Buscar el servicio **"Administración de Certificados Digitales"** (si no aparece,
    habilitarlo desde *Administrador de Relaciones de Clave Fiscal → Adherir servicio*).
-3. **Crear un alias** (ej. `losamigos`) y **subir el archivo `losamigos.csr`**.
+3. **Crear un alias** (ej. `aluso`) y **subir el archivo `aluso.csr`**.
 4. ARCA procesa y permite **descargar el certificado** (`.crt` / `.pem`).
-5. Guardar ese archivo como **`afip/losamigos.crt`** junto a la clave privada.
+5. Guardar ese archivo como **`afip/aluso.crt`** junto a la clave privada.
 
 > ⚠️ Este certificado es de **PRODUCCIÓN**. No mezclar con uno de homologación: si el
 > ambiente del cert no coincide con el del sistema, AFIP responde *"AC de confianza"*
@@ -57,7 +57,7 @@ Genera dos archivos en la carpeta `afip/` (ya está en `.gitignore`, no se sube 
 
 1. En ARCA: **"Administrador de Relaciones de Clave Fiscal"**.
 2. **Nueva Relación** → Buscar el servicio **"Facturación Electrónica" (wsfe)**.
-3. En *Representante*, seleccionar el **certificado/Computador Fiscal** recién creado (el alias `losamigos`).
+3. En *Representante*, seleccionar el **certificado/Computador Fiscal** recién creado (el alias `aluso`).
 4. Confirmar.
 
 Sin este paso, AFIP rechaza con error `10016/10017` ("certificado no autorizado al servicio").
@@ -92,12 +92,12 @@ Una vez completados los pasos anteriores, el sistema necesita esta configuració
 
 | Campo | Valor |
 |-------|-------|
-| CUIT emisor | `20250642114` |
+| CUIT emisor | `20480385382` |
 | Razón social | *(la legal, la misma del CSR)* |
 | Condición IVA | `responsable_inscripto` |
 | Punto de venta | *(el nº del paso 4)* |
 | Ambiente | `produccion` |
-| Certificado (`.crt`) | contenido de `afip/losamigos.crt` (base64) |
+| Certificado (`.crt`) | contenido de `afip/aluso.crt` (base64) |
 | Clave privada (`.key`) | contenido de `afip/private.key` (base64) |
 
 ---
@@ -135,7 +135,7 @@ no tiene).
 
 ## Checklist final antes de operar en serio
 
-- [ ] `private.key` + `losamigos.crt` resguardados (backup seguro, fuera de git).
+- [ ] `private.key` + `aluso.crt` resguardados (backup seguro, fuera de git).
 - [ ] Certificado vinculado a **wsfe** en ARCA.
 - [ ] Punto de venta **"RECE Web Services"** creado y su número anotado.
 - [ ] Cloud Function de emisión desplegada con cert/key cargados.

@@ -248,7 +248,7 @@ export default function DayReportModal({
     });
     const totalGastos = expenses.reduce((s, g) => s + g.monto, 0);
 
-    // === Caja Fidel del día (sobre las ventas = remitos) ===
+    // === Total vendido del día (sobre las ventas = remitos) ===
     // Desglose por forma de pago (remitos viejos sin forma = efectivo).
     const ventaEfectivo = dayRemitos
       .filter((r) => (r.formaPago ?? "efectivo") === "efectivo")
@@ -259,8 +259,8 @@ export default function DayReportModal({
     const ventaCheque = dayRemitos
       .filter((r) => r.formaPago === "cheque")
       .reduce((s, r) => s + r.total, 0);
-    // Caja Fidel = total vendido; la caja física solo cuenta el EFECTIVO.
-    const cajaFidel = ventaRemitos;
+    // Total vendido; la caja física solo cuenta el EFECTIVO.
+    const totalVendido = ventaRemitos;
     // MISMA fórmula que el cierre en Ventas → Caja (incluye los pagos a
     // proveedores hechos con billetes y no tapa los negativos con un max(0)).
     const cajaFisica = efectivoEsperadoDelDia({
@@ -288,7 +288,7 @@ export default function DayReportModal({
       gastosPorTipo,
       gastosEfectivo,
       pagosEfectivo,
-      cajaFidel,
+      totalVendido,
       cajaFisica,
       gananciaEstimada,
       dayRemitos,
@@ -456,11 +456,11 @@ export default function DayReportModal({
                 </div>
                 <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2">
                   <span className="text-sm font-medium text-emerald-900">
-                    Total ventas (Caja Fidel)
+                    Total ventas del día
                   </span>
                   <span className="text-lg font-bold text-emerald-900">
-                    {data.cajaFidel > 0
-                      ? formatARS(data.cajaFidel)
+                    {data.totalVendido > 0
+                      ? formatARS(data.totalVendido)
                       : "a confirmar"}
                   </span>
                 </div>
@@ -599,7 +599,7 @@ export default function DayReportModal({
             </h3>
             <div className="space-y-1.5 text-sm">
               <Row label="Caja inicial del día" value={cajaInicial} />
-              <Row label="Ventas del día" value={data.cajaFidel} tone="emerald" />
+              <Row label="Ventas del día" value={data.totalVendido} tone="emerald" />
               {data.ventaEfectivo > 0 && (
                 <Row label="• Efectivo" value={data.ventaEfectivo} />
               )}

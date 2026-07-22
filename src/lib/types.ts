@@ -213,14 +213,24 @@ export interface Factura {
 
 // ===== Módulo Reportes — operación por CAMIÓN =====
 
-export const PROVEEDORES = [
-  "Lenterdith SA",
-  "Fincadelazo SA",
-  "Azucarera SA",
-  "Arrocera SA",
-] as const;
+/**
+ * Proveedores que se siembran en una base vacía (seedProveedoresIfEmpty).
+ *
+ * ⚠️ Acá estaban los de Distribuidora Los Amigos NOA: "Fincadelazo SA",
+ *    "Azucarera SA" y "Arrocera SA" — aceite, azúcar y arroz, el rubro de
+ *    ELLOS. Y no era decorativo: se creaban de verdad en Firestore la primera
+ *    vez que alguien abría Cuentas Corrientes, así que ALUSO arrancaba con
+ *    cuatro proveedores ajenos en su cuenta corriente.
+ *    ALUSO vende SOLO productos Lenterdit (lo confirmaron en el formulario).
+ */
+export const PROVEEDORES = ["Lenterdit SA"] as const;
 
-export const TRANSPORTES = ["Mafe (propio)"] as const;
+/**
+ * Transportes disponibles al dar de alta un camión.
+ * Era `["Mafe (propio)"]`, el flete propio de Los Amigos. El de ALUSO todavía
+ * no lo sabemos, así que queda la opción genérica y la de escribirlo a mano.
+ */
+export const TRANSPORTES = ["Propio", "Otro"] as const;
 
 // ===== Cuentas Corrientes — compras a proveedores (deudas) =====
 
@@ -334,7 +344,7 @@ export const EXPENSE_LABELS: Record<ExpenseType, string> = {
   impuestos: "Impuestos",
   insumos: "Insumos",
   mantenimiento: "Mantenimiento",
-  sueldos: "Sueldos (Joaquín / Benjamín)",
+  sueldos: "Sueldos",
   fletes: "Fletes",
   cobertura_cheques: "Cobertura de cheques",
   adelantos: "Adelantos de sueldo",
@@ -380,7 +390,7 @@ export interface Truck {
   numeroRemito?: string; // nº de remito del proveedor/transporte (compra B, sin facturar)
   numeroFactura?: string; // nº de factura del proveedor/transporte (compra A, facturado)
   costoCamion?: number; // gastos de LOGÍSTICA del camión (flete/descarga); se descuenta en la ganancia real
-  logisticaDetalle?: string; // nota de qué incluye la logística (ej: "flete Mafe + descarga")
+  logisticaDetalle?: string; // nota de qué incluye la logística (ej: "flete + descarga")
   porcentajeGanancia: number; // %
   carga?: TruckCargoItem[];
   ventas?: TruckSale[];
@@ -405,7 +415,7 @@ export interface Check {
   notas?: string;
 }
 
-// ===== Caja Fidel — cierre de caja DIARIO (se deposita en banco) =====
+// ===== Caja — cierre de caja DIARIO (se deposita en banco) =====
 
 export interface CashMovement {
   id: string;

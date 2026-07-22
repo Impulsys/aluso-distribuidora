@@ -760,7 +760,7 @@ export default function AdminCuentasPage() {
                     <input
                       value={cLogisticaDetalle}
                       onChange={(e) => setCLogisticaDetalle(e.target.value)}
-                      placeholder="Flete Mafe + descarga"
+                      placeholder="Flete + descarga"
                       className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
                     />
                   </div>
