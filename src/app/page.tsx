@@ -71,11 +71,15 @@ export default function LandingPage() {
               {/* Verde de la marca Nonisec (caja Protección Adulta), el que pidió
                   el cliente. Inclina al verde (G>B), no es el turquesa puro que
                   había antes. Contraste sobre el fondo claro: 4,8:1, pasa AA. */}
-              <strong className="font-semibold text-[#146B60]">Nonisec</strong> en
-              farmacias, geriátricos, comercios y autoservicios de Argentina.
-              Cuidado adulto, incontinencia, higiene femenina y
-              algodón, con stock permanente y logística propia. Atención directa
-              con el fabricante y precios mayoristas para tu negocio.
+              {/* Reescrito según lo que pidió la clienta (24/07): arrancar por
+                  las marcas y poner al DISTRIBUIDOR primero — es su cliente
+                  principal. Antes lideraba con "farmacias, geriátricos". */}
+              <strong className="font-semibold text-[#146B60]">Nonisec</strong> a
+              distribuidores, mayoristas, comercios, geriátricos, farmacias y
+              autoservicios de todo el país. Cuidado adulto, incontinencia,
+              higiene femenina y algodón, con stock permanente y logística
+              propia. Atención directa con el fabricante y una condición pensada
+              para que revendas.
             </p>
 
             <Link
