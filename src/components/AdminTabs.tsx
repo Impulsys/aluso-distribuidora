@@ -7,6 +7,7 @@ const TABS = [
   { href: "/admin", label: "📊 Resumen" },
   { href: "/admin/pedidos", label: "🧾 Ventas" },
   { href: "/admin/productos", label: "📦 Productos" },
+  { href: "/admin/precios", label: "🏷️ Precios" },
   { href: "/admin/promociones", label: "⭐ Promociones" },
   { href: "/admin/clientes", label: "👤 Clientes" },
   { href: "/admin/entregas", label: "🛵 Entregas" },

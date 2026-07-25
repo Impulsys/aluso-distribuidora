@@ -24,6 +24,14 @@ export interface AppUser {
    * Lo asigna un superadmin desde el panel de usuarios.
    */
   markupLista?: number;
+  /**
+   * Descuento fijo extra del cliente (%), además de su lista. Anabela: "la gran
+   * mayoría tiene algún descuento extra" sobre la lista. Se aplica al precio de
+   * la lista, en el catálogo y en la venta. Ausente o 0 = sin descuento extra.
+   * (Los descuentos por condición —efectivo, retiro, volumen— son aparte y se
+   * aplican en el remito según cómo se cierre la venta.)
+   */
+  descuentoExtraPct?: number;
   createdAt: number;
 }
 

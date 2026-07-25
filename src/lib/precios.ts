@@ -117,6 +117,23 @@ export function precioParaLista(
   return Math.round((p + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * Precio final que ve un cliente en el catálogo: su lista y, encima, su
+ * descuento fijo extra (si tiene). Es lo que muestra la tarjeta y lo que se
+ * lleva al carrito. Los descuentos por condición (efectivo/retiro/volumen) se
+ * aplican después, en el remito.
+ */
+export function precioDeCliente(
+  precioDistribuidor: number,
+  markupLista?: number,
+  descuentoExtraPct?: number
+): number {
+  const base = precioParaLista(precioDistribuidor, markupLista);
+  const d = descuentoExtraPct ?? 0;
+  if (base <= 0 || d <= 0) return base;
+  return Math.round((base * (1 - d / 100) + Number.EPSILON) * 100) / 100;
+}
+
 export type ListaTipo = "distribuidor" | "especial";
 
 /** Cómo se le cobra a un cliente. Vive en el documento del cliente. */

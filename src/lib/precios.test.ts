@@ -11,6 +11,7 @@ import {
   precioVigente,
   estaEnOferta,
   precioParaLista,
+  precioDeCliente,
   MARKUP_DISTRIBUIDOR,
   CONFIG_PRECIOS_DEFAULT,
   type PerfilPrecioCliente,
@@ -47,6 +48,21 @@ test("Locales (33%) paga MÁS que el distribuidor", () => {
 
 test("Consultar precio (0) no se rompe", () => {
   assert.equal(precioParaLista(0, 15), 0);
+});
+
+test("precioDeCliente aplica lista y encima el descuento extra", () => {
+  // lista 15% sobre 551,08 = 495,11; con 10% extra = 445,60
+  assert.equal(precioDeCliente(551.08, 15, 10), 445.6);
+});
+
+test("sin descuento extra, precioDeCliente = precio de lista", () => {
+  assert.equal(precioDeCliente(551.08, 15), precioParaLista(551.08, 15));
+  assert.equal(precioDeCliente(551.08, 15, 0), precioParaLista(551.08, 15));
+});
+
+test("distribuidor con 5% extra descuenta sobre el precio público", () => {
+  assert.equal(precioDeCliente(1000, 28, 5), 950);
+  assert.equal(precioDeCliente(1000, undefined, 5), 950);
 });
 
 // ===== precioVigente: el bug de "muestro uno y cobro otro" =====

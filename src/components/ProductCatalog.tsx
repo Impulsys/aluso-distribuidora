@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import { formatARS } from "@/lib/format";
-import { precioVigente, estaEnOferta, precioParaLista } from "@/lib/precios";
+import { precioVigente, estaEnOferta, precioDeCliente } from "@/lib/precios";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { consultaProductoLink } from "@/lib/order";
@@ -31,17 +31,18 @@ export default function ProductCatalog() {
   const { user } = useAuth();
   const [agregado, setAgregado] = useState<string | null>(null);
 
-  // Markup de la lista del cliente logueado. Un cliente con lista especial ve
-  // SU precio; un visitante sin login (o cliente sin lista) ve el distribuidor.
+  // Lista y descuento extra del cliente logueado. Un visitante sin login (o
+  // cliente sin lista) ve el precio distribuidor.
   const markup = user?.markupLista;
+  const descuento = user?.descuentoExtraPct;
 
-  // Devuelve el producto con SU precio (lista del cliente) ya aplicado a venta y
-  // oferta, para que tanto la tarjeta como el carrito usen el mismo número.
+  // Devuelve el producto con SU precio (lista + descuento del cliente) ya
+  // aplicado a venta y oferta, para que la tarjeta y el carrito usen el mismo.
   const conPrecioDelCliente = (p: Product): Product => ({
     ...p,
-    precioVenta: precioParaLista(p.precioVenta, markup),
+    precioVenta: precioDeCliente(p.precioVenta, markup, descuento),
     precioOferta: p.precioOferta
-      ? precioParaLista(p.precioOferta, markup)
+      ? precioDeCliente(p.precioOferta, markup, descuento)
       : p.precioOferta,
   });
 
@@ -271,7 +272,7 @@ export default function ProductCatalog() {
                   <p className="mt-2 flex items-baseline gap-2">
                     {estaEnOferta(p) && (
                       <span className="text-sm text-brand-dark/45 line-through">
-                        {formatARS(precioParaLista(p.precioVenta, markup))}
+                        {formatARS(precioDeCliente(p.precioVenta, markup, descuento))}
                       </span>
                     )}
                     <span className="text-lg font-bold text-primary">

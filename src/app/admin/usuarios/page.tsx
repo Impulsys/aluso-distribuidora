@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllUsers, updateUserRole, updateUserMarkup } from "@/lib/admin";
-import { LISTAS_PRECIO } from "@/lib/precios";
+import { getAllUsers, updateUserRole, updateUserPricing } from "@/lib/admin";
+import {
+  DEFAULT_PRECIOS_CONFIG,
+  subscribePreciosConfig,
+} from "@/lib/preciosConfig";
 import {
   adminCreateUser,
   adminSetPassword,
@@ -47,7 +50,12 @@ export default function AdminUsuariosPage() {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [rol, setRol] = useState<Role>("vendedor");
+  // Lista de precios y descuento para el nuevo usuario (si es cliente).
+  const [markupNuevo, setMarkupNuevo] = useState<number>(28);
+  const [descuentoNuevo, setDescuentoNuevo] = useState<number>(0);
   const [creating, setCreating] = useState(false);
+  // Listas de precio configurables (viven en config/precios).
+  const [listas, setListas] = useState(DEFAULT_PRECIOS_CONFIG.listas);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createOk, setCreateOk] = useState<string | null>(null);
 
@@ -68,6 +76,11 @@ export default function AdminUsuariosPage() {
     refresh();
   }, []);
 
+  useEffect(
+    () => subscribePreciosConfig((c) => setListas(c.listas)),
+    []
+  );
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError(null);
@@ -78,17 +91,28 @@ export default function AdminUsuariosPage() {
     }
     setCreating(true);
     try {
-      await adminCreateUser({
+      const uid = await adminCreateUser({
         username: usuario,
         displayName: nombre,
         password,
         role: rol,
       });
+      // Si es cliente y se le eligió una lista/descuento distinto del default,
+      // se lo asignamos al perfil recién creado.
+      if (rol === "cliente" && (markupNuevo !== 28 || descuentoNuevo > 0)) {
+        await updateUserPricing(
+          uid,
+          markupNuevo === 28 ? undefined : markupNuevo,
+          descuentoNuevo > 0 ? descuentoNuevo : undefined
+        );
+      }
       setCreateOk(`Usuario "${usuario.trim().toLowerCase()}" creado.`);
       setNombre("");
       setUsuario("");
       setPassword("");
       setRol("vendedor");
+      setMarkupNuevo(28);
+      setDescuentoNuevo(0);
       await refresh();
     } catch (err) {
       console.error(err);
@@ -132,18 +156,24 @@ export default function AdminUsuariosPage() {
     }
   };
 
-  const handleMarkup = async (uid: string, markup: number) => {
+  const handlePricing = async (
+    uid: string,
+    markup: number,
+    descuento: number
+  ) => {
     setBusy(uid);
     try {
-      // 28 = distribuidor = default → se guarda vacío para no arrastrar el dato.
-      const valor = markup === 28 ? undefined : markup;
-      await updateUserMarkup(uid, valor);
+      const m = markup === 28 ? undefined : markup;
+      const d = descuento > 0 ? descuento : undefined;
+      await updateUserPricing(uid, m, d);
       setUsers((prev) =>
-        prev.map((u) => (u.uid === uid ? { ...u, markupLista: valor } : u))
+        prev.map((u) =>
+          u.uid === uid ? { ...u, markupLista: m, descuentoExtraPct: d } : u
+        )
       );
     } catch (e) {
       console.error(e);
-      alert("No se pudo cambiar la lista de precios.");
+      alert("No se pudo cambiar los precios del cliente.");
     } finally {
       setBusy(null);
     }
@@ -269,6 +299,55 @@ export default function AdminUsuariosPage() {
           </div>
         </div>
 
+        {/* Precios del cliente: qué lista ve y qué descuento extra tiene.
+            Solo aparece si el usuario nuevo es un cliente. */}
+        {rol === "cliente" && (
+          <div className="mt-3 grid gap-4 rounded-lg bg-primary-light/25 p-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium">
+                Lista de precios
+              </label>
+              <select
+                value={markupNuevo}
+                onChange={(e) => setMarkupNuevo(Number(e.target.value))}
+                className="mt-1 w-full rounded-lg border border-brand-border bg-surface px-3 py-2 outline-none focus:border-primary"
+              >
+                {listas.map((l) => (
+                  <option key={l.markup} value={l.markup}>
+                    {l.nombre} ({l.markup}%)
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-brand-dark/45">
+                El precio que verá en el catálogo.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Descuento extra
+              </label>
+              <div className="mt-1 flex items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  step="0.5"
+                  value={descuentoNuevo || ""}
+                  onChange={(e) =>
+                    setDescuentoNuevo(Math.max(0, Number(e.target.value) || 0))
+                  }
+                  placeholder="0"
+                  className="w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-primary"
+                />
+                <span className="text-lg text-brand-dark/50">%</span>
+              </div>
+              <p className="mt-1 text-[11px] text-brand-dark/45">
+                Se descuenta sobre el precio de la lista. Opcional.
+              </p>
+            </div>
+          </div>
+        )}
+
         {createError && (
           <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
             {createError}
@@ -371,13 +450,15 @@ export default function AdminUsuariosPage() {
                 <span className="text-xs text-brand-dark/50">
                   Lista de precios:
                 </span>
-                {LISTAS_PRECIO.map((l) => {
+                {listas.map((l) => {
                   const activa = (u.markupLista ?? 28) === l.markup;
                   return (
                     <button
                       key={l.markup}
                       disabled={busy === u.uid || activa}
-                      onClick={() => handleMarkup(u.uid, l.markup)}
+                      onClick={() =>
+                        handlePricing(u.uid, l.markup, u.descuentoExtraPct ?? 0)
+                      }
                       title={`${l.markup}% sobre el costo`}
                       className={`rounded-full px-3 py-1 text-xs font-medium ring-1 transition disabled:opacity-60 ${
                         activa
@@ -389,6 +470,23 @@ export default function AdminUsuariosPage() {
                     </button>
                   );
                 })}
+                {/* Descuento extra editable por cliente */}
+                <span className="ml-2 text-xs text-brand-dark/50">Desc. extra:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  step="0.5"
+                  defaultValue={u.descuentoExtraPct ?? 0}
+                  disabled={busy === u.uid}
+                  onBlur={(e) => {
+                    const v = Math.max(0, Number(e.target.value) || 0);
+                    if (v !== (u.descuentoExtraPct ?? 0))
+                      handlePricing(u.uid, u.markupLista ?? 28, v);
+                  }}
+                  className="w-16 rounded-full border border-brand-border px-2 py-1 text-center text-xs outline-none focus:border-primary"
+                />
+                <span className="text-xs text-brand-dark/50">%</span>
               </div>
             )}
             <p className="mt-2 text-[11px] text-brand-dark/40">

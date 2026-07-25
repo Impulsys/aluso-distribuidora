@@ -47,19 +47,23 @@ export async function updateUserRole(uid: string, role: Role): Promise<void> {
 }
 
 /**
- * Asigna la lista de precios de un cliente (su markup). Con esto ve SU precio
- * en el catálogo. markup === undefined o 28 → lista distribuidor (default).
+ * Asigna la lista de precios (markup) y el descuento extra de un cliente. Con
+ * esto ve SU precio en el catálogo. markup undefined o 28 → distribuidor;
+ * descuento undefined o 0 → sin descuento extra.
  */
-export async function updateUserMarkup(
+export async function updateUserPricing(
   uid: string,
-  markupLista: number | undefined
+  markupLista: number | undefined,
+  descuentoExtraPct: number | undefined
 ): Promise<void> {
-  // deleteField() no está importado; usar null limpia el campo con merge.
+  // null limpia el campo con merge (deleteField no está importado acá).
   await updateDoc(doc(db, "users", uid), {
     markupLista: markupLista ?? null,
+    descuentoExtraPct: descuentoExtraPct ?? null,
   });
-  logActivity("Cambió lista de precios de usuario", {
-    detalle: markupLista ? `→ ${markupLista}%` : "→ Distribuidor",
+  const d = descuentoExtraPct ? ` · -${descuentoExtraPct}%` : "";
+  logActivity("Cambió precios de usuario", {
+    detalle: `→ ${markupLista ? markupLista + "%" : "Distribuidor"}${d}`,
     entidad: "usuario",
     entidadId: uid,
   });
