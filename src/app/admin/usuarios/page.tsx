@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllUsers, updateUserRole } from "@/lib/admin";
+import { getAllUsers, updateUserRole, updateUserMarkup } from "@/lib/admin";
+import { LISTAS_PRECIO } from "@/lib/precios";
 import {
   adminCreateUser,
   adminSetPassword,
@@ -126,6 +127,23 @@ export default function AdminUsuariosPage() {
     } catch (e) {
       console.error(e);
       alert("No se pudo cambiar el rol.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleMarkup = async (uid: string, markup: number) => {
+    setBusy(uid);
+    try {
+      // 28 = distribuidor = default → se guarda vacío para no arrastrar el dato.
+      const valor = markup === 28 ? undefined : markup;
+      await updateUserMarkup(uid, valor);
+      setUsers((prev) =>
+        prev.map((u) => (u.uid === uid ? { ...u, markupLista: valor } : u))
+      );
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo cambiar la lista de precios.");
     } finally {
       setBusy(null);
     }
@@ -344,6 +362,35 @@ export default function AdminUsuariosPage() {
                 </button>
               ))}
             </div>
+
+            {/* Lista de precios: solo para clientes. Define qué precio ve en el
+                catálogo (su markup sobre el costo). El precio se calcula sobre
+                el público, sin exponer el costo. */}
+            {u.role === "cliente" && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-brand-dark/50">
+                  Lista de precios:
+                </span>
+                {LISTAS_PRECIO.map((l) => {
+                  const activa = (u.markupLista ?? 28) === l.markup;
+                  return (
+                    <button
+                      key={l.markup}
+                      disabled={busy === u.uid || activa}
+                      onClick={() => handleMarkup(u.uid, l.markup)}
+                      title={`${l.markup}% sobre el costo`}
+                      className={`rounded-full px-3 py-1 text-xs font-medium ring-1 transition disabled:opacity-60 ${
+                        activa
+                          ? "bg-primary text-white ring-primary ring-inset"
+                          : "bg-surface text-brand-dark/70 ring-brand-border hover:bg-primary-light"
+                      }`}
+                    >
+                      {l.nombre}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <p className="mt-2 text-[11px] text-brand-dark/40">
               Registrado: {formatDate(u.createdAt)}
             </p>

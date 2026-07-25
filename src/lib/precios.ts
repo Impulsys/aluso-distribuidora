@@ -62,6 +62,61 @@ export function estaEnOferta(p: {
   return precioVigente(p) < p.precioVenta;
 }
 
+/**
+ * Markup de la lista DISTRIBUIDOR (Fernando): el precio que se muestra en el
+ * catálogo público es costo × (1 + 28%). Es la base sobre la que se expresan
+ * las demás listas.
+ */
+export const MARKUP_DISTRIBUIDOR = 28;
+
+/**
+ * Listas de precios de ALUSO, tal como están en el Excel del cliente. Cada una
+ * es un markup sobre el costo. "Distribuidor" (28%) es la base y el precio que
+ * ve el público en el catálogo; las demás son clientes con condición mejor.
+ * Un superadmin asigna una lista a cada cliente desde el panel de usuarios.
+ */
+export const LISTAS_PRECIO: { nombre: string; markup: number }[] = [
+  { nombre: "Distribuidor", markup: 28 },
+  { nombre: "15%", markup: 15 },
+  { nombre: "18%", markup: 18 },
+  { nombre: "20%", markup: 20 },
+  { nombre: "23,5%", markup: 23.5 },
+  { nombre: "Locales", markup: 33 },
+];
+
+/**
+ * Precio de un producto para la lista de un cliente, PARTIENDO del precio
+ * distribuidor (el público) — sin necesidad del costo.
+ *
+ * Esta es la pieza que resuelve el pedido de Anabela ("que cada cliente vea su
+ * precio") sin filtrar el costo al navegador. El truco: si el precio público
+ * es costo × 1,28 y la lista del cliente es costo × (1 + m/100), entonces
+ *
+ *     precioCliente = precioDistribuidor × (1 + m/100) / 1,28
+ *
+ * El costo se cancela. El navegador solo necesita el precio público (que ya
+ * tiene) y el markup del cliente. El costo nunca sale de productCosts.
+ *
+ * Ejemplo real: cliente al 15% (Domingo) sobre un producto que en el catálogo
+ * vale $551,08 → 551,08 × 1,15 / 1,28 = $495,08. El cliente ve SU precio y
+ * nunca ve ni el costo ni el precio distribuidor.
+ *
+ * @param precioDistribuidor  el precioVenta público del producto (costo × 1,28)
+ * @param markupCliente       markup de la lista del cliente (15, 18, 23.5…).
+ *                            Si es 28 o no está, devuelve el mismo precio.
+ */
+export function precioParaLista(
+  precioDistribuidor: number,
+  markupCliente?: number
+): number {
+  if (precioDistribuidor <= 0) return precioDistribuidor; // "Consultar precio"
+  if (markupCliente == null || markupCliente === MARKUP_DISTRIBUIDOR) {
+    return precioDistribuidor;
+  }
+  const p = (precioDistribuidor * (1 + markupCliente / 100)) / (1 + MARKUP_DISTRIBUIDOR / 100);
+  return Math.round((p + Number.EPSILON) * 100) / 100;
+}
+
 export type ListaTipo = "distribuidor" | "especial";
 
 /** Cómo se le cobra a un cliente. Vive en el documento del cliente. */

@@ -10,12 +10,44 @@ import {
   calcularPrecio,
   precioVigente,
   estaEnOferta,
+  precioParaLista,
+  MARKUP_DISTRIBUIDOR,
   CONFIG_PRECIOS_DEFAULT,
   type PerfilPrecioCliente,
   type CondicionesVenta,
   // Con la extensión: el runner de Node resuelve como ESM y la exige.
   // Por eso tsconfig tiene `allowImportingTsExtensions` (válido con noEmit).
 } from "./precios.ts";
+
+// ===== precioParaLista: precio por cliente SIN exponer el costo (camino A) =====
+
+test("sin markup o markup distribuidor, el precio no cambia", () => {
+  assert.equal(precioParaLista(551.08), 551.08);
+  assert.equal(precioParaLista(551.08, MARKUP_DISTRIBUIDOR), 551.08);
+});
+
+test("cliente al 15% paga menos que el distribuidor (28%)", () => {
+  // 551,08 × 1,15 / 1,28 = 495,11
+  assert.equal(precioParaLista(551.08, 15), 495.11);
+});
+
+test("el precio por lista reconstruye el markup sobre el costo real", () => {
+  // costo 430,53 → distribuidor 551,08. Un cliente al 20% debería pagar
+  // 430,53 × 1,20 = 516,64, y precioParaLista tiene que dar eso partiendo
+  // del precio público, sin conocer el costo.
+  const costo = 430.53;
+  const dist = Math.round(costo * 1.28 * 100) / 100; // 551.08
+  const esperado = Math.round(costo * 1.2 * 100) / 100; // 516.64
+  assert.ok(Math.abs(precioParaLista(dist, 20) - esperado) < 0.02);
+});
+
+test("Locales (33%) paga MÁS que el distribuidor", () => {
+  assert.ok(precioParaLista(551.08, 33) > 551.08);
+});
+
+test("Consultar precio (0) no se rompe", () => {
+  assert.equal(precioParaLista(0, 15), 0);
+});
 
 // ===== precioVigente: el bug de "muestro uno y cobro otro" =====
 

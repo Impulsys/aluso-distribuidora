@@ -5,8 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import { formatARS } from "@/lib/format";
-import { precioVigente, estaEnOferta } from "@/lib/precios";
+import { precioVigente, estaEnOferta, precioParaLista } from "@/lib/precios";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { consultaProductoLink } from "@/lib/order";
 import { coincide } from "@/lib/search";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
@@ -27,7 +28,22 @@ export default function ProductCatalog() {
   const [cat, setCat] = useState<string>("Todas");
   const [q, setQ] = useState("");
   const { add } = useCart();
+  const { user } = useAuth();
   const [agregado, setAgregado] = useState<string | null>(null);
+
+  // Markup de la lista del cliente logueado. Un cliente con lista especial ve
+  // SU precio; un visitante sin login (o cliente sin lista) ve el distribuidor.
+  const markup = user?.markupLista;
+
+  // Devuelve el producto con SU precio (lista del cliente) ya aplicado a venta y
+  // oferta, para que tanto la tarjeta como el carrito usen el mismo número.
+  const conPrecioDelCliente = (p: Product): Product => ({
+    ...p,
+    precioVenta: precioParaLista(p.precioVenta, markup),
+    precioOferta: p.precioOferta
+      ? precioParaLista(p.precioOferta, markup)
+      : p.precioOferta,
+  });
 
   // Lee filtros del URL al montar (deep linking desde la landing)
   useEffect(() => {
@@ -72,7 +88,7 @@ export default function ProductCatalog() {
   );
 
   const handleAdd = (p: Product) => {
-    add(p, 1);
+    add(conPrecioDelCliente(p), 1);
     setAgregado(p.id);
     setTimeout(() => setAgregado((c) => (c === p.id ? null : c)), 1200);
   };
@@ -255,11 +271,11 @@ export default function ProductCatalog() {
                   <p className="mt-2 flex items-baseline gap-2">
                     {estaEnOferta(p) && (
                       <span className="text-sm text-brand-dark/45 line-through">
-                        {formatARS(p.precioVenta)}
+                        {formatARS(precioParaLista(p.precioVenta, markup))}
                       </span>
                     )}
                     <span className="text-lg font-bold text-primary">
-                      {formatARS(precioVigente(p))}
+                      {formatARS(precioVigente(conPrecioDelCliente(p)))}
                     </span>
                   </p>
                 ) : (

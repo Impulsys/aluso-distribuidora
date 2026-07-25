@@ -16,6 +16,14 @@ export interface AppUser {
   displayName: string;
   photoURL?: string;
   role: Role;
+  /**
+   * Markup de la lista de precios del cliente (15, 18, 23.5, 33…). Es lo que
+   * permite que cada cliente logueado vea SU precio en el catálogo, calculado
+   * sobre el precio público sin exponer el costo (ver precioParaLista en
+   * lib/precios). Ausente o 28 = lista distribuidor (el precio público).
+   * Lo asigna un superadmin desde el panel de usuarios.
+   */
+  markupLista?: number;
   createdAt: number;
 }
 

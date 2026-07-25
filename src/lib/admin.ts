@@ -46,6 +46,25 @@ export async function updateUserRole(uid: string, role: Role): Promise<void> {
   });
 }
 
+/**
+ * Asigna la lista de precios de un cliente (su markup). Con esto ve SU precio
+ * en el catálogo. markup === undefined o 28 → lista distribuidor (default).
+ */
+export async function updateUserMarkup(
+  uid: string,
+  markupLista: number | undefined
+): Promise<void> {
+  // deleteField() no está importado; usar null limpia el campo con merge.
+  await updateDoc(doc(db, "users", uid), {
+    markupLista: markupLista ?? null,
+  });
+  logActivity("Cambió lista de precios de usuario", {
+    detalle: markupLista ? `→ ${markupLista}%` : "→ Distribuidor",
+    entidad: "usuario",
+    entidadId: uid,
+  });
+}
+
 // ==================== PEDIDOS ====================
 export async function updateOrderStatus(
   id: string,
