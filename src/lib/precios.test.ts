@@ -12,6 +12,7 @@ import {
   estaEnOferta,
   precioParaLista,
   precioDeCliente,
+  descuentosVenta,
   MARKUP_DISTRIBUIDOR,
   CONFIG_PRECIOS_DEFAULT,
   type PerfilPrecioCliente,
@@ -63,6 +64,48 @@ test("sin descuento extra, precioDeCliente = precio de lista", () => {
 test("distribuidor con 5% extra descuenta sobre el precio público", () => {
   assert.equal(precioDeCliente(1000, 28, 5), 950);
   assert.equal(precioDeCliente(1000, undefined, 5), 950);
+});
+
+// ===== descuentosVenta: condición → descuento en el remito =====
+
+test("efectivo descuenta 2,5% del subtotal de la venta", () => {
+  const r = descuentosVenta(100000, {
+    formaPago: "efectivo",
+    retiraEnDeposito: false,
+    porVolumen: false,
+  });
+  assert.equal(r.total, 97500);
+  assert.equal(r.descuentos.length, 1);
+});
+
+test("efectivo + retiro + volumen suman 8,5%", () => {
+  const r = descuentosVenta(100000, {
+    formaPago: "efectivo",
+    retiraEnDeposito: true,
+    porVolumen: true,
+  });
+  assert.equal(r.total, 91500);
+  assert.equal(r.descuentos.length, 3);
+});
+
+test("transferencia sin retiro ni volumen no descuenta nada", () => {
+  const r = descuentosVenta(100000, {
+    formaPago: "transferencia",
+    retiraEnDeposito: false,
+    porVolumen: false,
+  });
+  assert.equal(r.total, 100000);
+  assert.equal(r.descuentos.length, 0);
+});
+
+test("el detalle de descuentos cierra con el total", () => {
+  const r = descuentosVenta(133337, {
+    formaPago: "efectivo",
+    retiraEnDeposito: true,
+    porVolumen: true,
+  });
+  const suma = r.descuentos.reduce((s, d) => s + d.monto, 0);
+  assert.equal(Math.round((r.subtotal + suma) * 100) / 100, r.total);
 });
 
 // ===== precioVigente: el bug de "muestro uno y cobro otro" =====

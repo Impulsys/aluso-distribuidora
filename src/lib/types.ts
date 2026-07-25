@@ -190,7 +190,11 @@ export interface Remito {
   clienteCuit?: string;
   formaPago?: FormaPago; // efectivo / transferencia / cheque
   items: RemitoItem[];
-  total: number; // total de venta
+  total: number; // total FINAL de la venta (con descuentos aplicados)
+  /** Subtotal antes de los descuentos por condición (suma de las líneas). */
+  subtotal?: number;
+  /** Descuentos por condición aplicados al cerrar (efectivo, retiro, volumen). */
+  descuentos?: { concepto: string; pct: number; monto: number }[];
   facturaId?: string; // si ya se facturó
   anulado?: boolean; // venta anulada (devolvió stock); no cuenta en reportes/caja
   anuladoPor?: string;

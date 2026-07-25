@@ -134,6 +134,83 @@ export function precioDeCliente(
   return Math.round((base * (1 - d / 100) + Number.EPSILON) * 100) / 100;
 }
 
+/** Condiciones de una venta que gatillan descuentos, elegidas al cerrarla. */
+export interface CondicionesDescuento {
+  formaPago: FormaPago;
+  retiraEnDeposito: boolean;
+  /** El pedido califica por volumen (lo confirma el operador o el sistema). */
+  porVolumen: boolean;
+}
+
+export interface DescuentoAplicado {
+  concepto: string;
+  pct: number;
+  monto: number; // ARS, negativo (descuenta)
+}
+
+export interface ResultadoVenta {
+  subtotal: number;
+  descuentos: DescuentoAplicado[];
+  total: number;
+}
+
+/**
+ * Aplica los descuentos por CONDICIÓN sobre el subtotal de una venta (el precio
+ * de lista de cada cliente ya viene en las líneas). Es lo que convierte el
+ * precio del catálogo en el precio final del remito, según cómo se cierra la
+ * venta: efectivo, retiro en depósito, volumen.
+ *
+ * Devuelve el detalle para que el remito lo imprima y el operador lo vea antes
+ * de confirmar. Usa la config editable de /admin/precios.
+ */
+export function descuentosVenta(
+  subtotal: number,
+  cond: CondicionesDescuento,
+  config: ConfigPrecios = CONFIG_PRECIOS_DEFAULT
+): ResultadoVenta {
+  const descuentos: DescuentoAplicado[] = [];
+  let pct = 0;
+
+  if (cond.formaPago === "efectivo" && config.descuentoEfectivoPct > 0) {
+    pct += config.descuentoEfectivoPct;
+    descuentos.push({ concepto: "Pago en efectivo", pct: config.descuentoEfectivoPct, monto: 0 });
+  }
+  if (cond.retiraEnDeposito && config.descuentoRetiroPct > 0) {
+    pct += config.descuentoRetiroPct;
+    descuentos.push({ concepto: "Retira en depósito", pct: config.descuentoRetiroPct, monto: 0 });
+  }
+  if (cond.porVolumen && config.descuentoVolumenPct > 0) {
+    pct += config.descuentoVolumenPct;
+    descuentos.push({ concepto: "Por volumen", pct: config.descuentoVolumenPct, monto: 0 });
+  }
+
+  let total: number;
+  if (config.acumulaSumando) {
+    total = subtotal * (1 - pct / 100);
+  } else {
+    total = subtotal;
+    for (const d of descuentos) total = total * (1 - d.pct / 100);
+  }
+  total = Math.round((total + Number.EPSILON) * 100) / 100;
+
+  // Repartir el monto total del descuento entre los conceptos (para el detalle),
+  // dándole el resto al último así la suma cierra exacto con (subtotal - total).
+  const deltaTotal = Math.round((total - subtotal + Number.EPSILON) * 100) / 100;
+  const pctTotal = descuentos.reduce((s, d) => s + d.pct, 0);
+  let acum = 0;
+  descuentos.forEach((d, i) => {
+    if (pctTotal === 0) return;
+    const monto =
+      i === descuentos.length - 1
+        ? Math.round((deltaTotal - acum) * 100) / 100
+        : Math.round((deltaTotal * d.pct) / pctTotal * 100) / 100;
+    d.monto = monto;
+    acum = Math.round((acum + monto) * 100) / 100;
+  });
+
+  return { subtotal: Math.round(subtotal * 100) / 100, descuentos, total };
+}
+
 export type ListaTipo = "distribuidor" | "especial";
 
 /** Cómo se le cobra a un cliente. Vive en el documento del cliente. */

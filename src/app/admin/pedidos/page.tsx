@@ -24,6 +24,11 @@ import RegistroHistorico from "@/components/RegistroHistorico";
 import { useAuth } from "@/context/AuthContext";
 import { formatARS, formatDate } from "@/lib/format";
 import { coincide } from "@/lib/search";
+import { descuentosVenta } from "@/lib/precios";
+import {
+  DEFAULT_PRECIOS_CONFIG,
+  subscribePreciosConfig,
+} from "@/lib/preciosConfig";
 import type {
   Factura,
   FormaPago,
@@ -144,6 +149,10 @@ function NuevaVentaView({
   const [costsListo, setCostsListo] = useState(false);
   const [cliente, setCliente] = useState("");
   const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
+  // Condiciones de descuento que el operador confirma al cerrar la venta.
+  const [retiraDeposito, setRetiraDeposito] = useState(false);
+  const [porVolumen, setPorVolumen] = useState(false);
+  const [cfgPrecios, setCfgPrecios] = useState(DEFAULT_PRECIOS_CONFIG);
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<POSLine[]>([]);
   const [busy, setBusy] = useState(false);
@@ -164,6 +173,8 @@ function NuevaVentaView({
       }),
     []
   );
+
+  useEffect(() => subscribePreciosConfig(setCfgPrecios), []);
 
   const resultados = useMemo(() => {
     const t = q.trim();
@@ -220,8 +231,26 @@ function NuevaVentaView({
     }
   };
 
-  const total = lines.reduce((s, l) => s + l.precioVenta * l.cantidad, 0);
+  const subtotal = lines.reduce((s, l) => s + l.precioVenta * l.cantidad, 0);
   const totalItems = lines.reduce((s, l) => s + l.cantidad, 0);
+
+  // Descuentos por condición, en vivo, con la config editable.
+  const ventaConDesc = useMemo(
+    () =>
+      descuentosVenta(
+        subtotal,
+        { formaPago, retiraEnDeposito: retiraDeposito, porVolumen },
+        {
+          descuentoEfectivoPct: cfgPrecios.descuentoEfectivoPct,
+          descuentoRetiroPct: cfgPrecios.descuentoRetiroPct,
+          descuentoVolumenPct: cfgPrecios.descuentoVolumenPct,
+          volumenMinBultos: cfgPrecios.volumenMinBultos,
+          acumulaSumando: cfgPrecios.acumulaSumando,
+        }
+      ),
+    [subtotal, formaPago, retiraDeposito, porVolumen, cfgPrecios]
+  );
+  const total = ventaConDesc.total;
 
   const generar = async () => {
     setError(null);
@@ -265,6 +294,19 @@ function NuevaVentaView({
         items,
         clienteNombre: cliente.trim() || undefined,
         formaPago,
+        // Los descuentos por condición que ve el operador son los que se guardan
+        // e imprimen. Se recalculan sobre los items saneados por las dudas.
+        descuentos: descuentosVenta(
+          totalCalc,
+          { formaPago, retiraEnDeposito: retiraDeposito, porVolumen },
+          {
+            descuentoEfectivoPct: cfgPrecios.descuentoEfectivoPct,
+            descuentoRetiroPct: cfgPrecios.descuentoRetiroPct,
+            descuentoVolumenPct: cfgPrecios.descuentoVolumenPct,
+            volumenMinBultos: cfgPrecios.volumenMinBultos,
+            acumulaSumando: cfgPrecios.acumulaSumando,
+          }
+        ).descuentos,
         createdBy: user?.uid,
       });
       if (printWin) {
@@ -276,6 +318,8 @@ function NuevaVentaView({
       setLines([]);
       setCliente("");
       setFormaPago("efectivo");
+      setRetiraDeposito(false);
+      setPorVolumen(false);
     } catch (e) {
       console.error(e);
       if (printWin) printWin.close();
@@ -467,11 +511,22 @@ function NuevaVentaView({
       {/* ----- Panel de venta (lateral) ----- */}
       <div className="flex h-fit flex-col gap-3 lg:sticky lg:top-4">
         <div className="rounded-2xl border-2 border-primary/20 bg-surface p-4 shadow-sm">
-          <div className="flex items-baseline justify-between border-b border-brand-border pb-2">
+          <div className="flex items-baseline justify-between pb-1">
             <span className="text-sm text-brand-dark/60">Subtotal</span>
-            <span className="text-sm font-medium">{formatARS(total)}</span>
+            <span className="text-sm font-medium">{formatARS(subtotal)}</span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
+          {ventaConDesc.descuentos.map((d) => (
+            <div
+              key={d.concepto}
+              className="flex items-baseline justify-between text-sm text-emerald-700"
+            >
+              <span>
+                {d.concepto} ({d.pct}%)
+              </span>
+              <span>{formatARS(d.monto)}</span>
+            </div>
+          ))}
+          <div className="mt-2 flex items-baseline justify-between border-t border-brand-border pt-2">
             <span className="font-serif text-lg text-brand-dark">TOTAL</span>
             <span className="font-serif text-3xl font-bold text-primary">
               {formatARS(total)}
@@ -508,6 +563,47 @@ function NuevaVentaView({
                 {f.label}
               </button>
             ))}
+          </div>
+
+          {/* Descuentos por condición: el operador confirma cuáles aplican y el
+              total de arriba se recalcula solo. El de efectivo lo activa la
+              forma de pago. */}
+          <label className="mb-1 mt-3 block text-[11px] font-bold uppercase text-brand-dark/55">
+            Descuentos
+          </label>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 text-sm text-brand-dark/80">
+              <input
+                type="checkbox"
+                checked={formaPago === "efectivo"}
+                readOnly
+                disabled
+                className="h-4 w-4"
+              />
+              Pago en efectivo ({cfgPrecios.descuentoEfectivoPct}%)
+              <span className="text-xs text-brand-dark/40">
+                — según la forma de pago
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-brand-dark/80">
+              <input
+                type="checkbox"
+                checked={retiraDeposito}
+                onChange={(e) => setRetiraDeposito(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Retira en depósito ({cfgPrecios.descuentoRetiroPct}%)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-brand-dark/80">
+              <input
+                type="checkbox"
+                checked={porVolumen}
+                onChange={(e) => setPorVolumen(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Por volumen +{cfgPrecios.volumenMinBultos} bultos (
+              {cfgPrecios.descuentoVolumenPct}%)
+            </label>
           </div>
 
           {error && (

@@ -54,6 +54,22 @@ function copia(r: Remito, etiqueta: string): string {
   <div class="hr"></div>
   ${itemsHTML(r)}
   <div class="hr"></div>
+  ${
+    r.descuentos && r.descuentos.length > 0
+      ? `<div class="row"><span>Subtotal</span><span>${ars(
+          r.subtotal ?? r.total
+        )}</span></div>` +
+        r.descuentos
+          .map(
+            (d) =>
+              `<div class="row"><span>${esc(d.concepto)} (${d.pct}%)</span><span>${ars(
+                d.monto
+              )}</span></div>`
+          )
+          .join("") +
+        `<div class="hr"></div>`
+      : ""
+  }
   <div class="row total"><span>TOTAL</span><span>${ars(r.total)}</span></div>
   <div class="firma">Recibí conforme</div>
   <p class="nota">Documento no válido como factura. Comprobante de entrega de mercadería.</p>`;

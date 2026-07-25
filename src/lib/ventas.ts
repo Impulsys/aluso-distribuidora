@@ -122,6 +122,8 @@ interface RemitoMeta {
   clienteNombre?: string;
   clienteCuit?: string;
   formaPago?: FormaPago;
+  /** Descuentos por condición ya calculados al cerrar la venta. */
+  descuentos?: Remito["descuentos"];
   createdBy?: string;
 }
 
@@ -136,7 +138,12 @@ async function persistRemito(
   items: RemitoItem[],
   meta: RemitoMeta
 ): Promise<Remito> {
-  const total = items.reduce((s, it) => s + it.precioVenta * it.cantidad, 0);
+  const subtotal = items.reduce((s, it) => s + it.precioVenta * it.cantidad, 0);
+  // El total FINAL resta los descuentos por condición que llegaron ya
+  // calculados. Si no hay descuentos, total === subtotal (como antes).
+  const descuentos = meta.descuentos ?? [];
+  const descTotal = descuentos.reduce((s, d) => s + d.monto, 0); // monto negativo
+  const total = Math.round((subtotal + descTotal + Number.EPSILON) * 100) / 100;
   const now = Date.now();
   const base = {
     orderId: meta.orderId ?? null,
@@ -145,6 +152,8 @@ async function persistRemito(
     clienteCuit: meta.clienteCuit ?? null,
     formaPago: meta.formaPago ?? "efectivo",
     items,
+    subtotal: Math.round(subtotal * 100) / 100,
+    descuentos,
     total,
     createdBy: meta.createdBy ?? null,
     createdAt: now,
@@ -253,12 +262,14 @@ export async function crearRemitoDirecto(input: {
   items: RemitoItem[];
   clienteNombre?: string;
   formaPago?: FormaPago;
+  descuentos?: Remito["descuentos"];
   createdBy?: string;
 }): Promise<Remito> {
   return persistRemito(input.items, {
     origin: "vendedor",
     clienteNombre: input.clienteNombre,
     formaPago: input.formaPago,
+    descuentos: input.descuentos,
     createdBy: input.createdBy,
   });
 }
