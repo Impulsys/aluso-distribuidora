@@ -17,6 +17,7 @@ const TABS = [
   { href: "/admin/cheques", label: "🧾 Cheques" },
   { href: "/admin/cuentas", label: "💳 Cuentas Ctes" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },
+  { href: "/admin/comisiones", label: "💼 Comisiones" },
   { href: "/admin/bitacora", label: "📋 Bitácora" },
   // Estaba huérfana: no figuraba en ningún menú, solo se llegaba por URL.
   { href: "/admin/configuracion", label: "⚙️ Configuración" },

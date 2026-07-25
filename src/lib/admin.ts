@@ -69,6 +69,28 @@ export async function updateUserPricing(
   });
 }
 
+/**
+ * Comisión de un vendedor y quién lo reclutó. comisionPct undefined → usa el
+ * default de la config; reclutadoPor undefined → no lo reclutó nadie.
+ */
+export async function updateUserComision(
+  uid: string,
+  comisionPct: number | undefined,
+  reclutadoPor: string | undefined
+): Promise<void> {
+  await updateDoc(doc(db, "users", uid), {
+    comisionPct: comisionPct ?? null,
+    reclutadoPor: reclutadoPor ?? null,
+  });
+  logActivity("Cambió comisión de vendedor", {
+    detalle: `→ ${comisionPct != null ? comisionPct + "%" : "default"}${
+      reclutadoPor ? " · reclutado" : ""
+    }`,
+    entidad: "usuario",
+    entidadId: uid,
+  });
+}
+
 // ==================== PEDIDOS ====================
 export async function updateOrderStatus(
   id: string,

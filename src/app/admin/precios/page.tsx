@@ -205,6 +205,42 @@ export default function AdminPreciosPage() {
           Guardar descuentos
         </button>
       </section>
+
+      {/* ===== COMISIONES ===== */}
+      <section className="mt-8 rounded-2xl border border-brand-border bg-surface p-5 shadow-sm">
+        <h2 className="mb-1 text-sm font-bold text-primary">
+          Comisiones de vendedores
+        </h2>
+        <p className="mb-4 text-xs text-brand-dark/55">
+          Valores por defecto. Cada vendedor puede tener su propio % desde
+          Usuarios. El reporte de comisiones está en su propia sección.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo
+            label="Comisión por defecto del vendedor"
+            value={cfg.comisionDefaultPct}
+            onChange={(v) => setDesc("comisionDefaultPct", v)}
+            suffix="%"
+          />
+          <Campo
+            label="Override del reclutador (sobre lo que vende el reclutado)"
+            value={cfg.overridePct}
+            onChange={(v) => setDesc("overridePct", v)}
+            suffix="%"
+          />
+        </div>
+        <button
+          onClick={() =>
+            guardar({
+              comisionDefaultPct: cfg.comisionDefaultPct,
+              overridePct: cfg.overridePct,
+            })
+          }
+          className="mt-4 rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-white hover:bg-primary-dark"
+        >
+          Guardar comisiones
+        </button>
+      </section>
     </div>
   );
 }

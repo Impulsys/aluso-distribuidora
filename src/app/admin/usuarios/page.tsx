@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllUsers, updateUserRole, updateUserPricing } from "@/lib/admin";
+import {
+  getAllUsers,
+  updateUserRole,
+  updateUserPricing,
+  updateUserComision,
+} from "@/lib/admin";
 import {
   DEFAULT_PRECIOS_CONFIG,
   subscribePreciosConfig,
@@ -54,8 +59,9 @@ export default function AdminUsuariosPage() {
   const [markupNuevo, setMarkupNuevo] = useState<number>(28);
   const [descuentoNuevo, setDescuentoNuevo] = useState<number>(0);
   const [creating, setCreating] = useState(false);
-  // Listas de precio configurables (viven en config/precios).
-  const [listas, setListas] = useState(DEFAULT_PRECIOS_CONFIG.listas);
+  // Config de precios/comisiones (vive en config/precios).
+  const [preciosCfg, setPreciosCfg] = useState(DEFAULT_PRECIOS_CONFIG);
+  const listas = preciosCfg.listas;
   const [createError, setCreateError] = useState<string | null>(null);
   const [createOk, setCreateOk] = useState<string | null>(null);
 
@@ -76,10 +82,7 @@ export default function AdminUsuariosPage() {
     refresh();
   }, []);
 
-  useEffect(
-    () => subscribePreciosConfig((c) => setListas(c.listas)),
-    []
-  );
+  useEffect(() => subscribePreciosConfig(setPreciosCfg), []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +177,30 @@ export default function AdminUsuariosPage() {
     } catch (e) {
       console.error(e);
       alert("No se pudo cambiar los precios del cliente.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleComision = async (
+    uid: string,
+    comision: number,
+    reclutadoPor: string
+  ) => {
+    setBusy(uid);
+    try {
+      // Vacío/0 en comisión → default de la config. "" en reclutador → nadie.
+      const c = comision > 0 ? comision : undefined;
+      const r = reclutadoPor || undefined;
+      await updateUserComision(uid, c, r);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.uid === uid ? { ...u, comisionPct: c, reclutadoPor: r } : u
+        )
+      );
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo cambiar la comisión.");
     } finally {
       setBusy(null);
     }
@@ -487,6 +514,53 @@ export default function AdminUsuariosPage() {
                   className="w-16 rounded-full border border-brand-border px-2 py-1 text-center text-xs outline-none focus:border-primary"
                 />
                 <span className="text-xs text-brand-dark/50">%</span>
+              </div>
+            )}
+
+            {/* Comisión: solo para vendedores. Su % y quién lo reclutó. */}
+            {u.role === "vendedor" && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-brand-dark/50">Comisión:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  step="0.5"
+                  defaultValue={u.comisionPct ?? ""}
+                  disabled={busy === u.uid}
+                  placeholder={String(preciosCfg.comisionDefaultPct)}
+                  onBlur={(e) => {
+                    const v = Math.max(0, Number(e.target.value) || 0);
+                    if (v !== (u.comisionPct ?? 0))
+                      handleComision(u.uid, v, u.reclutadoPor ?? "");
+                  }}
+                  className="w-16 rounded-full border border-brand-border px-2 py-1 text-center text-xs outline-none focus:border-primary"
+                />
+                <span className="text-xs text-brand-dark/50">%</span>
+                <span className="ml-2 text-xs text-brand-dark/50">
+                  Reclutado por:
+                </span>
+                <select
+                  value={u.reclutadoPor ?? ""}
+                  disabled={busy === u.uid}
+                  onChange={(e) =>
+                    handleComision(
+                      u.uid,
+                      u.comisionPct ?? 0,
+                      e.target.value
+                    )
+                  }
+                  className="rounded-full border border-brand-border bg-surface px-2 py-1 text-xs outline-none focus:border-primary"
+                >
+                  <option value="">Nadie</option>
+                  {users
+                    .filter((o) => o.role === "vendedor" && o.uid !== u.uid)
+                    .map((o) => (
+                      <option key={o.uid} value={o.uid}>
+                        {o.displayName}
+                      </option>
+                    ))}
+                </select>
               </div>
             )}
             <p className="mt-2 text-[11px] text-brand-dark/40">

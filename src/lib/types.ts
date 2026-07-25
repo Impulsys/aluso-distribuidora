@@ -32,6 +32,16 @@ export interface AppUser {
    * aplican en el remito según cómo se cierre la venta.)
    */
   descuentoExtraPct?: number;
+  /**
+   * Comisión del vendedor (%) sobre lo que vende. Ausente = usa el default de
+   * la config. Solo aplica a usuarios con rol "vendedor".
+   */
+  comisionPct?: number;
+  /**
+   * uid del vendedor que lo RECLUTÓ. Si está, el reclutador cobra un override
+   * sobre las ventas de este vendedor (ver lib/comisiones).
+   */
+  reclutadoPor?: string;
   createdAt: number;
 }
 

@@ -13,6 +13,7 @@
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { LISTAS_PRECIO, CONFIG_PRECIOS_DEFAULT } from "./precios";
+import { CONFIG_COMISIONES_DEFAULT } from "./comisiones";
 
 export interface ListaPrecio {
   nombre: string;
@@ -29,6 +30,10 @@ export interface PreciosConfig {
   volumenMinBultos: number;
   /** true = los % de descuento se suman; false = se aplican uno sobre otro. */
   acumulaSumando: boolean;
+  /** Comisión por defecto de un vendedor (% de sus ventas). */
+  comisionDefaultPct: number;
+  /** % que cobra un reclutador sobre las ventas de cada reclutado (override). */
+  overridePct: number;
 }
 
 export const DEFAULT_PRECIOS_CONFIG: PreciosConfig = {
@@ -38,6 +43,8 @@ export const DEFAULT_PRECIOS_CONFIG: PreciosConfig = {
   descuentoVolumenPct: CONFIG_PRECIOS_DEFAULT.descuentoVolumenPct,
   volumenMinBultos: CONFIG_PRECIOS_DEFAULT.volumenMinBultos,
   acumulaSumando: CONFIG_PRECIOS_DEFAULT.acumulaSumando,
+  comisionDefaultPct: CONFIG_COMISIONES_DEFAULT.comisionDefaultPct,
+  overridePct: CONFIG_COMISIONES_DEFAULT.overridePct,
 };
 
 const CONFIG_DOC = "config/precios";
