@@ -11,11 +11,14 @@ const TABS = [
   { href: "/admin/clientes", label: "👤 Clientes" },
   { href: "/admin/entregas", label: "🛵 Entregas" },
   { href: "/admin/camiones", label: "🚚 Camiones" },
+  { href: "/admin/logistica", label: "📐 Logística" },
   { href: "/admin/gastos", label: "💸 Egresos" },
   { href: "/admin/cheques", label: "🧾 Cheques" },
   { href: "/admin/cuentas", label: "💳 Cuentas Ctes" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },
   { href: "/admin/bitacora", label: "📋 Bitácora" },
+  // Estaba huérfana: no figuraba en ningún menú, solo se llegaba por URL.
+  { href: "/admin/configuracion", label: "⚙️ Configuración" },
   { href: "/contador", label: "🧮 Contaduría" },
 ];
 

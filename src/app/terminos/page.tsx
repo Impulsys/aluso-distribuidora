@@ -24,7 +24,7 @@ export default function TerminosPage() {
           <h2 className="font-serif text-xl text-brand-dark">1. Quiénes somos</h2>
           <p>
             Esta plataforma pertenece a <b>ALUSO DISTRIBUIDORA</b>,
-            con domicilio comercial en el Noroeste argentino. Es un canal
+            con domicilio comercial en Buenos Aires. Es un canal
             digital de catálogo y pedidos mayoristas. El sitio es operado y
             mantenido por Impulsys en nombre de la distribuidora.
           </p>

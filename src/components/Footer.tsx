@@ -35,8 +35,9 @@ export default function Footer() {
             </div>
           </div>
           <p className="mt-4 text-sm text-white/70">
-            Distribución mayorista de productos Lenterdit (Doncella & Nonisec)
-            para farmacias, geriátricos y comercios del Noroeste argentino.
+            Distribución mayorista de productos Lenterdit (Doncella &amp; Nonisec)
+            para distribuidores, comercios, geriátricos y farmacias de todo el
+            país.
           </p>
         </div>
 
