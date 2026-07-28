@@ -1,5 +1,5 @@
-// Reporte diario de caja en ticket de 80mm (se imprime en la térmica de la caja).
-import { ars, esc, fechaCorta, ticketDoc, ticketHeader, abrirTicket } from "./ticket";
+// Reporte diario de caja en HOJA A4 (imprimir / guardar PDF con el navegador).
+import { ars, esc, fechaCorta, a4Header, a4Doc, abrirA4 } from "./a4";
 
 export interface ReporteCajaData {
   fecha: number;
@@ -22,50 +22,58 @@ export function reporteCajaHTML(
   d: ReporteCajaData,
   opts: { autoprint?: boolean } = {}
 ): string {
-  const row = (l: string, v: number) =>
-    `<div class="row small"><span>${esc(l)}</span><span>${ars(v)}</span></div>`;
+  const row = (l: string, v: number, cls = "") =>
+    `<div class="row ${cls}"><span>${esc(l)}</span><span>${ars(v)}</span></div>`;
 
   const inner = `
-  ${ticketHeader()}
-  <div class="doc">REPORTE DE CAJA</div>
-  <div class="row small"><span>Fecha</span><span>${fechaCorta(d.fecha)}</span></div>
-  <div class="row small"><span>Estado</span><span>${
-    d.cerrado ? "CERRADA" : "Abierta"
-  }</span></div>
-  ${
-    d.cerrado && d.cerradoPor
-      ? `<div class="row small"><span>Cerró</span><span>${esc(
-          d.cerradoPor
-        )}</span></div>`
-      : ""
-  }
-  <div class="hr"></div>
-  <div class="n">VENTAS</div>
-  ${row("Total ventas", d.ventas)}
-  ${row("· Efectivo", d.ventaEfectivo)}
-  ${row("· Transferencia", d.ventaTransfer)}
-  ${d.ventaCheque > 0 ? row("· Cheque", d.ventaCheque) : ""}
-  <div class="hr"></div>
-  ${row("Egresos", -d.gastosTotal)}
-  ${row("Pagos a proveedores", -d.pagosTotal)}
-  <div class="row total"><span>Disponible</span><span>${ars(d.disponible)}</span></div>
-  <div class="hr"></div>
-  <div class="n">CIERRE</div>
-  ${row("Caja inicial", d.cajaInicial)}
-  ${row("Efectivo esperado", d.efectivoEsperado)}
-  ${d.efectivoContado != null ? row("Efectivo contado", d.efectivoContado) : ""}
-  ${
-    d.diferencia != null
-      ? `<div class="row total"><span>Diferencia</span><span>${ars(
-          d.diferencia
-        )}</span></div>`
-      : ""
-  }
-  <p class="nota">Generado el ${fechaCorta(Date.now())}</p>`;
+    ${a4Header()}
 
-  return ticketDoc("Reporte de caja", inner, opts);
+    <div class="doc-head">
+      <span class="tipo">REPORTE DE CAJA</span>
+      <div style="text-align:right">
+        <div class="nro">${fechaCorta(d.fecha)}</div>
+        <div class="fecha">${d.cerrado ? "CERRADA" : "Abierta"}${
+    d.cerrado && d.cerradoPor ? ` · cerró ${esc(d.cerradoPor)}` : ""
+  }</div>
+      </div>
+    </div>
+
+    <div class="bloques">
+      <div class="bloque">
+        <h3>Ventas</h3>
+        ${row("Total ventas", d.ventas, "fuerte")}
+        ${row("· Efectivo", d.ventaEfectivo)}
+        ${row("· Transferencia", d.ventaTransfer)}
+        ${d.ventaCheque > 0 ? row("· Cheque", d.ventaCheque) : ""}
+      </div>
+
+      <div class="bloque">
+        <h3>Egresos del día</h3>
+        ${row("Gastos", -d.gastosTotal)}
+        ${row("Pagos a proveedores", -d.pagosTotal)}
+        ${row("Disponible", d.disponible, "fuerte")}
+      </div>
+    </div>
+
+    <div class="totales" style="width:60%;">
+      <h3 style="margin:0 0 6px; color:#0a5b7a; font-size:13px;">Cierre</h3>
+      ${row("Caja inicial", d.cajaInicial)}
+      ${row("Efectivo esperado", d.efectivoEsperado)}
+      ${d.efectivoContado != null ? row("Efectivo contado", d.efectivoContado) : ""}
+      ${
+        d.diferencia != null
+          ? `<div class="row total"><span>Diferencia</span><span>${ars(
+              d.diferencia
+            )}</span></div>`
+          : ""
+      }
+    </div>
+
+    <p class="nota">Generado el ${fechaCorta(Date.now())}</p>`;
+
+  return a4Doc("Reporte de caja", inner, opts);
 }
 
 export function printReporteCaja(d: ReporteCajaData): void {
-  abrirTicket(reporteCajaHTML(d, { autoprint: true }));
+  abrirA4(reporteCajaHTML(d, { autoprint: true }));
 }

@@ -1,8 +1,8 @@
-// Factura en ticket de 80mm (impresora térmica). Lleva tipo A/B, neto/IVA
-// (en A discriminado) y, si está emitida en AFIP, el CAE + QR oficial.
+// Factura en HOJA A4 (imprimir / guardar PDF con el navegador). Lleva tipo A/B,
+// neto/IVA (en A discriminado) y, si está emitida en AFIP, el CAE + QR oficial.
 import * as QRCode from "qrcode";
 import type { Factura } from "./types";
-import { ars, esc, fechaCorta, ticketDoc, ticketHeader, abrirTicket } from "./ticket";
+import { ars, esc, fechaCorta, a4Header, a4Doc, abrirA4 } from "./a4";
 
 /** "YYYYMMDD" (formato AFIP) → "DD/MM/AAAA". */
 function fmtCaeVto(s?: string | null): string {
@@ -17,66 +17,87 @@ export function facturaHTML(
   const items = f.items
     .map(
       (it) => `
-      <div class="it">
-        <div class="n">${esc(it.nombre)}</div>
-        <div class="d">
-          <span>${it.cantidad} x ${ars(it.precioVenta)}</span>
-          <span>${ars(it.precioVenta * it.cantidad)}</span>
-        </div>
-      </div>`
+      <tr>
+        <td>${esc(it.nombre)}</td>
+        <td class="num">${it.cantidad}</td>
+        <td class="num">${ars(it.precioVenta)}</td>
+        <td class="num">${ars(it.precioVenta * it.cantidad)}</td>
+      </tr>`
     )
     .join("");
 
   const totales =
     f.tipo === "A"
-      ? `<div class="row small"><span>Neto gravado</span><span>${ars(
-          f.neto
-        )}</span></div>
-         <div class="row small"><span>IVA 21%</span><span>${ars(f.iva)}</span></div>
+      ? `<div class="row"><span>Neto gravado</span><span>${ars(f.neto)}</span></div>
+         <div class="row"><span>IVA 21%</span><span>${ars(f.iva)}</span></div>
          <div class="row total"><span>TOTAL</span><span>${ars(f.total)}</span></div>`
       : `<div class="row total"><span>TOTAL</span><span>${ars(f.total)}</span></div>`;
 
   const cliente = f.consumidorFinal
     ? "Consumidor Final"
-    : `${esc(f.razonSocial || "—")}${f.cuit ? ` · CUIT ${esc(f.cuit)}` : ""}`;
-
-  const cae = f.cae
-    ? `<div class="row small"><span>CAE</span><span>${esc(f.cae)}</span></div>
-       <div class="row small"><span>Vto CAE</span><span>${fmtCaeVto(
-         f.caeVto
-       )}</span></div>`
-    : `<p class="nota">Comprobante interno · pendiente de CAE (AFIP)</p>`;
-
-  // QR oficial (solo si está emitida y la verificación no dio mismatch)
-  const qr =
-    opts.qrDataUrl && f.verification !== "mismatch"
-      ? `<div class="center" style="margin-top:8px;">
-           <img src="${opts.qrDataUrl}" alt="QR AFIP" style="width:150px;height:150px;" />
-         </div>`
-      : "";
+    : esc(f.razonSocial || "—");
+  const cuit = f.consumidorFinal ? "—" : esc(f.cuit || "—");
 
   const nro = f.numero ? `N° ${esc(f.numero)}` : "Interno";
 
-  const inner = `
-  ${ticketHeader()}
-  <div class="doc">FACTURA ${esc(f.tipo)} · ${nro}</div>
-  <div class="row small"><span>Fecha</span><span>${fechaCorta(f.fecha)}</span></div>
-  <div class="row small"><span>Cliente</span><span>${cliente}</span></div>
-  <div class="row small"><span>Remito</span><span>${esc(f.remitoNumero)}</span></div>
-  <div class="hr"></div>
-  ${items}
-  <div class="hr"></div>
-  ${totales}
-  <div class="hr"></div>
-  ${cae}
-  ${qr}
-  <p class="nota">${
-    f.cae
-      ? "Comprobante autorizado por AFIP."
-      : "Documento interno (sin CAE)."
-  }</p>`;
+  const cae = f.cae
+    ? `<div class="cae">
+         <div><span class="lbl">CAE:</span> <b>${esc(f.cae)}</b></div>
+         <div><span class="lbl">Vto. CAE:</span> ${fmtCaeVto(f.caeVto)}</div>
+       </div>`
+    : `<p class="nota">Comprobante interno · pendiente de CAE (AFIP)</p>`;
 
-  return ticketDoc(`Factura ${f.tipo} ${f.numero || ""}`, inner, opts);
+  const qr =
+    opts.qrDataUrl && f.verification !== "mismatch"
+      ? `<img src="${opts.qrDataUrl}" alt="QR AFIP" style="width:120px;height:120px;" />`
+      : "";
+
+  const inner = `
+    ${a4Header()}
+
+    <div class="doc-head">
+      <span class="tipo">FACTURA ${esc(f.tipo)}</span>
+      <div style="text-align:right">
+        <div class="nro">${nro}</div>
+        <div class="fecha">${fechaCorta(f.fecha)}</div>
+      </div>
+    </div>
+
+    <div class="cliente">
+      <div><span class="lbl">Cliente:</span> ${cliente}</div>
+      <div><span class="lbl">CUIT:</span> ${cuit}</div>
+      <div><span class="lbl">Remito:</span> ${esc(f.remitoNumero)}</div>
+      <div><span class="lbl">Condición:</span> ${
+        f.consumidorFinal ? "Consumidor Final" : "Responsable Inscripto"
+      }</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th class="num">Cant.</th>
+          <th class="num">P. Unitario</th>
+          <th class="num">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>${items}</tbody>
+    </table>
+
+    <div class="totales">${totales}</div>
+
+    <div class="pie-fiscal">
+      <div>${cae}</div>
+      <div class="qr">${qr}</div>
+    </div>
+
+    <p class="nota">${
+      f.cae
+        ? "Comprobante autorizado por AFIP."
+        : "Documento interno (sin CAE de AFIP)."
+    }</p>`;
+
+  return a4Doc(`Factura ${f.tipo} ${f.numero || ""}`, inner, opts);
 }
 
 /** Genera el data-URL del QR (o "" si no hay). */
@@ -91,7 +112,7 @@ async function qrDataUrl(f: Factura): Promise<string> {
 
 /** Abre la factura y dispara impresión. La ventana se abre YA (gesto del click). */
 export async function printFactura(f: Factura): Promise<void> {
-  const w = window.open("", "_blank", "width=380,height=720");
+  const w = window.open("", "_blank", "width=900,height=1000");
   const qr = await qrDataUrl(f);
   const html = facturaHTML(f, { autoprint: true, qrDataUrl: qr });
   if (w) {
@@ -99,13 +120,13 @@ export async function printFactura(f: Factura): Promise<void> {
     w.document.close();
     w.focus();
   } else {
-    abrirTicket(html);
+    abrirA4(html);
   }
 }
 
 /** Abre la factura para verla (sin forzar impresión). */
 export async function openFactura(f: Factura): Promise<void> {
-  const w = window.open("", "_blank", "width=380,height=720");
+  const w = window.open("", "_blank", "width=900,height=1000");
   const qr = await qrDataUrl(f);
   const html = facturaHTML(f, { autoprint: false, qrDataUrl: qr });
   if (w) {
@@ -113,6 +134,6 @@ export async function openFactura(f: Factura): Promise<void> {
     w.document.close();
     w.focus();
   } else {
-    abrirTicket(html);
+    abrirA4(html);
   }
 }

@@ -288,7 +288,7 @@ function NuevaVentaView({
     setBusy(true);
     // Abrimos la ventana YA (en el gesto del click) para que no la bloquee el
     // navegador; la rellenamos cuando el remito esté creado.
-    const printWin = window.open("", "_blank", "width=820,height=900");
+    const printWin = window.open("", "_blank", "width=900,height=1000");
     try {
       const r = await crearRemitoDirecto({
         items,

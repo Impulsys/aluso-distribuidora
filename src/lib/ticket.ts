@@ -29,7 +29,15 @@ export function esc(s: string): string {
 }
 
 export function ars(n: number): string {
-  return "$ " + (n || 0).toLocaleString("es-AR");
+  // Siempre 2 decimales: en un comprobante "$ 22.043,2" queda mal; va
+  // "$ 22.043,20". Solo se usa en documentos impresos (remito/factura/caja).
+  return (
+    "$ " +
+    (n || 0).toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 export function fechaCorta(ts: number): string {
