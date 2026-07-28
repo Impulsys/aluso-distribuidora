@@ -181,7 +181,7 @@ function TruckCard({
             <input
               type="number"
               min={0}
-              step={1}
+              step="any"
               value={pct}
               disabled={savingPct}
               onChange={(e) => setPct(Number(e.target.value))}

@@ -187,7 +187,7 @@ export default function AdminChequesPage() {
               required
               type="number"
               min={0}
-              step={100}
+              step="any"
               value={monto || ""}
               onChange={(e) => setMonto(Number(e.target.value))}
               className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"

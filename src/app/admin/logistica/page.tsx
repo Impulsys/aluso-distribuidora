@@ -95,6 +95,7 @@ export default function LogisticaPage() {
             <input
               type="number"
               inputMode="numeric"
+              step="any"
               value={flete || ""}
               onChange={(e) => setFlete(num(e.target.value))}
               placeholder="0"

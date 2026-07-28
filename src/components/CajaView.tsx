@@ -503,6 +503,7 @@ function GastoDelDia({
           <input
             type="number"
             min={0}
+            step="any"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
             placeholder="0"

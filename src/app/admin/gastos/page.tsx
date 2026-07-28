@@ -220,7 +220,7 @@ export default function AdminGastosPage() {
             <input
               type="number"
               min={0}
-              step={100}
+              step="any"
               value={monto || ""}
               onChange={(e) => setMonto(Number(e.target.value))}
               required

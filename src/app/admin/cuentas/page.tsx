@@ -558,7 +558,7 @@ export default function AdminCuentasPage() {
                 <input
                   type="number"
                   min={0}
-                  step={1}
+                  step="any"
                   value={cPorcentaje}
                   onChange={(e) => setCPorcentaje(Number(e.target.value))}
                   className={inputCls}
