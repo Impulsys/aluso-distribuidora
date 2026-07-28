@@ -280,6 +280,7 @@ function CrearProductoModal({ onClose }: { onClose: () => void }) {
               <input
                 type="number"
                 min={0}
+                step="any"
                 value={precioVenta || ""}
                 onChange={(e) => setPrecioVenta(Number(e.target.value))}
                 className={inputCls}
@@ -289,6 +290,7 @@ function CrearProductoModal({ onClose }: { onClose: () => void }) {
               <input
                 type="number"
                 min={0}
+                step="any"
                 value={precioCosto || ""}
                 onChange={(e) => setPrecioCosto(Number(e.target.value))}
                 className={inputCls}
@@ -708,7 +710,7 @@ function EditForm({
         <input
           type="number"
           min={0}
-          step={1}
+          step="any"
           value={precioVenta}
           onChange={(e) => setPrecioVenta(Number(e.target.value))}
           className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
@@ -718,7 +720,7 @@ function EditForm({
         <input
           type="number"
           min={0}
-          step={1}
+          step="any"
           value={precioCosto}
           onChange={(e) => setPrecioCosto(Number(e.target.value))}
           className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
@@ -738,7 +740,7 @@ function EditForm({
         <input
           type="number"
           min={0}
-          step={1}
+          step="any"
           value={precioOferta}
           onChange={(e) => setPrecioOferta(Number(e.target.value))}
           className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
