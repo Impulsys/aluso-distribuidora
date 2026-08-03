@@ -519,7 +519,6 @@ function GastoDelDia({
           >
             <option value="efectivo">Efectivo</option>
             <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option>
           </select>
         </label>
         <label className="text-xs font-medium text-brand-dark/70">

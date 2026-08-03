@@ -42,14 +42,12 @@ import type {
   TipoFactura,
 } from "@/lib/types";
 
-// Faltaba "cheque", que sí existe en el tipo FormaPago, sí lo ofrece el carrito
-// del vendedor y sí lo usa la Caja. Una venta cobrada con cheque se registraba
-// como EFECTIVO: el arqueo del día cerraba con efectivo esperado inflado y el
-// cheque no quedaba trazado contra ninguna venta.
+// ALUSO no usa cheques (confirmado por el cliente): las formas de pago son
+// efectivo y transferencia. El tipo "cheque" sigue existiendo en FormaPago por
+// compatibilidad con datos viejos, pero no se ofrece.
 const FORMAS_PAGO: { id: FormaPago; label: string }[] = [
   { id: "efectivo", label: "💵 Efectivo" },
   { id: "transferencia", label: "🏦 Transferencia" },
-  { id: "cheque", label: "📄 Cheque" },
 ];
 
 const STATUS_OPTIONS: OrderStatus[] = [
@@ -676,7 +674,7 @@ function NuevaVentaView({
           <label className="mb-1 mt-3 block text-[11px] font-bold uppercase text-brand-dark/55">
             Forma de pago
           </label>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 gap-1">
             {FORMAS_PAGO.map((f) => (
               <button
                 key={f.id}

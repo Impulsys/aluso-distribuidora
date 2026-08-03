@@ -16,9 +16,9 @@ import {
   type FormaPago,
 } from "@/lib/types";
 
+// ALUSO no usa cheques (confirmado por el cliente).
 const FORMAS: { id: FormaPago; label: string; emoji: string }[] = [
   { id: "efectivo", label: "Efectivo", emoji: "💵" },
-  { id: "cheque", label: "Cheque", emoji: "🧾" },
   { id: "transferencia", label: "Transferencia", emoji: "🏦" },
 ];
 

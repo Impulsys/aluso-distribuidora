@@ -14,7 +14,6 @@ const TABS = [
   { href: "/admin/camiones", label: "🚚 Camiones" },
   { href: "/admin/logistica", label: "📐 Logística" },
   { href: "/admin/gastos", label: "💸 Egresos" },
-  { href: "/admin/cheques", label: "🧾 Cheques" },
   { href: "/admin/cuentas", label: "💳 Cuentas Ctes" },
   { href: "/admin/usuarios", label: "👥 Usuarios" },
   { href: "/admin/comisiones", label: "💼 Comisiones" },
