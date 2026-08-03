@@ -93,6 +93,7 @@ service cloud.firestore {
 
     // ===== Reportes: camiones, cheques, gastos, cajas ===== (gestión interna)
     match /trucks/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    match /envios/{id}         { allow read: if isVendedorOrUp(); allow write: if isSuperadmin(); }
     match /checks/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /expenses/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /cashClosings/{id}   { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }

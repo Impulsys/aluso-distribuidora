@@ -100,6 +100,62 @@ export function remitoHTML(r: Remito): string {
   return a4Shell(`Remito ${r.numero}`, body);
 }
 
+/**
+ * PROFORMA: el mismo remito pero SIN PRECIOS, para que el depósito arme el
+ * pedido sin ver importes (pedido de Luciano). Solo código, descripción y
+ * cantidad, con un casillero para tildar lo armado.
+ */
+export function proformaHTML(r: Remito): string {
+  const items = r.items
+    .map((it) => {
+      const cod = it.codigo ? `<span class="cod">${esc(it.codigo)}</span><br>` : "";
+      return `
+      <tr>
+        <td style="width:34px;text-align:center;color:#889">☐</td>
+        <td>${cod}${esc(it.nombre)}</td>
+        <td class="num" style="font-size:15px;font-weight:700">${it.cantidad}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const body = `
+  ${a4Toolbar()}
+  <div class="hoja">
+    ${a4Header()}
+    <div class="doc-head">
+      <span class="tipo">ORDEN DE ARMADO</span>
+      <div style="text-align:right">
+        <div class="nro">N° ${esc(r.numero)}</div>
+        <div class="fecha">${fechaCorta(r.fecha)}</div>
+      </div>
+    </div>
+    <div class="cliente">
+      <div><span class="lbl">Cliente:</span> ${esc(
+        r.clienteNombre || "Consumidor final"
+      )}</div>
+      <div><span class="lbl">Pedido:</span> ${esc(r.numero)}</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:34px">✓</th>
+          <th>Descripción</th>
+          <th class="num">Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>${items}</tbody>
+    </table>
+    <div class="firma">
+      <div class="linea">Armó el pedido</div>
+      <div class="linea">Controló</div>
+    </div>
+    <p class="nota">
+      Documento interno de armado. No es remito ni factura. Sin valores.
+    </p>
+  </div>`;
+  return a4Shell(`Proforma ${r.numero}`, body);
+}
+
 /** Abre la ventana del remito, lista para imprimir o guardar como PDF. */
 export function printRemito(r: Remito): void {
   abrirA4(remitoHTML(r));

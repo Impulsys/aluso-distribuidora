@@ -221,6 +221,10 @@ export interface Remito {
   anulado?: boolean; // venta anulada (devolvió stock); no cuenta en reportes/caja
   anuladoPor?: string;
   anuladoAt?: number;
+  /** Envío al que está asignado (módulo Logística de envíos). */
+  envioId?: string;
+  /** Estado de despacho, independiente del estado de la venta. */
+  estadoLogistica?: EstadoLogistica;
   createdBy?: string;
   createdAt: number;
   fecha: number; // fecha de la venta (timestamp)
@@ -251,6 +255,34 @@ export interface Factura {
   createdBy?: string;
   createdAt: number;
   fecha: number;
+}
+
+// ===== Módulo Logística de envíos =====
+
+export type EstadoLogistica =
+  | "pendiente" // sin asignar a un envío
+  | "asignado" // en un envío programado
+  | "preparacion" // el depósito lo está armando
+  | "listo" // armado, esperando que lo retire el flete
+  | "entregado"; // el cliente lo recibió
+
+export const ESTADO_LOGISTICA_LABELS: Record<EstadoLogistica, string> = {
+  pendiente: "Pendiente",
+  asignado: "Programado",
+  preparacion: "En preparación",
+  listo: "Listo para despachar",
+  entregado: "Entregado",
+};
+
+export interface Envio {
+  id: string;
+  fecha: number; // día de entrega (timestamp)
+  transporte: string; // nombre del flete, o "Retira en depósito"
+  estado: EstadoLogistica; // asignado → preparacion → listo → entregado
+  remitoIds: string[]; // los remitos (pedidos) que van en este envío
+  observaciones?: string;
+  createdBy?: string;
+  createdAt: number;
 }
 
 // ===== Módulo Reportes — operación por CAMIÓN =====

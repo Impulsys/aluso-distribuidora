@@ -62,6 +62,50 @@ function r2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+// ===== Volumen de un envío (para programar la logística) =====
+
+/** m³ que ocupa UN pallet armado, aprox. Configurable a futuro. */
+export const M3_POR_PALLET = 1.6;
+
+export interface ItemVolumen {
+  ean: string;
+  /** Unidades vendidas (no bultos). */
+  cantidad: number;
+  m3Bulto: number;
+  paqPorBulto: number;
+}
+
+export interface Volumen {
+  m3: number;
+  bultos: number;
+  pallets: number;
+}
+
+/**
+ * Calcula el volumen total de un envío a partir de los productos que lleva.
+ *
+ * La cantidad de los ítems está en UNIDADES (así se cargan hoy los precios), y
+ * cada bulto trae `paqPorBulto` unidades, así que los bultos = unidades /
+ * paqPorBulto. El volumen es proporcional (un bulto a medias ocupa su parte).
+ * Los pallets son una ESTIMACIÓN (m³ total / m³ por pallet); el armado fino del
+ * pallet surtido se define aparte.
+ */
+export function volumenDeEnvio(items: ItemVolumen[]): Volumen {
+  let m3 = 0;
+  let bultos = 0;
+  for (const it of items) {
+    if (it.cantidad <= 0 || it.paqPorBulto <= 0) continue;
+    const b = it.cantidad / it.paqPorBulto;
+    bultos += b;
+    m3 += b * it.m3Bulto;
+  }
+  return {
+    m3: r2(m3),
+    bultos: Math.round(bultos * 10) / 10,
+    pallets: m3 > 0 ? Math.ceil(m3 / M3_POR_PALLET) : 0,
+  };
+}
+
 /**
  * Reparte el costo de un flete entre las líneas de la carga.
  *

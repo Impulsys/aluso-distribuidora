@@ -66,3 +66,28 @@ test("las líneas con 0 bultos se ignoran", () => {
   assert.equal(r.lineas.length, 1);
   assert.equal(r.lineas[0].costoLinea, 30000);
 });
+
+// ===== volumenDeEnvio =====
+import { volumenDeEnvio } from "./logistica.ts";
+
+test("el volumen suma proporcional a los bultos", () => {
+  // 40 unidades, 40 por bulto → 1 bulto de 0,2 m³
+  const v = volumenDeEnvio([{ ean: "a", cantidad: 40, m3Bulto: 0.2, paqPorBulto: 40 }]);
+  assert.equal(v.bultos, 1);
+  assert.equal(v.m3, 0.2);
+  assert.equal(v.pallets, 1);
+});
+
+test("media docena de bultos estima los pallets", () => {
+  // 10 bultos de 0,2 m³ = 2 m³ → ceil(2/1.6) = 2 pallets
+  const v = volumenDeEnvio([{ ean: "a", cantidad: 400, m3Bulto: 0.2, paqPorBulto: 40 }]);
+  assert.equal(v.bultos, 10);
+  assert.equal(v.m3, 2);
+  assert.equal(v.pallets, 2);
+});
+
+test("un producto sin datos de paquetería no rompe", () => {
+  const v = volumenDeEnvio([{ ean: "a", cantidad: 40, m3Bulto: 0, paqPorBulto: 0 }]);
+  assert.equal(v.m3, 0);
+  assert.equal(v.pallets, 0);
+});
