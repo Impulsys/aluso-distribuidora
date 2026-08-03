@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { findTruckForDay } from "@/lib/trucks";
 import { getExpensesForDay } from "@/lib/cashflow";
 import { formatARS } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
@@ -20,13 +19,11 @@ import {
   type ExpenseType,
   type Remito,
   type SupplierPayment,
-  type Truck,
 } from "@/lib/types";
 
 interface Props {
   dayTs: number | null; // EOD del día seleccionado (null = cerrado)
   onClose: () => void;
-  trucks: Truck[];
   remitos: Remito[];
 }
 
@@ -53,14 +50,12 @@ const EXPENSE_TYPES: ExpenseType[] = [
   "mantenimiento",
   "sueldos",
   "fletes",
-  "cobertura_cheques",
   "adelantos",
 ];
 
 export default function DayReportModal({
   dayTs,
   onClose,
-  trucks,
   remitos,
 }: Props) {
   const { user } = useAuth();
@@ -143,7 +138,6 @@ export default function DayReportModal({
   const data = useMemo(() => {
     if (dayTs === null) return null;
     const { start, end, date } = dayBounds(dayTs);
-    const truck = findTruckForDay(trucks, start);
 
     // La VENTA del día = remitos no anulados (fuente única de verdad)
     const dayRemitos = remitos.filter(
@@ -183,14 +177,14 @@ export default function DayReportModal({
      * STOCK DEL DÍA: inicial → vendido → final, para poder controlar.
      *
      * El stock guardado en el producto es el de AHORA, así que para un día
-     * pasado hay que "rebobinar": deshacer las ventas y las recepciones
-     * POSTERIORES a ese día. Después, el inicial sale del final del día.
+     * pasado hay que "rebobinar": deshacer las ventas POSTERIORES a ese día.
+     * Después, el inicial sale del final del día.
      *
-     *   final del día = stock de hoy + vendido después − recibido después
-     *   inicial       = final del día + vendido ese día − recibido ese día
+     *   final del día = stock de hoy + vendido después
+     *   inicial       = final del día + vendido ese día
      *
-     * Ojo: solo contempla ventas (remitos) y recepciones de camión. Si alguien
-     * corrige el stock a mano desde Productos, ese ajuste no se ve acá.
+     * Ojo: solo contempla ventas (remitos). Si se corrige el stock a mano desde
+     * Productos, ese ajuste no se refleja acá.
      */
     const vendidoDespues = new Map<string, number>();
     remitos
@@ -204,37 +198,14 @@ export default function DayReportModal({
         )
       );
 
-    const recibidoEnElDia = new Map<string, number>();
-    const recibidoDespues = new Map<string, number>();
-    trucks.forEach((t) => {
-      const destino =
-        t.fechaIngreso >= start && t.fechaIngreso <= end
-          ? recibidoEnElDia
-          : t.fechaIngreso > end
-          ? recibidoDespues
-          : null;
-      if (!destino) return;
-      (t.carga ?? []).forEach((c) =>
-        destino.set(
-          c.productId,
-          (destino.get(c.productId) ?? 0) + c.cantidadUnidades
-        )
-      );
-    });
-
     const items = Array.from(itemsMap.values())
       .map((it) => {
         const stockHoy = productos.find((p) => p.id === it.productId)?.stock ?? 0;
-        const stockFinal =
-          stockHoy +
-          (vendidoDespues.get(it.productId) ?? 0) -
-          (recibidoDespues.get(it.productId) ?? 0);
-        const recibido = recibidoEnElDia.get(it.productId) ?? 0;
+        const stockFinal = stockHoy + (vendidoDespues.get(it.productId) ?? 0);
         return {
           ...it,
-          recibido,
           stockFinal,
-          stockInicial: stockFinal + it.cantidad - recibido,
+          stockInicial: stockFinal + it.cantidad,
         };
       })
       .sort((a, b) => b.cantidad - a.cantidad);
@@ -256,9 +227,6 @@ export default function DayReportModal({
     const ventaTransferencia = dayRemitos
       .filter((r) => r.formaPago === "transferencia")
       .reduce((s, r) => s + r.total, 0);
-    const ventaCheque = dayRemitos
-      .filter((r) => r.formaPago === "cheque")
-      .reduce((s, r) => s + r.total, 0);
     // Total vendido; la caja física solo cuenta el EFECTIVO.
     const totalVendido = ventaRemitos;
     // MISMA fórmula que el cierre en Ventas → Caja (incluye los pagos a
@@ -271,15 +239,10 @@ export default function DayReportModal({
     });
     const pagosEfectivo =
       cajaInicial + ventaEfectivo - gastosEfectivo - cajaFisica;
-    const gananciaEstimada =
-      truck && truck.porcentajeGanancia
-        ? (ventaRemitos * truck.porcentajeGanancia) / 100
-        : 0;
 
     const totalUnidades = items.reduce((s, it) => s + it.cantidad, 0);
 
     return {
-      truck,
       items,
       totalUnidades,
       date,
@@ -290,16 +253,14 @@ export default function DayReportModal({
       pagosEfectivo,
       totalVendido,
       cajaFisica,
-      gananciaEstimada,
       dayRemitos,
       ventaRemitos,
       costoRemitos,
       gananciaRemitos,
       ventaEfectivo,
       ventaTransferencia,
-      ventaCheque,
     };
-  }, [dayTs, trucks, expenses, remitos, cajaInicial, pagos, productos]);
+  }, [dayTs, expenses, remitos, cajaInicial, pagos, productos]);
 
   if (dayTs === null || !data) return null;
 
@@ -312,11 +273,8 @@ export default function DayReportModal({
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Banda superior con color del camión */}
-        <div
-          className="h-3 w-full"
-          style={{ background: data.truck?.color ?? "#94a3b8" }}
-        />
+        {/* Banda superior */}
+        <div className="h-3 w-full bg-primary" />
         <div className="p-5 sm:p-6">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
@@ -336,44 +294,6 @@ export default function DayReportModal({
               ✕
             </button>
           </div>
-
-          {/* Camión */}
-          <section className="mt-4 rounded-xl border border-brand-border bg-primary-light/40 p-4">
-            {data.truck ? (
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="grid h-12 w-12 place-items-center rounded-full text-xl text-white shadow"
-                    style={{ background: data.truck.color }}
-                  >
-                    🚚
-                  </span>
-                  <div>
-                    <p className="text-xs uppercase text-brand-dark/55">
-                      Camión activo
-                    </p>
-                    <p className="font-serif text-lg font-medium text-brand-dark">
-                      {data.truck.nombre}
-                    </p>
-                  </div>
-                </div>
-                {showGanancia && (
-                  <div className="text-right">
-                    <p className="text-xs uppercase text-brand-dark/55">
-                      % Ganancia
-                    </p>
-                    <p className="font-serif text-2xl text-primary">
-                      {data.truck.porcentajeGanancia}%
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-brand-dark/55">
-                No había camión activo este día.
-              </p>
-            )}
-          </section>
 
           {/* Ventas */}
           <section className="mt-4">
@@ -407,17 +327,7 @@ export default function DayReportModal({
                           key={i}
                           className="border-t border-brand-border first:border-t-0"
                         >
-                          <td className="px-3 py-2">
-                            {it.nombre}
-                            {it.recibido > 0 && (
-                              <span
-                                className="ml-1.5 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-800"
-                                title="Entraron por camión ese día"
-                              >
-                                +{it.recibido} camión
-                              </span>
-                            )}
-                          </td>
+                          <td className="px-3 py-2">{it.nombre}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-brand-dark/60">
                             {it.stockInicial}
                           </td>
@@ -605,9 +515,6 @@ export default function DayReportModal({
               )}
               {data.ventaTransferencia > 0 && (
                 <Row label="• Transferencia (banco)" value={data.ventaTransferencia} />
-              )}
-              {data.ventaCheque > 0 && (
-                <Row label="• Cheque (a cobrar)" value={data.ventaCheque} />
               )}
               <Row label="Gastos en efectivo" value={-data.gastosEfectivo} tone="rose" />
               {data.pagosEfectivo > 0 && (

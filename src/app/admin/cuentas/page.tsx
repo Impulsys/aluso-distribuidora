@@ -667,8 +667,7 @@ export default function AdminCuentasPage() {
                   const saldo = Math.max(0, saldoCompra(c, payments));
                   return (
                     <option key={c.id} value={c.id}>
-                      {c.modalidad} · {c.numero} (
-                      {c.camionNombre ?? "s/camión"}) —{" "}
+                      {c.modalidad} · {c.numero} —{" "}
                       {saldo > 0 ? `debe ${formatARS(saldo)}` : "saldado"}
                     </option>
                   );

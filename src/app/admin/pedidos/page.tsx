@@ -1206,7 +1206,7 @@ function FacturarView() {
         </h2>
         <p className="mb-3 text-xs text-brand-dark/55">
           Ingresá el nº de remito para traer lo comprado y emitir la factura
-          electrónica en <b>AFIP</b> (CAE + QR oficial). Punto de venta 6.
+          electrónica en <b>AFIP</b> (CAE + QR oficial).
         </p>
         <input
           value={numero}

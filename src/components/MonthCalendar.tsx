@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { findTruckForDay } from "@/lib/trucks";
-import type { Order, Remito, Truck } from "@/lib/types";
+import type { Order, Remito } from "@/lib/types";
 
 const MONTH_NAMES = [
   "Enero",
@@ -34,7 +33,6 @@ function dayEndTs(year: number, month: number, day: number): number {
 export interface MonthCalendarProps {
   year: number;
   month: number; // 0-11
-  trucks: Truck[];
   remitos: Remito[]; // ventas (remitos) del año
   orders?: Order[]; // pedidos (para puntito de vendedor y de entrega)
   onDayClick: (ts: number) => void;
@@ -43,7 +41,6 @@ export interface MonthCalendarProps {
 export default function MonthCalendar({
   year,
   month,
-  trucks,
   remitos,
   orders = [],
   onDayClick,
@@ -119,7 +116,6 @@ export default function MonthCalendar({
           if (!cell) return <div key={i} className="aspect-square" />;
           const dayStart = dayStartTs(year, month, cell.day);
           const dayEnd = dayEndTs(year, month, cell.day);
-          const truck = findTruckForDay(trucks, dayStart);
           const hasVentas = (ventasByDay.get(cell.day) ?? 0) > 0;
 
           // Estado del día
@@ -149,14 +145,6 @@ export default function MonthCalendar({
                 isToday ? "ring-2 ring-primary ring-offset-1" : ""
               }`}
             >
-              {/* Banda superior con color del camión activo */}
-              {truck && (
-                <span
-                  className="absolute inset-x-0 top-0 h-1"
-                  style={{ background: truck.color }}
-                  aria-hidden
-                />
-              )}
               <span className="absolute inset-0 grid place-items-center">
                 {cell.day}
               </span>

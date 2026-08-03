@@ -15,23 +15,18 @@ const TOGGLES: {
 }[] = [
   {
     key: "mostrarGananciaASocios",
-    label: "Mostrar % y ganancia del camión",
-    hint: "Si lo desactivás, los socios no ven el porcentaje de ganancia asignado ni el monto estimado/real.",
+    label: "Mostrar ganancia del día",
+    hint: "Si lo desactivás, los socios no ven la ganancia estimada ni el margen de las ventas.",
   },
   {
     key: "mostrarGastosASocios",
     label: "Mostrar gastos detallados del día",
-    hint: "Las 7 categorías de gastos (impuestos, sueldos, fletes, etc).",
+    hint: "Las categorías de gastos (impuestos, sueldos, fletes, etc).",
   },
   {
     key: "mostrarCajaFisicaASocios",
     label: "Mostrar Caja física y depósito a banco",
     hint: "Cuánto efectivo queda en mano y cuánto se deposita.",
-  },
-  {
-    key: "mostrarCargaCamionASocios",
-    label: "Mostrar carga de productos del camión",
-    hint: "Listado de qué productos y cantidades trajo cada camión.",
   },
 ];
 

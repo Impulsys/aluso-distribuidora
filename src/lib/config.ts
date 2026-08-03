@@ -9,14 +9,12 @@ export interface ReportesConfig {
   mostrarGananciaASocios: boolean;
   mostrarGastosASocios: boolean;
   mostrarCajaFisicaASocios: boolean;
-  mostrarCargaCamionASocios: boolean;
 }
 
 export const DEFAULT_REPORTES_CONFIG: ReportesConfig = {
   mostrarGananciaASocios: true,
   mostrarGastosASocios: true,
   mostrarCajaFisicaASocios: true,
-  mostrarCargaCamionASocios: true,
 };
 
 const CONFIG_DOC = "config/reportes";

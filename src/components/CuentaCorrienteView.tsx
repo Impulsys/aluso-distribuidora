@@ -167,7 +167,6 @@ export default function CuentaCorrienteView({
                               <th className="px-2 py-1.5 text-left">Modalidad</th>
                               <th className="px-2 py-1.5 text-left">Nº</th>
                               <th className="px-2 py-1.5 text-left">Fecha</th>
-                              <th className="px-2 py-1.5 text-left">Camión</th>
                               <th className="px-2 py-1.5 text-right">Monto</th>
                               <th className="px-2 py-1.5 text-right">Saldo</th>
                               {!readOnly && <th className="w-8" />}
@@ -187,9 +186,6 @@ export default function CuentaCorrienteView({
                                   <td className="px-2 py-1.5">{c.numero}</td>
                                   <td className="px-2 py-1.5">
                                     {formatDate(c.fecha)}
-                                  </td>
-                                  <td className="px-2 py-1.5 text-brand-dark/60">
-                                    {c.camionNombre ?? "—"}
                                   </td>
                                   <td className="px-2 py-1.5 text-right font-semibold">
                                     {formatARS(c.monto)}

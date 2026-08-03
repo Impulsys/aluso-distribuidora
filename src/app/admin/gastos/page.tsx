@@ -18,7 +18,6 @@ import {
 
 const FORMAS: { id: FormaPago; label: string; emoji: string }[] = [
   { id: "efectivo", label: "Efectivo", emoji: "💵" },
-  { id: "cheque", label: "Cheque", emoji: "🧾" },
   { id: "transferencia", label: "Transferencia", emoji: "🏦" },
 ];
 
@@ -28,7 +27,6 @@ const EXPENSE_TYPES: ExpenseType[] = [
   "mantenimiento",
   "sueldos",
   "fletes",
-  "cobertura_cheques",
   "adelantos",
 ];
 

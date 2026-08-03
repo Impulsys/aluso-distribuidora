@@ -9,7 +9,6 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { subscribeTrucks } from "@/lib/trucks";
 import { useAuth } from "@/context/AuthContext";
 import {
   DEFAULT_REPORTES_CONFIG,
@@ -34,7 +33,6 @@ import type {
   Purchase,
   Remito,
   SupplierPayment,
-  Truck,
 } from "@/lib/types";
 
 const MONTH_NAMES = [
@@ -55,7 +53,6 @@ const MONTH_NAMES = [
 export default function ReportesPage() {
   const { user } = useAuth();
   const [year, setYear] = useState(new Date().getFullYear());
-  const [trucks, setTrucks] = useState<Truck[]>([]);
   const [expenses, setExpenses] = useState<DailyExpense[]>([]);
   const [config, setConfig] = useState<ReportesConfig>(DEFAULT_REPORTES_CONFIG);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -70,7 +67,6 @@ export default function ReportesPage() {
 
   // Suscripciones tiempo real
   useEffect(() => {
-    const u1 = subscribeTrucks(setTrucks);
     const u2 = subscribeReportesConfig(setConfig);
     const u3 = subscribePurchases(setPurchases);
     const u4 = subscribeSupplierPayments(setSupplierPayments);
@@ -78,7 +74,6 @@ export default function ReportesPage() {
     const u6 = subscribeRemitos(setRemitos);
     getAllOrders(500).then(setOrders).catch(() => {});
     return () => {
-      u1();
       u2();
       u3();
       u4();
@@ -135,17 +130,6 @@ export default function ReportesPage() {
       })
       .finally(() => setLoading(false));
   }, [year]);
-
-  // Camiones que tocan el año (para la leyenda)
-  const trucksConRangos = useMemo(() => {
-    const yearStart = new Date(year, 0, 1).getTime();
-    const yearEnd = new Date(year + 1, 0, 1).getTime();
-    return trucks.filter(
-      (t) =>
-        t.fechaIngreso < yearEnd &&
-        (!t.fechaCierre || t.fechaCierre > yearStart)
-    );
-  }, [trucks, year]);
 
   // ====== TOTALES — año completo + mes actual ======
   const totales = useMemo(() => {
@@ -333,34 +317,6 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* Camiones del año (leyenda visual) */}
-      {trucksConRangos.length > 0 && (
-        <div className="mb-5 rounded-xl border border-brand-border bg-surface p-3">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-brand-dark/55">
-            Camiones del {year}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {trucksConRangos.map((t) => (
-              <span
-                key={t.id}
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-brand-dark"
-              >
-                <span
-                  className="h-3 w-3 rounded-sm"
-                  style={{ background: t.color }}
-                />
-                {t.nombre}
-                {!t.fechaCierre && (
-                  <span className="rounded-full bg-emerald-100 px-1.5 text-[9px] font-bold uppercase text-emerald-800">
-                    activo
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {loading && (
         <p className="py-12 text-center text-brand-dark/60">
           Cargando calendario…
@@ -379,7 +335,6 @@ export default function ReportesPage() {
               key={m}
               year={year}
               month={m}
-              trucks={trucks}
               remitos={remitos}
               orders={orders}
               onDayClick={(ts) => setDayOpen(ts)}
@@ -391,7 +346,6 @@ export default function ReportesPage() {
       <DayReportModal
         dayTs={dayOpen}
         onClose={() => setDayOpen(null)}
-        trucks={trucks}
         remitos={remitos}
       />
     </div>
