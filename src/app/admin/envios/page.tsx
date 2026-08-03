@@ -58,6 +58,58 @@ const ESTADO_COLOR: Record<EstadoLogistica, string> = {
 
 const FLUJO: EstadoLogistica[] = ["asignado", "preparacion", "listo", "entregado"];
 
+// Envío de EJEMPLO para mostrar el armado 3D en funcionamiento SIN cargar datos
+// reales (no escribe nada en la base). Usa EANs con medidas exactas de la
+// planilla, con productId = ean para que resuelva la paquetería igual que una
+// venta real. Tres pedidos de distintos rubros → tres colores en el pallet.
+const EJEMPLO_PEDIDOS: {
+  numero: string;
+  cliente: string;
+  items: { ean: string; cantidad: number }[];
+}[] = [
+  {
+    numero: "R-000101",
+    cliente: "Kiosco La Esquina",
+    items: [
+      { ean: "7790940003034", cantidad: 200 }, // algodón — bultos chatos
+      { ean: "7790940216205", cantidad: 150 }, // toallas
+    ],
+  },
+  {
+    numero: "R-000102",
+    cliente: "Almacén Doña Rosa",
+    items: [
+      { ean: "7790940003065", cantidad: 40 }, // algodón grande — cajas largas
+      { ean: "7790940518057", cantidad: 60 }, // pañal — cajas anchas
+    ],
+  },
+  {
+    numero: "R-000103",
+    cliente: "Farmacia del Pueblo",
+    items: [
+      { ean: "7790940000033", cantidad: 240 }, // gasa — muchos bultos
+      { ean: "7790940515032", cantidad: 48 }, // cofias — cajas chicas
+    ],
+  },
+];
+
+function ejemploEnvio(): { envio: Envio; rs: Remito[] } {
+  const rs = EJEMPLO_PEDIDOS.map((p, i) => ({
+    id: `ejemplo-${i}`,
+    numero: p.numero,
+    clienteNombre: p.cliente,
+    items: p.items.map((it) => ({ productId: it.ean, cantidad: it.cantidad })),
+  })) as unknown as Remito[];
+  const envio = {
+    id: "ejemplo",
+    fecha: Date.now(),
+    transporte: "Ejemplo de demostración",
+    estado: "asignado",
+    remitoIds: rs.map((r) => r.id),
+  } as unknown as Envio;
+  return { envio, rs };
+}
+
 export default function EnviosPage() {
   const { user } = useAuth();
   const productos = useProducts();
@@ -210,6 +262,18 @@ export default function EnviosPage() {
           Programá las entregas: agrupá pedidos en un envío, con su flete y día.
           El volumen y los pallets se calculan con las medidas de cada producto.
         </p>
+        <button
+          onClick={() => {
+            setPalletActivo(0);
+            setPallet3d(ejemploEnvio());
+          }}
+          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-light/40 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
+        >
+          👁️ Ver ejemplo de armado 3D
+          <span className="text-[11px] font-normal opacity-70">
+            (demostración — no carga datos)
+          </span>
+        </button>
       </div>
 
       {/* ===== Armar un envío ===== */}
