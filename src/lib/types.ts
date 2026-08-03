@@ -225,6 +225,14 @@ export interface Remito {
   envioId?: string;
   /** Estado de despacho, independiente del estado de la venta. */
   estadoLogistica?: EstadoLogistica;
+  /**
+   * Cobrado: la venta se pagó. Mientras esté en false/ausente, cuenta como
+   * deuda del cliente. `fechaCobro` es CUÁNDO se cobró — la comisión del
+   * vendedor se paga según esa fecha (no según la fecha de la venta).
+   */
+  cobrado?: boolean;
+  fechaCobro?: number;
+  cobradoPor?: string;
   createdBy?: string;
   createdAt: number;
   fecha: number; // fecha de la venta (timestamp)

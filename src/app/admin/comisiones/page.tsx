@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getAllUsers } from "@/lib/admin";
-import { subscribeRemitosRange } from "@/lib/ventas";
+import { subscribeRemitosRange, subscribeRemitosCobradosRange } from "@/lib/ventas";
 import {
   DEFAULT_PRECIOS_CONFIG,
   subscribePreciosConfig,
@@ -31,6 +31,11 @@ export default function ComisionesPage() {
   const [cfg, setCfg] = useState(DEFAULT_PRECIOS_CONFIG);
   const [desde, setDesde] = useState(primerDiaMes());
   const [hasta, setHasta] = useState(hoyISO());
+  // Base de cálculo. "cobro" (real): comisiona lo COBRADO en el período — es la
+  // regla de Anabela: si vendió a fin de mes y se cobró al mes siguiente, la
+  // comisión cae al mes siguiente. "venta" (referencia): lo vendido, se cobre o
+  // no — sirve para proyectar, pero NO es lo que se paga.
+  const [base, setBase] = useState<"cobro" | "venta">("cobro");
 
   useEffect(() => {
     getAllUsers().then(setUsers).catch(() => {});
@@ -39,8 +44,10 @@ export default function ComisionesPage() {
   useEffect(() => {
     const start = tsFromISO(desde);
     const end = tsFromISO(hasta) + 86_400_000; // incluye el día "hasta"
-    return subscribeRemitosRange(start, end, setRemitos);
-  }, [desde, hasta]);
+    return base === "cobro"
+      ? subscribeRemitosCobradosRange(start, end, setRemitos)
+      : subscribeRemitosRange(start, end, setRemitos);
+  }, [desde, hasta, base]);
 
   const resultado = useMemo(() => {
     const vendedores: VendedorComision[] = users
@@ -77,17 +84,42 @@ export default function ComisionesPage() {
           <span className="text-3xl">💼</span> Comisiones
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-brand-dark/60">
-          Lo que cobra cada vendedor por sus ventas del período, más el override
-          de los vendedores que reclutó. Se calcula sobre los remitos no
-          anulados. Las ventas de la casa (sin vendedor) no comisionan.
+          Lo que cobra cada vendedor, más el override de los vendedores que
+          reclutó. Por defecto se paga sobre lo <b>cobrado</b> en el período (si
+          se vendió a fin de mes y se cobró al siguiente, la comisión cae al
+          siguiente). Las ventas de la casa (sin vendedor) no comisionan.
         </p>
+      </div>
+
+      {/* Base de cálculo: cobro (real) vs venta (referencia) */}
+      <div className="mb-3 inline-flex rounded-xl border border-brand-border bg-surface p-1 text-sm">
+        <button
+          onClick={() => setBase("cobro")}
+          className={`rounded-lg px-4 py-1.5 font-medium transition ${
+            base === "cobro"
+              ? "bg-primary text-white shadow-sm"
+              : "text-brand-dark/60 hover:text-brand-dark"
+          }`}
+        >
+          💰 Por cobro <span className="text-[11px] opacity-80">(se paga esto)</span>
+        </button>
+        <button
+          onClick={() => setBase("venta")}
+          className={`rounded-lg px-4 py-1.5 font-medium transition ${
+            base === "venta"
+              ? "bg-primary text-white shadow-sm"
+              : "text-brand-dark/60 hover:text-brand-dark"
+          }`}
+        >
+          📊 Por venta <span className="text-[11px] opacity-80">(referencia)</span>
+        </button>
       </div>
 
       {/* Rango de fechas */}
       <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-brand-border bg-surface p-4">
         <div>
           <label className="block text-[11px] font-bold uppercase text-brand-dark/55">
-            Desde
+            {base === "cobro" ? "Cobrado desde" : "Vendido desde"}
           </label>
           <input
             type="date"
@@ -98,7 +130,7 @@ export default function ComisionesPage() {
         </div>
         <div>
           <label className="block text-[11px] font-bold uppercase text-brand-dark/55">
-            Hasta
+            {base === "cobro" ? "Cobrado hasta" : "Vendido hasta"}
           </label>
           <input
             type="date"
@@ -115,7 +147,7 @@ export default function ComisionesPage() {
             {formatARS(totalAPagar)}
           </p>
           <p className="text-[11px] text-brand-dark/45">
-            sobre {formatARS(totalVentas)} vendidos
+            sobre {formatARS(totalVentas)} {base === "cobro" ? "cobrados" : "vendidos"}
           </p>
         </div>
       </div>

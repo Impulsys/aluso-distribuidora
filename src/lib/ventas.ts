@@ -318,6 +318,67 @@ export function subscribeRemitosRange(
   });
 }
 
+/**
+ * Marca un remito como COBRADO en la fecha indicada (por defecto, ahora). La
+ * `fechaCobro` define en qué mes cae la comisión del vendedor. Ver lib/cobros.
+ */
+export async function marcarCobrado(
+  remito: Remito,
+  cobradoPor?: string,
+  fechaCobro?: number
+): Promise<void> {
+  const fecha = fechaCobro ?? Date.now();
+  await updateDoc(doc(db, "remitos", remito.id), {
+    cobrado: true,
+    fechaCobro: fecha,
+    cobradoPor: cobradoPor ?? null,
+  });
+  logActivity("Registró cobro", {
+    detalle: `${remito.numero} · ${formatARS(remito.total)}${
+      remito.clienteNombre ? ` · ${remito.clienteNombre}` : ""
+    }`,
+    entidad: "remito",
+    entidadId: remito.id,
+  });
+}
+
+/** Revierte un cobro (se marcó por error): el remito vuelve a ser deuda. */
+export async function desmarcarCobrado(remito: Remito): Promise<void> {
+  await updateDoc(doc(db, "remitos", remito.id), {
+    cobrado: false,
+    fechaCobro: null,
+    cobradoPor: null,
+  });
+  logActivity("Revirtió cobro", {
+    detalle: `${remito.numero} · ${formatARS(remito.total)}`,
+    entidad: "remito",
+    entidadId: remito.id,
+  });
+}
+
+/**
+ * Remitos COBRADOS cuya plata entró en [start, end). Para la comisión "según
+ * cobro": el vendedor cobra sobre lo que se cobró en el período, no sobre lo
+ * que vendió. La fecha que manda es `fechaCobro`, no `fecha`.
+ */
+export function subscribeRemitosCobradosRange(
+  start: number,
+  end: number,
+  cb: (xs: Remito[]) => void
+): () => void {
+  const q = query(
+    collection(db, "remitos"),
+    where("fechaCobro", ">=", start),
+    where("fechaCobro", "<", end)
+  );
+  return onSnapshot(q, (snap) => {
+    cb(
+      snap.docs
+        .map((d) => ({ ...(d.data() as Remito), id: d.id }))
+        .sort((a, b) => (b.fechaCobro ?? 0) - (a.fechaCobro ?? 0))
+    );
+  });
+}
 
 /*
  * NO agregues acá una `crearFactura()` que escriba en `facturas` desde el
