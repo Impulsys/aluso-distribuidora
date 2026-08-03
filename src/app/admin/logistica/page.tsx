@@ -10,7 +10,6 @@ import {
   type LineaCarga,
 } from "@/lib/logistica";
 import { formatARS } from "@/lib/format";
-import { coincide } from "@/lib/search";
 import type { Product } from "@/lib/types";
 
 const num = (v: string) => Math.max(0, Number(v) || 0);
@@ -20,21 +19,12 @@ export default function LogisticaPage() {
   const [flete, setFlete] = useState(0);
   const [criterio, setCriterio] = useState<CriterioReparto>("volumen");
   const [bultos, setBultos] = useState<Record<string, number>>({});
-  const [q, setQ] = useState("");
 
   // Solo productos que tienen datos logísticos cargados (medidas/peso).
   const conDatos = useMemo(
     () => productos.filter((p) => p.ean && LOGISTICA_POR_EAN[p.ean]),
     [productos]
   );
-
-  const filtrados = useMemo(() => {
-    const t = q.trim();
-    if (!t) return conDatos;
-    return conDatos.filter(
-      (p) => coincide(p.nombre, t) || coincide(p.ean ?? "", t)
-    );
-  }, [conDatos, q]);
 
   // Líneas de la carga (las que tienen al menos 1 bulto cargado).
   const lineas: LineaCarga[] = useMemo(() => {
@@ -192,85 +182,108 @@ export default function LogisticaPage() {
         </div>
       )}
 
-      {/* Selección de productos */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      {/* Selección de productos: desplegable → arma la lista de la carga */}
+      <div className="mb-3">
         <h2 className="text-sm font-bold text-brand-dark">
           ¿Qué vino en la carga?
         </h2>
-        <div className="relative w-full sm:w-72">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark/40">
-            🔎
-          </span>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar producto…"
-            className="w-full rounded-full border border-brand-border bg-surface py-2 pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-          />
-        </div>
+        <p className="text-xs text-brand-dark/55">
+          Elegí un producto del listado y cuántos bultos vinieron. Se van sumando abajo.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {filtrados.map((p) => {
-          const b = bultos[p.ean!] ?? 0;
-          const activo = b > 0;
-          return (
-            <div
-              key={p.ean}
-              className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${
-                activo
-                  ? "border-primary bg-primary-light/25 shadow-sm"
-                  : "border-brand-border bg-surface"
-              }`}
-            >
-              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-white ring-1 ring-brand-border">
-                {p.imagen && (
-                  <Image
-                    src={p.imagen}
-                    alt={p.nombre}
-                    fill
-                    sizes="44px"
-                    className="object-contain p-1"
-                    style={{ mixBlendMode: "multiply" }}
-                  />
-                )}
-              </div>
-              <p className="min-w-0 flex-1 truncate text-xs font-medium text-brand-dark">
-                {p.nombre}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setBulto(p.ean!, Math.max(0, b - 1))}
-                  className="grid h-7 w-7 place-items-center rounded-lg bg-primary-light text-primary hover:bg-primary hover:text-white"
-                  aria-label="Menos"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={b || ""}
-                  onChange={(e) => setBulto(p.ean!, num(e.target.value))}
-                  placeholder="0"
-                  className="w-12 rounded-lg border border-brand-border bg-surface py-1 text-center text-sm outline-none focus:border-primary"
-                />
-                <button
-                  onClick={() => setBulto(p.ean!, b + 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg bg-primary-light text-primary hover:bg-primary hover:text-white"
-                  aria-label="Más"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {conDatos.length === 0 && (
+      {conDatos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-brand-border bg-surface p-8 text-center text-sm text-brand-dark/55">
           Todavía no hay productos con medidas cargadas.
         </p>
+      ) : (
+        <>
+          {/* Desplegable para agregar un producto a la carga */}
+          <select
+            value=""
+            onChange={(e) => {
+              const ean = e.target.value;
+              if (ean) setBulto(ean, (bultos[ean] ?? 0) + 1);
+            }}
+            className="w-full rounded-xl border border-brand-border bg-surface px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+          >
+            <option value="">＋ Agregar producto a la carga…</option>
+            {conDatos.map((p) => (
+              <option key={p.ean} value={p.ean!}>
+                {(bultos[p.ean!] ?? 0) > 0 ? `✓ (${bultos[p.ean!]}) ` : ""}
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+
+          {/* Lista de lo cargado, con cantidad editable */}
+          {lineas.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-dashed border-brand-border bg-surface p-6 text-center text-sm text-brand-dark/50">
+              Todavía no cargaste nada. Elegí un producto arriba.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {lineas.map((l) => {
+                const p = imgPorEan.get(l.ean);
+                const b = bultos[l.ean] ?? 0;
+                return (
+                  <div
+                    key={l.ean}
+                    className="flex items-center gap-3 rounded-xl border border-primary bg-primary-light/25 p-2.5 shadow-sm"
+                  >
+                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-white ring-1 ring-brand-border">
+                      {p?.imagen && (
+                        <Image
+                          src={p.imagen}
+                          alt={l.nombre}
+                          fill
+                          sizes="44px"
+                          className="object-contain p-1"
+                          style={{ mixBlendMode: "multiply" }}
+                        />
+                      )}
+                    </div>
+                    <p className="min-w-0 flex-1 truncate text-xs font-medium text-brand-dark">
+                      {l.nombre}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setBulto(l.ean, Math.max(0, b - 1))}
+                        className="grid h-7 w-7 place-items-center rounded-lg bg-primary-light text-primary hover:bg-primary hover:text-white"
+                        aria-label="Menos"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={b || ""}
+                        onChange={(e) => setBulto(l.ean, num(e.target.value))}
+                        placeholder="0"
+                        className="w-12 rounded-lg border border-brand-border bg-surface py-1 text-center text-sm outline-none focus:border-primary"
+                      />
+                      <button
+                        onClick={() => setBulto(l.ean, b + 1)}
+                        className="grid h-7 w-7 place-items-center rounded-lg bg-primary-light text-primary hover:bg-primary hover:text-white"
+                        aria-label="Más"
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => setBulto(l.ean, 0)}
+                        className="ml-1 grid h-7 w-7 place-items-center rounded-lg text-brand-dark/40 hover:bg-red-50 hover:text-red-600"
+                        aria-label="Quitar"
+                        title="Quitar de la carga"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

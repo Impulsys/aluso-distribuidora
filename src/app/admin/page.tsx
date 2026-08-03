@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "@/hooks/useProducts";
 import { getAllOrders } from "@/lib/orders";
 import { getAllUsers, subscribeProductCosts } from "@/lib/admin";
-import { subscribeChecks, chequesProximos, chequesVencidos } from "@/lib/cashflow";
 import { subscribeRemitos } from "@/lib/ventas";
 import {
   subscribePurchases,
@@ -15,7 +14,6 @@ import {
 import { formatARS, daysBetween } from "@/lib/format";
 import type {
   AppUser,
-  Check,
   Order,
   Purchase,
   Remito,
@@ -61,7 +59,6 @@ export default function AdminDashboard() {
   const productos = useProducts();
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
-  const [checks, setChecks] = useState<Check[]>([]);
   const [remitos, setRemitos] = useState<Remito[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [pagos, setPagos] = useState<SupplierPayment[]>([]);
@@ -77,7 +74,6 @@ export default function AdminDashboard() {
       .catch((e) => console.error(e))
       .finally(() => setLoading(false));
     const unsubs = [
-      subscribeChecks(setChecks),
       subscribeRemitos(setRemitos),
       subscribePurchases(setPurchases),
       subscribeSupplierPayments(setPagos),
@@ -85,9 +81,6 @@ export default function AdminDashboard() {
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
-
-  const proximos = chequesProximos(checks, 3);
-  const vencidos = chequesVencidos(checks);
 
   const { ventaHoy, gananciaHoy } = useMemo(() => {
     const start = new Date().setHours(0, 0, 0, 0);
@@ -123,37 +116,6 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      {/* Alertas de cheques */}
-      {(vencidos.length > 0 || proximos.length > 0) && (
-        <div className="mb-4 space-y-2">
-          {vencidos.length > 0 && (
-            <a
-              href="/admin/cheques"
-              className="block rounded-2xl border border-rose-300 bg-rose-50 p-4 transition hover:bg-rose-100"
-            >
-              <p className="text-sm font-bold text-rose-900">
-                🚨 {vencidos.length} cheque{vencidos.length === 1 ? "" : "s"}{" "}
-                vencido{vencidos.length === 1 ? "" : "s"} sin pagar
-              </p>
-              <p className="mt-1 text-xs text-rose-800">
-                Tocá para revisar la sección de cheques →
-              </p>
-            </a>
-          )}
-          {proximos.length > 0 && (
-            <a
-              href="/admin/cheques"
-              className="block rounded-2xl border border-amber-300 bg-amber-50 p-4 transition hover:bg-amber-100"
-            >
-              <p className="text-sm font-bold text-amber-900">
-                ⚠️ {proximos.length} cheque{proximos.length === 1 ? "" : "s"}{" "}
-                vence{proximos.length === 1 ? "" : "n"} en los próximos 3 días
-              </p>
-            </a>
-          )}
-        </div>
-      )}
-
       {/* Métricas del negocio (reales) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card

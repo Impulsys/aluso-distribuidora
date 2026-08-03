@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import CuentaCorrienteView from "@/components/CuentaCorrienteView";
 import {
@@ -10,6 +9,7 @@ import {
   subscribeSupplierPayments,
   seedProveedoresIfEmpty,
   createProveedor,
+  createPurchase,
   createPayment,
   updatePayment,
   deleteProveedor,
@@ -17,12 +17,10 @@ import {
   deletePayment,
   saldoCompra,
 } from "@/lib/cuentas";
-import { recibirCamion, TruckValidationError } from "@/lib/trucks";
 import { createExpense } from "@/lib/cashflow";
 import { DENOMINACIONES, totalArqueo } from "@/lib/caja";
 import { formatARS, tsFromISO } from "@/lib/format";
 import {
-  TRANSPORTES,
   type PagoVia,
   type Proveedor,
   type Purchase,
@@ -57,19 +55,6 @@ interface PagoOpts {
   depositoTitular?: string;
 }
 
-const PRESET_COLORS = [
-  "#EF4444",
-  "#F97316",
-  "#EAB308",
-  "#10B981",
-  "#06B6D4",
-  "#3B82F6",
-  "#8B5CF6",
-  "#EC4899",
-  "#A16207",
-  "#475569",
-];
-
 export default function AdminCuentasPage() {
   const { user } = useAuth();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -81,24 +66,17 @@ export default function AdminCuentasPage() {
   const [pCuit, setPCuit] = useState("");
   const [pContacto, setPContacto] = useState("");
 
-  // Form: llegó un camión (compra)
+  // Form: registrar compra (deuda al proveedor). Una compra puede venir con un
+  // comprobante facturado (A) y/o uno sin facturar (B), y cada uno puede ir a
+  // una razón social distinta.
   const [cProv, setCProv] = useState("");
-  const [cNombre, setCNombre] = useState("");
-  const [cColor, setCColor] = useState(PRESET_COLORS[5]);
-  const [cPorcentaje, setCPorcentaje] = useState(35);
-  const [cTransporte, setCTransporte] = useState<string>(TRANSPORTES[0]);
-  const [cTransporteOtro, setCTransporteOtro] = useState("");
   const [cFecha, setCFecha] = useState(todayISO());
-  const [cDescripcion, setCDescripcion] = useState("");
   const [cNumFacturaA, setCNumFacturaA] = useState("");
   const [cMontoA, setCMontoA] = useState(0);
-  const [cProvA, setCProvA] = useState(""); // vacío = el proveedor del camión
+  const [cProvA, setCProvA] = useState(""); // vacío = el proveedor de la compra
   const [cNumRemitoB, setCNumRemitoB] = useState("");
   const [cMontoB, setCMontoB] = useState(0);
   const [cProvB, setCProvB] = useState(""); // lo NO facturado suele ir a otra razón social
-  const [cShowLogistica, setCShowLogistica] = useState(false);
-  const [cLogistica, setCLogistica] = useState(0);
-  const [cLogisticaDetalle, setCLogisticaDetalle] = useState("");
   const [cBusy, setCBusy] = useState(false);
 
   // Form: nuevo pago
@@ -120,7 +98,7 @@ export default function AdminCuentasPage() {
   const [gPurchase, setGPurchase] = useState(""); // "" = a cuenta
 
   const [error, setError] = useState<string | null>(null);
-  // Camión recién creado → aviso para ir a cargar la mercadería
+  // Aviso de compra registrada.
   const [creado, setCreado] = useState<string | null>(null);
   // Pago en edición (abre modal)
   const [editPago, setEditPago] = useState<SupplierPayment | null>(null);
@@ -162,75 +140,71 @@ export default function AdminCuentasPage() {
     }
   };
 
-  // Proveedor propio de un comprobante. Vacío = va al del camión.
-  const provComprobante = (id: string) => {
+  // Razón social propia de un comprobante. Vacío = va al proveedor de la compra.
+  const provComprobante = (
+    id: string
+  ): { proveedorId?: string; proveedorNombre?: string } => {
     const p = proveedores.find((x) => x.id === id);
     return p ? { proveedorId: p.id, proveedorNombre: p.nombre } : {};
   };
   const cProvNombre = proveedores.find((p) => p.id === cProv)?.nombre ?? "";
 
-  const handleRecibirCamion = async (e: React.FormEvent) => {
+  const handleRegistrarCompra = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cBusy) return;
     const prov = proveedores.find((p) => p.id === cProv);
-    if (!prov || !cNombre.trim()) {
-      setError("Elegí un proveedor y poné un nombre al camión.");
+    if (!prov) {
+      setError("Elegí un proveedor.");
+      return;
+    }
+    const tieneA = cNumFacturaA.trim() && cMontoA > 0;
+    const tieneB = cNumRemitoB.trim() && cMontoB > 0;
+    if (!tieneA && !tieneB) {
+      setError("Cargá al menos un comprobante (Factura A o Remito B) con su monto.");
       return;
     }
     setError(null);
     setCBusy(true);
+    const fecha = tsFromISO(cFecha);
     try {
-      await recibirCamion({
-        nombre: cNombre.trim(),
-        color: cColor,
-        fechaIngreso: tsFromISO(cFecha),
-        porcentajeGanancia: Number(cPorcentaje) || 0,
-        transporte: cTransporte,
-        transporteOtro:
-          cTransporte === "otro" ? cTransporteOtro.trim() : undefined,
-        descripcion: cDescripcion.trim() || undefined,
-        proveedorId: prov.id,
-        proveedorNombre: prov.nombre,
-        facturaA:
-          cNumFacturaA.trim() && cMontoA > 0
-            ? {
-                numero: cNumFacturaA.trim(),
-                monto: Number(cMontoA),
-                ...provComprobante(cProvA),
-              }
-            : undefined,
-        remitoB:
-          cNumRemitoB.trim() && cMontoB > 0
-            ? {
-                numero: cNumRemitoB.trim(),
-                monto: Number(cMontoB),
-                ...provComprobante(cProvB),
-              }
-            : undefined,
-        logistica: cShowLogistica && cLogistica > 0 ? Number(cLogistica) : undefined,
-        logisticaDetalle: cShowLogistica
-          ? cLogisticaDetalle.trim() || undefined
-          : undefined,
-        createdBy: user?.uid,
-      });
-      // Reset (mantiene proveedor, color, % y transporte para cargas seguidas)
-      setCNombre("");
-      setCDescripcion("");
+      // Cada comprobante genera su propia deuda, en la razón social elegida (o la
+      // del proveedor de la compra si no se cambió).
+      if (tieneA) {
+        const dest = provComprobante(cProvA);
+        await createPurchase({
+          proveedorId: dest.proveedorId ?? prov.id,
+          proveedorNombre: dest.proveedorNombre ?? prov.nombre,
+          modalidad: "A",
+          numero: cNumFacturaA.trim(),
+          monto: Number(cMontoA),
+          fecha,
+          createdBy: user?.uid,
+        });
+      }
+      if (tieneB) {
+        const dest = provComprobante(cProvB);
+        await createPurchase({
+          proveedorId: dest.proveedorId ?? prov.id,
+          proveedorNombre: dest.proveedorNombre ?? prov.nombre,
+          modalidad: "B",
+          numero: cNumRemitoB.trim(),
+          monto: Number(cMontoB),
+          fecha,
+          createdBy: user?.uid,
+        });
+      }
+      // Reset (mantiene el proveedor para cargar varias compras seguidas).
       setCNumFacturaA("");
       setCMontoA(0);
+      setCProvA("");
       setCNumRemitoB("");
       setCMontoB(0);
-      setCShowLogistica(false);
-      setCLogistica(0);
-      setCLogisticaDetalle("");
-      // Aviso: el camión quedó creado; la mercadería se carga en Camiones.
-      setCreado(cNombre.trim());
+      setCProvB("");
+      setCreado(prov.nombre);
+      setTimeout(() => setCreado(null), 4000);
     } catch (err) {
       console.error(err);
-      setError(
-        err instanceof TruckValidationError
-          ? err.message
-          : "No se pudo registrar el camión."
-      );
+      setError("No se pudo registrar la compra.");
     } finally {
       setCBusy(false);
     }
@@ -483,89 +457,38 @@ export default function AdminCuentasPage() {
           </button>
         </form>
 
-        {/* Llegó un camión (compra) */}
+        {/* Registrar compra (deuda al proveedor) */}
         <form
-          onSubmit={handleRecibirCamion}
+          onSubmit={handleRegistrarCompra}
           className="rounded-2xl border border-brand-border bg-surface p-4"
         >
           <h2 className="font-serif text-lg text-brand-dark">
-            Llegó un camión
+            Registrar compra
           </h2>
           <p className="mb-3 text-xs text-brand-dark/55">
-            Registra la compra al proveedor y crea el camión. El camión activo
-            anterior se cierra automáticamente.
+            Cargá la factura o el remito que te dejó el proveedor. Queda como
+            deuda en su cuenta corriente.
           </p>
           <div className="space-y-2">
-            <div>
-              <label className={labelCls}>Proveedor</label>
-              <select
-                required
-                value={cProv}
-                onChange={(e) => setCProv(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">— Elegir —</option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelCls}>Nombre del camión</label>
-              <input
-                required
-                value={cNombre}
-                onChange={(e) => setCNombre(e.target.value)}
-                placeholder="Camión #12"
-                className={inputCls}
-              />
-            </div>
-
-            <div>
-              <label className={labelCls}>Color de referencia</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={cColor}
-                  onChange={(e) => setCColor(e.target.value)}
-                  className="h-9 w-11 cursor-pointer rounded-lg border border-brand-border"
-                />
-                <div className="flex flex-wrap gap-1.5">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCColor(c)}
-                      className={`h-6 w-6 rounded-full ring-2 transition ${
-                        cColor === c
-                          ? "scale-110 ring-brand-dark"
-                          : "ring-transparent hover:ring-brand-dark/30"
-                      }`}
-                      style={{ background: c }}
-                      aria-label={`Color ${c}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className={labelCls}>% Ganancia</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={cPorcentaje}
-                  onChange={(e) => setCPorcentaje(Number(e.target.value))}
+                <label className={labelCls}>Proveedor</label>
+                <select
+                  required
+                  value={cProv}
+                  onChange={(e) => setCProv(e.target.value)}
                   className={inputCls}
-                />
+                >
+                  <option value="">— Elegir —</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className={labelCls}>Fecha de ingreso</label>
+                <label className={labelCls}>Fecha</label>
                 <input
                   type="date"
                   value={cFecha}
@@ -575,33 +498,8 @@ export default function AdminCuentasPage() {
               </div>
             </div>
 
-            <div>
-              <label className={labelCls}>Transporte</label>
-              <select
-                value={cTransporte}
-                onChange={(e) => setCTransporte(e.target.value)}
-                className={inputCls}
-              >
-                {TRANSPORTES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-                <option value="otro">Otro…</option>
-              </select>
-              {cTransporte === "otro" && (
-                <input
-                  value={cTransporteOtro}
-                  onChange={(e) => setCTransporteOtro(e.target.value)}
-                  placeholder="Nombre del transportista"
-                  className={`mt-2 ${inputCls}`}
-                />
-              )}
-            </div>
-
-            {/* Comprobantes (al menos uno). Cada uno puede ir a un proveedor
-                DISTINTO: lo facturado a una razón social y lo no facturado a
-                otra. Antes los dos iban al proveedor del camión. */}
+            {/* Comprobantes (al menos uno). Cada uno puede ir a una razón social
+                DISTINTA: lo facturado a una y lo no facturado a otra. */}
             <div className="rounded-lg border border-brand-border bg-primary-light/20 p-3">
               <p className="mb-2 text-[11px] font-semibold text-brand-dark">
                 Comprobante de la compra (al menos uno)
@@ -644,7 +542,7 @@ export default function AdminCuentasPage() {
                     className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
                   >
                     <option value="">
-                      El proveedor del camión
+                      El proveedor de la compra
                       {cProvNombre ? ` (${cProvNombre})` : ""}
                     </option>
                     {proveedores.map((p) => (
@@ -693,7 +591,7 @@ export default function AdminCuentasPage() {
                     className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
                   >
                     <option value="">
-                      El proveedor del camión
+                      El proveedor de la compra
                       {cProvNombre ? ` (${cProvNombre})` : ""}
                     </option>
                     {proveedores.map((p) => (
@@ -711,89 +609,20 @@ export default function AdminCuentasPage() {
               </p>
             </div>
 
-            {/* Logística (opcional) */}
-            {!cShowLogistica ? (
-              <button
-                type="button"
-                onClick={() => setCShowLogistica(true)}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                ＋ Agregar gastos de logística
-              </button>
-            ) : (
-              <div className="rounded-lg border border-brand-border bg-amber-50/60 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[11px] font-semibold text-brand-dark">
-                    Gastos de logística (flete / descarga)
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCShowLogistica(false);
-                      setCLogistica(0);
-                      setCLogisticaDetalle("");
-                    }}
-                    className="text-[11px] text-brand-dark/60 hover:underline"
-                  >
-                    Quitar
-                  </button>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] gap-2">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                      Monto
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={cLogistica || ""}
-                      onChange={(e) => setCLogistica(Number(e.target.value))}
-                      placeholder="0"
-                      className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-dark/55">
-                      Detalle (opcional)
-                    </label>
-                    <input
-                      value={cLogisticaDetalle}
-                      onChange={(e) => setCLogisticaDetalle(e.target.value)}
-                      placeholder="Flete + descarga"
-                      className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-                <p className="mt-1 text-[10px] text-brand-dark/45">
-                  Se descuenta de la ganancia real del camión en el reporte.
-                </p>
-              </div>
-            )}
           </div>
           <button
             type="submit"
             disabled={cBusy}
             className="mt-3 w-full rounded-lg bg-primary px-4 py-2 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
           >
-            {cBusy ? "Registrando…" : "Registrar camión + compra"}
+            {cBusy ? "Registrando…" : "Registrar compra"}
           </button>
 
           {creado && (
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs">
               <p className="font-semibold text-emerald-900">
-                ✓ Camión “{creado}” creado y compra registrada.
+                ✓ Compra registrada en la cuenta de {creado}.
               </p>
-              <p className="mt-0.5 text-emerald-800/80">
-                Ahora cargá la mercadería que trajo: poné cantidad y costo a cada
-                producto y guardá. Eso suma el stock y alimenta el reporte.
-              </p>
-              <Link
-                href="/admin/camiones"
-                className="mt-2 inline-block rounded-lg bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700"
-              >
-                Cargar la mercadería del camión →
-              </Link>
             </div>
           )}
         </form>
