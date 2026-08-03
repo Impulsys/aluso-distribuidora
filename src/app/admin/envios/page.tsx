@@ -1,7 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { subscribeRemitosRange } from "@/lib/ventas";
+import {
+  armarPallet,
+  COLORES_PEDIDO,
+  PALLET_ESTANDAR,
+  type BultoAColocar,
+} from "@/lib/pallet";
+import { medidasBulto } from "@/data/logistica";
+
+// El visor 3D usa WebGL (window), así que se carga solo en el cliente.
+const PalletViewer3D = dynamic(() => import("@/components/PalletViewer3D"), {
+  ssr: false,
+  loading: () => (
+    <div className="grid h-[420px] place-items-center text-sm text-brand-dark/50">
+      Cargando vista 3D…
+    </div>
+  ),
+});
 import {
   subscribeEnvios,
   crearEnvio,
@@ -80,6 +98,48 @@ export default function EnviosPage() {
     remitos.forEach((r) => m.set(r.id, r));
     return m;
   }, [remitos]);
+
+  // Arma la lista de bultos físicos de un envío para el optimizador 3D: expande
+  // cada renglón (unidades → bultos) con las medidas de cada producto, y le da
+  // un color a cada pedido.
+  const bultosDeEnvio = (rs: Remito[]): BultoAColocar[] => {
+    const bultos: BultoAColocar[] = [];
+    rs.forEach((r, i) => {
+      const color = COLORES_PEDIDO[i % COLORES_PEDIDO.length];
+      const etiqueta = `${r.numero} · ${r.clienteNombre || "s/cliente"}`;
+      r.items.forEach((it) => {
+        const ean = eanPorId.get(it.productId) ?? it.productId;
+        const d = LOGISTICA_POR_EAN[ean];
+        if (!d) return;
+        const nBultos = Math.max(1, Math.ceil(it.cantidad / (d.paqPorBulto || 1)));
+        const med = medidasBulto(d);
+        // Tope de seguridad para no renderizar miles de cajas.
+        for (let k = 0; k < Math.min(nBultos, 120); k++) {
+          bultos.push({
+            pedidoId: r.id,
+            etiqueta,
+            color,
+            alto: med.alto,
+            ancho: med.ancho,
+            prof: med.prof,
+          });
+        }
+      });
+    });
+    return bultos;
+  };
+
+  // Modal del pallet 3D.
+  const [pallet3d, setPallet3d] = useState<{
+    envio: Envio;
+    rs: Remito[];
+  } | null>(null);
+  const [palletActivo, setPalletActivo] = useState(0);
+  const armado = useMemo(
+    () => (pallet3d ? armarPallet(bultosDeEnvio(pallet3d.rs)) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pallet3d]
+  );
 
   // Pendientes de despacho: remitos no anulados, sin envío asignado.
   const pendientes = useMemo(
@@ -335,6 +395,15 @@ export default function EnviosPage() {
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setPalletActivo(0);
+                        setPallet3d({ envio: e, rs });
+                      }}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark"
+                    >
+                      🧊 Ver armado del pallet 3D
+                    </button>
                     {proximo && (
                       <button
                         onClick={() => cambiarEstadoEnvio(e, proximo)}
@@ -359,6 +428,86 @@ export default function EnviosPage() {
           </div>
         )}
       </section>
+
+      {/* ===== Modal: armado del pallet en 3D ===== */}
+      {pallet3d && armado && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setPallet3d(null)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl bg-surface p-5 shadow-2xl"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="font-serif text-xl text-brand-dark">
+                  Armado del pallet
+                </h3>
+                <p className="text-xs text-brand-dark/55">
+                  {formatDate(pallet3d.envio.fecha)} · {pallet3d.envio.transporte}{" "}
+                  · {armado.cajas.length} bultos · {armado.pallets} pallet
+                  {armado.pallets === 1 ? "" : "s"}
+                </p>
+              </div>
+              <button
+                onClick={() => setPallet3d(null)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-brand-dark/60 hover:bg-brand-border/30"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+
+            {/* Selector de pallet (si hay más de uno) */}
+            {armado.pallets > 1 && (
+              <div className="mb-2 flex gap-1">
+                {Array.from({ length: armado.pallets }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPalletActivo(i)}
+                    className={`rounded-lg px-3 py-1 text-xs font-semibold ${
+                      palletActivo === i
+                        ? "bg-primary text-white"
+                        : "bg-primary-light text-primary"
+                    }`}
+                  >
+                    Pallet {i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <PalletViewer3D
+              cajas={armado.cajas}
+              pallet={PALLET_ESTANDAR}
+              palletIndex={palletActivo}
+            />
+
+            {/* Referencia de colores por pedido */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {pallet3d.rs.map((r, i) => (
+                <span
+                  key={r.id}
+                  className="inline-flex items-center gap-1.5 text-xs text-brand-dark/70"
+                >
+                  <span
+                    className="h-3 w-3 rounded-sm"
+                    style={{
+                      background: COLORES_PEDIDO[i % COLORES_PEDIDO.length],
+                    }}
+                  />
+                  {r.numero} · {r.clienteNombre || "s/cliente"}
+                </span>
+              ))}
+            </div>
+
+            <p className="mt-3 text-center text-[11px] text-brand-dark/45">
+              Girá con el mouse o el dedo · rueda para acercar. Los pedidos van
+              agrupados por color para descargarlos juntos.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

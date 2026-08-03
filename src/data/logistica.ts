@@ -17,6 +17,26 @@ export interface DatoLogistico {
   paqPorBulto: number;
   pesoBultoKg: number;
   m3Bulto: number;
+  /** Medidas del bulto en cm (alto × ancho × profundidad). Opcionales: cuando
+   *  no están, el armado del pallet las estima del m³ como un cubo. Se cargan
+   *  exactas de la planilla "Datos Logísticos" (columnas ALTURA/ANCHO/PROF bulto). */
+  altoBultoCm?: number;
+  anchoBultoCm?: number;
+  profBultoCm?: number;
+}
+
+/** Medidas de un bulto en cm. Si no hay medidas exactas, arma un cubo del m³. */
+export function medidasBulto(d: DatoLogistico): {
+  alto: number;
+  ancho: number;
+  prof: number;
+} {
+  if (d.altoBultoCm && d.anchoBultoCm && d.profBultoCm) {
+    return { alto: d.altoBultoCm, ancho: d.anchoBultoCm, prof: d.profBultoCm };
+  }
+  // Estimación: cubo equivalente al m³ (lado = raíz cúbica del volumen).
+  const ladoCm = Math.cbrt(Math.max(d.m3Bulto, 0.000001)) * 100;
+  return { alto: ladoCm, ancho: ladoCm, prof: ladoCm };
 }
 
 export const DATOS_LOGISTICOS: DatoLogistico[] = [
