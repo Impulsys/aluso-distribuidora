@@ -64,14 +64,29 @@ export default function ProductCatalog() {
     } as Record<MarcaFilter, number>;
   }, [all]);
 
-  // Conteos por categoría (dependientes de marca activa)
+  // Orden del catálogo pedido por el cliente: primero algodones, después el
+  // resto de Doncella (toallas, protectores…), y por último la línea Nonisec.
+  const ordenProducto = (p: Product): number => {
+    if (/algod/i.test(p.categoria)) return 0;
+    if (p.marca === "nonisec") return 2;
+    return 1; // resto de Doncella (femenina, bebé, etc.)
+  };
+
+  // Conteos por categoría (dependientes de marca activa), en el mismo orden.
   const catCounts = useMemo(() => {
     const filtered = all.filter(
       (p) => p.activo && (marca === "todos" ? true : p.marca === marca)
     );
     const m = new Map<string, number>();
-    filtered.forEach((p) => m.set(p.categoria, (m.get(p.categoria) ?? 0) + 1));
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    const prio = new Map<string, number>();
+    filtered.forEach((p) => {
+      m.set(p.categoria, (m.get(p.categoria) ?? 0) + 1);
+      if (!prio.has(p.categoria)) prio.set(p.categoria, ordenProducto(p));
+    });
+    return Array.from(m.entries()).sort((a, b) => {
+      const d = (prio.get(a[0]) ?? 1) - (prio.get(b[0]) ?? 1);
+      return d !== 0 ? d : a[0].localeCompare(b[0]);
+    });
   }, [marca, all]);
 
   const productos = useMemo(
@@ -83,7 +98,17 @@ export default function ProductCatalog() {
         .filter((p) => {
           const t = q.trim();
           if (!t) return true;
-          return coincide(p.nombre, t) || coincide(p.descripcion, t);
+          // Buscar también por CÓDIGO (pedido de Luciano) y por EAN.
+          return (
+            coincide(p.nombre, t) ||
+            coincide(p.descripcion, t) ||
+            (p.codigo ?? "").includes(t) ||
+            (p.ean ?? "").includes(t)
+          );
+        })
+        .sort((a, b) => {
+          const d = ordenProducto(a) - ordenProducto(b);
+          return d !== 0 ? d : a.categoria.localeCompare(b.categoria);
         }),
     [marca, cat, q, all]
   );
@@ -104,103 +129,57 @@ export default function ProductCatalog() {
 
   return (
     <>
-      {/* === Marca tabs (estilo segmento grande) === */}
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex w-full overflow-hidden rounded-2xl border border-brand-border bg-surface p-1 shadow-sm sm:w-auto">
-          {MARCA_TABS.map((m) => {
-            const active = marca === m.id;
-            return (
-              <button
-                key={m.id}
-                onClick={() => {
-                  setMarca(m.id);
-                  setCat("Todas");
-                }}
-                className={`flex flex-1 flex-col items-start gap-0.5 rounded-xl px-4 py-2.5 text-left transition sm:flex-none ${
-                  active
-                    ? "bg-primary text-white shadow-md"
-                    : "text-brand-dark hover:bg-primary-light"
-                }`}
-              >
-                <span className="flex items-center gap-2 text-sm font-bold leading-tight">
-                  {m.label}
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                      active
-                        ? "bg-white/20 text-white"
-                        : "bg-primary-light text-primary"
-                    }`}
-                  >
-                    {countByMarca[m.id]}
-                  </span>
-                </span>
-                <span
-                  className={`text-[11px] ${
-                    active ? "text-white/75" : "text-brand-dark/55"
-                  }`}
-                >
-                  {m.subtitle}
-                </span>
-              </button>
-            );
-          })}
+      {/* === Filtros compactos: marca y categoría como desplegables + buscador.
+             Antes eran dos filas grandes de botones (ocupaban mucho y a veces
+             confundían); Luciano pidió menús desplegables. === */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex gap-3">
+          <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand-dark/55">
+            Marca
+            <select
+              value={marca}
+              onChange={(e) => {
+                setMarca(e.target.value as MarcaFilter);
+                setCat("Todas");
+              }}
+              className="rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm font-medium normal-case text-brand-dark outline-none focus:border-primary"
+            >
+              {MARCA_TABS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label} ({countByMarca[m.id]})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-1 flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand-dark/55">
+            Categoría
+            <select
+              value={cat}
+              onChange={(e) => setCat(e.target.value)}
+              className="rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm font-medium normal-case text-brand-dark outline-none focus:border-primary"
+            >
+              <option value="Todas">
+                Todas ({catCounts.reduce((s, [, n]) => s + n, 0)})
+              </option>
+              {catCounts.map(([c, n]) => (
+                <option key={c} value={c}>
+                  {c} ({n})
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-        <div className="relative w-full sm:w-80">
+        <div className="relative flex-1">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark/40">
             🔎
           </span>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre o descripción…"
+            placeholder="Buscar por nombre, código o descripción…"
             className="w-full rounded-full border border-brand-border bg-surface py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
         </div>
-      </div>
-
-      {/* === Categorías como pills con conteo === */}
-      <div className="mb-6 -mx-2 flex flex-wrap gap-2 px-2">
-        <button
-          onClick={() => setCat("Todas")}
-          className={`group inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
-            cat === "Todas"
-              ? "bg-primary text-white shadow-sm"
-              : "border border-brand-border bg-surface text-brand-dark hover:border-primary hover:text-primary"
-          }`}
-        >
-          Todas
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-              cat === "Todas"
-                ? "bg-white/20 text-white"
-                : "bg-primary-light text-primary group-hover:bg-primary group-hover:text-white"
-            }`}
-          >
-            {catCounts.reduce((s, [, n]) => s + n, 0)}
-          </span>
-        </button>
-        {catCounts.map(([c, n]) => (
-          <button
-            key={c}
-            onClick={() => setCat(c)}
-            className={`group inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
-              cat === c
-                ? "bg-primary text-white shadow-sm"
-                : "border border-brand-border bg-surface text-brand-dark hover:border-primary hover:text-primary"
-            }`}
-          >
-            {c}
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                cat === c
-                  ? "bg-white/20 text-white"
-                  : "bg-primary-light text-primary group-hover:bg-primary group-hover:text-white"
-              }`}
-            >
-              {n}
-            </span>
-          </button>
-        ))}
       </div>
 
       <p className="mb-4 text-sm text-brand-dark/60">
