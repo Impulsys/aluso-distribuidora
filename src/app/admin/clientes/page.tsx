@@ -10,6 +10,7 @@ import {
   type NewClienteInput,
 } from "@/lib/clientes";
 import { coincide } from "@/lib/search";
+import { LISTAS_PRECIO } from "@/lib/precios";
 import {
   CONDICION_IVA_LABELS,
   type Cliente,
@@ -25,6 +26,8 @@ const VACIO: NewClienteInput = {
   telefono: "",
   direccionEntrega: "",
   domicilioFiscal: "",
+  markupLista: 28,
+  descuentoExtraPct: 0,
 };
 
 export default function ClientesPage() {
@@ -68,6 +71,8 @@ export default function ClientesPage() {
       telefono: c.telefono ?? "",
       direccionEntrega: c.direccionEntrega ?? "",
       domicilioFiscal: c.domicilioFiscal ?? "",
+      markupLista: c.markupLista ?? 28,
+      descuentoExtraPct: c.descuentoExtraPct ?? 0,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -175,6 +180,42 @@ export default function ClientesPage() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-brand-dark">Lista de precios</span>
+            <select
+              value={form.markupLista ?? 28}
+              onChange={(e) =>
+                set("markupLista", Number(e.target.value) || 28)
+              }
+              className={inputCls}
+            >
+              {LISTAS_PRECIO.map((l) => (
+                <option key={l.markup} value={l.markup}>
+                  {l.nombre} ({l.markup}%)
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-brand-dark">
+              Descuento extra (%)
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={90}
+              step="any"
+              value={form.descuentoExtraPct ?? ""}
+              onChange={(e) =>
+                set("descuentoExtraPct", Math.max(0, Number(e.target.value) || 0))
+              }
+              placeholder="0"
+              className={inputCls}
+            />
+            <span className="mt-0.5 block text-[11px] text-brand-dark/45">
+              Se aplica solo cuando elegís este cliente en la venta.
+            </span>
           </label>
           <label className="block text-sm">
             <span className="font-medium text-brand-dark">Teléfono</span>

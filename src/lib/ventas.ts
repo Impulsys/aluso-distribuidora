@@ -119,8 +119,11 @@ export async function updateRemitoMeta(
 interface RemitoMeta {
   orderId?: string;
   origin?: Remito["origin"];
+  clienteId?: string;
   clienteNombre?: string;
   clienteCuit?: string;
+  vendedorUid?: string;
+  vendedorNombre?: string;
   formaPago?: FormaPago;
   /** Descuentos por condición ya calculados al cerrar la venta. */
   descuentos?: Remito["descuentos"];
@@ -148,8 +151,11 @@ async function persistRemito(
   const base = {
     orderId: meta.orderId ?? null,
     origin: meta.origin ?? null,
+    clienteId: meta.clienteId ?? null,
     clienteNombre: meta.clienteNombre ?? null,
     clienteCuit: meta.clienteCuit ?? null,
+    vendedorUid: meta.vendedorUid ?? null,
+    vendedorNombre: meta.vendedorNombre ?? null,
     formaPago: meta.formaPago ?? "efectivo",
     items,
     subtotal: Math.round(subtotal * 100) / 100,
@@ -260,14 +266,22 @@ export async function crearRemitoDesdePedido(
  */
 export async function crearRemitoDirecto(input: {
   items: RemitoItem[];
+  clienteId?: string;
   clienteNombre?: string;
+  clienteCuit?: string;
+  vendedorUid?: string;
+  vendedorNombre?: string;
   formaPago?: FormaPago;
   descuentos?: Remito["descuentos"];
   createdBy?: string;
 }): Promise<Remito> {
   return persistRemito(input.items, {
     origin: "vendedor",
+    clienteId: input.clienteId,
     clienteNombre: input.clienteNombre,
+    clienteCuit: input.clienteCuit,
+    vendedorUid: input.vendedorUid,
+    vendedorNombre: input.vendedorNombre,
     formaPago: input.formaPago,
     descuentos: input.descuentos,
     createdBy: input.createdBy,

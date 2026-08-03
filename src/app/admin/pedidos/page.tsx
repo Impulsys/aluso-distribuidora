@@ -24,11 +24,14 @@ import RegistroHistorico from "@/components/RegistroHistorico";
 import { useAuth } from "@/context/AuthContext";
 import { formatARS, formatDate } from "@/lib/format";
 import { coincide } from "@/lib/search";
-import { descuentosVenta } from "@/lib/precios";
+import { descuentosVenta, MARKUP_DISTRIBUIDOR } from "@/lib/precios";
 import {
   DEFAULT_PRECIOS_CONFIG,
   subscribePreciosConfig,
 } from "@/lib/preciosConfig";
+import { subscribeClientes } from "@/lib/clientes";
+import { getAllUsers } from "@/lib/admin";
+import type { Cliente, AppUser } from "@/lib/types";
 import type {
   Factura,
   FormaPago,
@@ -147,11 +150,20 @@ function NuevaVentaView({
   // Sin los costos cargados, el remito guardaría costoUnitario 0 y el margen de
   // esa venta queda roto PARA SIEMPRE (los ítems del remito son inmutables).
   const [costsListo, setCostsListo] = useState(false);
-  const [cliente, setCliente] = useState("");
+  // Cliente de la venta: se elige del CRM (obligatorio) para poder ver a fin de
+  // mes cuántos pedidos y la deuda de cada uno (pedido de Luciano).
+  const [clienteId, setClienteId] = useState("");
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  // Vendedor al que se le atribuye la venta (para la comisión).
+  const [vendedorId, setVendedorId] = useState("");
+  const [vendedores, setVendedores] = useState<AppUser[]>([]);
   const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
   // Condiciones de descuento que el operador confirma al cerrar la venta.
   const [retiraDeposito, setRetiraDeposito] = useState(false);
   const [porVolumen, setPorVolumen] = useState(false);
+  // Descuento adicional a mano (el "+" que pidió Luciano).
+  const [descAdicional, setDescAdicional] = useState(0);
+  const [descAdicOpen, setDescAdicOpen] = useState(false);
   const [cfgPrecios, setCfgPrecios] = useState(DEFAULT_PRECIOS_CONFIG);
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<POSLine[]>([]);
@@ -165,6 +177,34 @@ function NuevaVentaView({
     onCartCount?.(lines.length);
   }, [lines.length, onCartCount]);
 
+  // BORRADOR: la venta a medias se guarda en el navegador (pedido de Luciano:
+  // "que quede en borrador como los mails"). Sobrevive a cambiar de solapa,
+  // cerrar la pestaña o recargar. Se limpia al generar el remito.
+  const [borradorListo, setBorradorListo] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("pos_borrador");
+      if (raw) {
+        const b = JSON.parse(raw);
+        if (Array.isArray(b.lines)) setLines(b.lines);
+        if (b.clienteId) setClienteId(b.clienteId);
+        if (b.vendedorId) setVendedorId(b.vendedorId);
+      }
+    } catch {}
+    setBorradorListo(true);
+  }, []);
+  useEffect(() => {
+    if (!borradorListo) return;
+    if (lines.length === 0 && !clienteId && !vendedorId) {
+      localStorage.removeItem("pos_borrador");
+    } else {
+      localStorage.setItem(
+        "pos_borrador",
+        JSON.stringify({ lines, clienteId, vendedorId })
+      );
+    }
+  }, [lines, clienteId, vendedorId, borradorListo]);
+
   useEffect(
     () =>
       subscribeProductCosts((c) => {
@@ -175,6 +215,14 @@ function NuevaVentaView({
   );
 
   useEffect(() => subscribePreciosConfig(setCfgPrecios), []);
+  useEffect(() => subscribeClientes(setClientes), []);
+  useEffect(() => {
+    getAllUsers()
+      .then((us) => setVendedores(us.filter((u) => u.role === "vendedor")))
+      .catch(() => {});
+  }, []);
+
+  const clienteSel = clientes.find((c) => c.id === clienteId);
 
   const resultados = useMemo(() => {
     const t = q.trim();
@@ -234,7 +282,26 @@ function NuevaVentaView({
   const subtotal = lines.reduce((s, l) => s + l.precioVenta * l.cantidad, 0);
   const totalItems = lines.reduce((s, l) => s + l.cantidad, 0);
 
-  // Descuentos por condición, en vivo, con la config editable.
+  // Descuentos extra: la lista del cliente (si tiene una mejor que la
+  // distribuidor), su descuento fijo, y el adicional a mano.
+  const extrasDesc = useMemo(() => {
+    const e: { concepto: string; pct: number }[] = [];
+    const m = clienteSel?.markupLista;
+    if (m != null && m < MARKUP_DISTRIBUIDOR) {
+      // La lista del cliente, expresada como descuento sobre el precio
+      // distribuidor: precioCliente = distribuidor × (1+m) / (1+28).
+      const pct =
+        (1 - (1 + m / 100) / (1 + MARKUP_DISTRIBUIDOR / 100)) * 100;
+      e.push({ concepto: `Lista ${m}%`, pct: Math.round(pct * 100) / 100 });
+    }
+    if (clienteSel?.descuentoExtraPct && clienteSel.descuentoExtraPct > 0)
+      e.push({ concepto: "Descuento del cliente", pct: clienteSel.descuentoExtraPct });
+    if (descAdicional > 0)
+      e.push({ concepto: "Descuento adicional", pct: descAdicional });
+    return e;
+  }, [clienteSel, descAdicional]);
+
+  // Descuentos por condición + extras, en vivo, con la config editable.
   const ventaConDesc = useMemo(
     () =>
       descuentosVenta(
@@ -246,15 +313,22 @@ function NuevaVentaView({
           descuentoVolumenPct: cfgPrecios.descuentoVolumenPct,
           volumenMinBultos: cfgPrecios.volumenMinBultos,
           acumulaSumando: cfgPrecios.acumulaSumando,
-        }
+        },
+        extrasDesc
       ),
-    [subtotal, formaPago, retiraDeposito, porVolumen, cfgPrecios]
+    [subtotal, formaPago, retiraDeposito, porVolumen, cfgPrecios, extrasDesc]
   );
   const total = ventaConDesc.total;
 
   const generar = async () => {
     setError(null);
     setMsg(null);
+    // Cliente obligatorio: sin esto no se puede saber a fin de mes cuántos
+    // pedidos hizo cada cliente ni su deuda.
+    if (!clienteSel) {
+      setError("Elegí el cliente de la venta. Si no está en la lista, cargalo primero en la solapa Clientes.");
+      return;
+    }
     if (!costsListo) {
       setError(
         "Esperá un segundo: se están cargando los costos. Si generás ahora, el margen de esta venta queda mal para siempre."
@@ -290,12 +364,18 @@ function NuevaVentaView({
     // navegador; la rellenamos cuando el remito esté creado.
     const printWin = window.open("", "_blank", "width=900,height=1000");
     try {
+      const vend = vendedores.find((v) => v.uid === vendedorId);
       const r = await crearRemitoDirecto({
         items,
-        clienteNombre: cliente.trim() || undefined,
+        clienteId: clienteSel.id,
+        clienteNombre: clienteSel.nombre,
+        clienteCuit: clienteSel.cuit,
+        // Vendedor al que se le atribuye la venta (para la comisión). Si no se
+        // elige, queda el que la cargó.
+        vendedorUid: vend?.uid,
+        vendedorNombre: vend?.displayName,
         formaPago,
-        // Los descuentos por condición que ve el operador son los que se guardan
-        // e imprimen. Se recalculan sobre los items saneados por las dudas.
+        // Los descuentos que ve el operador son los que se guardan e imprimen.
         descuentos: descuentosVenta(
           totalCalc,
           { formaPago, retiraEnDeposito: retiraDeposito, porVolumen },
@@ -305,7 +385,8 @@ function NuevaVentaView({
             descuentoVolumenPct: cfgPrecios.descuentoVolumenPct,
             volumenMinBultos: cfgPrecios.volumenMinBultos,
             acumulaSumando: cfgPrecios.acumulaSumando,
-          }
+          },
+          extrasDesc
         ).descuentos,
         createdBy: user?.uid,
       });
@@ -316,7 +397,10 @@ function NuevaVentaView({
       }
       setMsg(`Remito ${r.numero} generado. Stock descontado.`);
       setLines([]);
-      setCliente("");
+      setClienteId("");
+      setVendedorId("");
+      setDescAdicional(0);
+      setDescAdicOpen(false);
       setFormaPago("efectivo");
       setRetiraDeposito(false);
       setPorVolumen(false);
@@ -535,15 +619,59 @@ function NuevaVentaView({
         </div>
 
         <div className="rounded-2xl border border-brand-border bg-surface p-4">
-          <label className="mb-1 block text-[11px] font-bold uppercase text-brand-dark/55">
-            Cliente (opcional)
-          </label>
-          <input
-            value={cliente}
-            onChange={(e) => setCliente(e.target.value)}
-            placeholder="Nombre del cliente"
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-[11px] font-bold uppercase text-brand-dark/55">
+              Cliente
+            </label>
+            <a
+              href="/admin/clientes"
+              target="_blank"
+              className="text-[11px] font-semibold text-primary hover:underline"
+            >
+              + Ver / cargar clientes
+            </a>
+          </div>
+          <select
+            value={clienteId}
+            onChange={(e) => setClienteId(e.target.value)}
             className={inputCls}
-          />
+          >
+            <option value="">— Elegí el cliente —</option>
+            {clientes
+              .slice()
+              .sort((a, b) => a.nombre.localeCompare(b.nombre))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                  {c.razonSocial ? ` · ${c.razonSocial}` : ""}
+                </option>
+              ))}
+          </select>
+          {clienteSel &&
+            (clienteSel.markupLista || clienteSel.descuentoExtraPct) && (
+              <p className="mt-1 text-[11px] text-emerald-700">
+                Condición del cliente aplicada
+                {clienteSel.descuentoExtraPct
+                  ? ` · -${clienteSel.descuentoExtraPct}%`
+                  : ""}
+              </p>
+            )}
+
+          <label className="mb-1 mt-3 block text-[11px] font-bold uppercase text-brand-dark/55">
+            Vendedor <span className="font-normal normal-case text-brand-dark/40">(para la comisión)</span>
+          </label>
+          <select
+            value={vendedorId}
+            onChange={(e) => setVendedorId(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">— Sin vendedor (venta de la casa) —</option>
+            {vendedores.map((v) => (
+              <option key={v.uid} value={v.uid}>
+                {v.displayName}
+              </option>
+            ))}
+          </select>
 
           <label className="mb-1 mt-3 block text-[11px] font-bold uppercase text-brand-dark/55">
             Forma de pago
@@ -604,6 +732,47 @@ function NuevaVentaView({
               Por volumen +{cfgPrecios.volumenMinBultos} bultos (
               {cfgPrecios.descuentoVolumenPct}%)
             </label>
+
+            {/* Descuento adicional a mano (pedido de Luciano): el "+" abre un
+                campo para cargar un % extra sobre este pedido. */}
+            {descAdicOpen ? (
+              <div className="flex items-center gap-2 text-sm text-brand-dark/80">
+                <span className="flex-1">Descuento adicional</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  step="any"
+                  autoFocus
+                  value={descAdicional || ""}
+                  onChange={(e) =>
+                    setDescAdicional(Math.max(0, Number(e.target.value) || 0))
+                  }
+                  placeholder="0"
+                  className="w-16 rounded-lg border border-brand-border px-2 py-1 text-center text-sm outline-none focus:border-primary"
+                />
+                <span>%</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDescAdicional(0);
+                    setDescAdicOpen(false);
+                  }}
+                  className="text-rose-600 hover:text-rose-700"
+                  aria-label="Quitar descuento adicional"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setDescAdicOpen(true)}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                + Agregar descuento adicional
+              </button>
+            )}
           </div>
 
           {error && (
@@ -628,7 +797,10 @@ function NuevaVentaView({
             <button
               onClick={() => {
                 setLines([]);
-                setCliente("");
+                setClienteId("");
+                setVendedorId("");
+                setDescAdicional(0);
+                setDescAdicOpen(false);
               }}
               className="mt-2 w-full rounded-lg border border-brand-border px-4 py-2 text-sm font-medium hover:bg-rose-50 hover:text-rose-700"
             >

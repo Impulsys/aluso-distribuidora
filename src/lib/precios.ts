@@ -166,10 +166,22 @@ export interface ResultadoVenta {
 export function descuentosVenta(
   subtotal: number,
   cond: CondicionesDescuento,
-  config: ConfigPrecios = CONFIG_PRECIOS_DEFAULT
+  config: ConfigPrecios = CONFIG_PRECIOS_DEFAULT,
+  /**
+   * Descuentos extra que no dependen de la condición: el fijo del cliente y el
+   * adicional que carga el operador a mano. Se aplican igual que los otros.
+   */
+  extras: { concepto: string; pct: number }[] = []
 ): ResultadoVenta {
   const descuentos: DescuentoAplicado[] = [];
   let pct = 0;
+
+  for (const e of extras) {
+    if (e.pct > 0) {
+      pct += e.pct;
+      descuentos.push({ concepto: e.concepto, pct: e.pct, monto: 0 });
+    }
+  }
 
   if (cond.formaPago === "efectivo" && config.descuentoEfectivoPct > 0) {
     pct += config.descuentoEfectivoPct;

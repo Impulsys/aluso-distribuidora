@@ -105,6 +105,14 @@ export interface Cliente {
   domicilioFiscal?: string;
   vendedorId?: string; // quién lo cargó (automático)
   vendedorNombre?: string; // snapshot
+  /**
+   * Condición comercial del cliente, que se aplica sola al elegirlo en la venta
+   * (pedido de Luciano). markupLista = su lista de precios (15, 18…); ausente o
+   * 28 = distribuidor. descuentoExtraPct = descuento fijo adicional sobre esa
+   * lista.
+   */
+  markupLista?: number;
+  descuentoExtraPct?: number;
   createdAt: number;
 }
 
@@ -196,8 +204,12 @@ export interface Remito {
   numero: string; // nº de guía, ej "R-000001"
   orderId?: string; // pedido del que se generó
   origin?: OrderOrigin;
+  clienteId?: string; // cliente del CRM
   clienteNombre?: string;
   clienteCuit?: string;
+  /** Vendedor al que se le atribuye la venta (para comisiones). */
+  vendedorUid?: string;
+  vendedorNombre?: string;
   formaPago?: FormaPago; // efectivo / transferencia / cheque
   items: RemitoItem[];
   total: number; // total FINAL de la venta (con descuentos aplicados)

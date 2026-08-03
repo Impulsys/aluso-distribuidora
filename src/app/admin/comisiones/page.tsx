@@ -52,12 +52,14 @@ export default function ComisionesPage() {
         reclutadoPor: u.reclutadoPor,
       }));
 
-    // Ventas atribuidas a un vendedor (remito.createdBy). Las de la casa
-    // (creadas por admin/socio) no entran: no comisionan.
+    // Ventas atribuidas al VENDEDOR de la venta (el que se elige en el POS).
+    // Si no se eligió vendedor, cae en createdBy. Las de la casa (sin vendedor)
+    // no entran: no comisionan.
     const uidsVendedor = new Set(vendedores.map((v) => v.uid));
     const ventas: VentaVendedor[] = remitos
-      .filter((r) => !r.anulado && r.createdBy && uidsVendedor.has(r.createdBy))
-      .map((r) => ({ vendedorUid: r.createdBy as string, monto: r.total }));
+      .filter((r) => !r.anulado)
+      .map((r) => ({ vendedorUid: r.vendedorUid || r.createdBy || "", monto: r.total }))
+      .filter((v) => v.vendedorUid && uidsVendedor.has(v.vendedorUid));
 
     return calcularComisiones(vendedores, ventas, {
       comisionDefaultPct: cfg.comisionDefaultPct,
