@@ -226,6 +226,12 @@ export interface Remito {
   /** Estado de despacho, independiente del estado de la venta. */
   estadoLogistica?: EstadoLogistica;
   /**
+   * Cómo se despacha el pedido. "palletizado" (por defecto) entra al armado de
+   * pallet 3D; "granel" va suelto (fletes chicos donde no entra un pallet) y no
+   * se palletiza. Lo elige el operador en "Pendientes de despacho".
+   */
+  modoDespacho?: "palletizado" | "granel";
+  /**
    * Cobrado: la venta se pagó. Mientras esté en false/ausente, cuenta como
    * deuda del cliente. `fechaCobro` es CUÁNDO se cobró — la comisión del
    * vendedor se paga según esa fecha (no según la fecha de la venta).

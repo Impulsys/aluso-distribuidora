@@ -78,3 +78,20 @@ test("ninguna caja se solapa con otra (mismo pallet)", () => {
 test("sin bultos, cero pallets", () => {
   assert.equal(armarPallet([]).pallets, 0);
 });
+
+test("separarPedidos: dos clientes chicos = dos pallets (no se surten)", () => {
+  // Sin separar, estos dos bultos chiquitos entran en el mismo pallet.
+  const bultos = [caja("p1", 40, 30, 30), caja("p2", 40, 30, 30)];
+  assert.equal(armarPallet(bultos).pallets, 1);
+  // Separando por pedido, cada cliente tiene el suyo.
+  const r = armarPallet(bultos, undefined, { separarPedidos: true });
+  assert.equal(r.pallets, 2);
+  assert.equal(r.cajas.find((c) => c.pedidoId === "p1")!.pallet, 0);
+  assert.equal(r.cajas.find((c) => c.pedidoId === "p2")!.pallet, 1);
+});
+
+test("separarPedidos: un mismo pedido grande sigue usando varios pallets", () => {
+  const bultos = [caja("p1", 40, 30, 100), caja("p1", 40, 30, 100)];
+  const r = armarPallet(bultos, { ancho: 40, prof: 30, alto: 150 }, { separarPedidos: true });
+  assert.equal(r.pallets, 2); // no entra en altura → segundo pallet, mismo pedido
+});

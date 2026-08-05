@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { subscribeRemitosRange } from "@/lib/ventas";
+import { subscribeRemitosRange, setModoDespacho } from "@/lib/ventas";
 import {
   armarPallet,
   COLORES_PEDIDO,
@@ -55,6 +55,24 @@ const ESTADO_COLOR: Record<EstadoLogistica, string> = {
   listo: "bg-violet-100 text-violet-800",
   entregado: "bg-emerald-100 text-emerald-800",
 };
+
+// "Retira en depósito" vs un flete: se distinguen para que no haya confusión.
+const esRetiro = (t: string) => t.toLowerCase().includes("retir");
+const esGranel = (r: Remito) => r.modoDespacho === "granel";
+
+/** Cartel claro de cómo sale el envío: retira el cliente o va con flete. */
+function TransporteBadge({ t }: { t: string }) {
+  const retiro = esRetiro(t);
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+        retiro ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+      }`}
+    >
+      {retiro ? "🏢 Retira en depósito" : `🚚 ${t}`}
+    </span>
+  );
+}
 
 const FLUJO: EstadoLogistica[] = ["asignado", "preparacion", "listo", "entregado"];
 
@@ -187,11 +205,39 @@ export default function EnviosPage() {
     rs: Remito[];
   } | null>(null);
   const [palletActivo, setPalletActivo] = useState(0);
-  const armado = useMemo(
-    () => (pallet3d ? armarPallet(bultosDeEnvio(pallet3d.rs)) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Solo los pedidos palletizados van al pallet; los "a granel" van sueltos.
+  // Cada pedido arma SUS propios pallets (no se surten con otro cliente).
+  const rsPallet = useMemo(
+    () => (pallet3d ? pallet3d.rs.filter((r) => !esGranel(r)) : []),
     [pallet3d]
   );
+  const rsGranel = useMemo(
+    () => (pallet3d ? pallet3d.rs.filter(esGranel) : []),
+    [pallet3d]
+  );
+  const armado = useMemo(
+    () =>
+      pallet3d
+        ? armarPallet(bultosDeEnvio(rsPallet), PALLET_ESTANDAR, {
+            separarPedidos: true,
+          })
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pallet3d, rsPallet]
+  );
+  // Qué pedido (etiqueta/color) va en cada pallet, para rotular el selector.
+  const palletsInfo = useMemo(() => {
+    if (!armado) return [];
+    const info: { etiqueta: string; color: string }[] = [];
+    for (let i = 0; i < armado.pallets; i++) {
+      const caja = armado.cajas.find((c) => c.pallet === i);
+      info.push({
+        etiqueta: caja?.etiqueta ?? `Pallet ${i + 1}`,
+        color: caja?.color ?? "#94a3b8",
+      });
+    }
+    return info;
+  }, [armado]);
 
   // Pendientes de despacho: remitos no anulados, sin envío asignado.
   const pendientes = useMemo(
@@ -230,6 +276,22 @@ export default function EnviosPage() {
     });
     return volumenDeEnvio(items);
   }, [sel, remitoPorId, eanPorId]);
+
+  // Pallets reales de la selección: cada pedido palletizado arma los suyos (no
+  // se surten), los "a granel" no cuentan pallets.
+  const selData = useMemo(() => {
+    const rs = [...sel]
+      .map((id) => remitoPorId.get(id))
+      .filter(Boolean) as Remito[];
+    const nGranel = rs.filter(esGranel).length;
+    const pallets = armarPallet(
+      bultosDeEnvio(rs.filter((r) => !esGranel(r))),
+      PALLET_ESTANDAR,
+      { separarPedidos: true }
+    ).pallets;
+    return { nGranel, pallets };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, remitoPorId]);
 
   const programar = async () => {
     if (sel.size === 0) return;
@@ -291,10 +353,11 @@ export default function EnviosPage() {
               {pendientes.map((r) => {
                 const v = volumenDeRemito(r);
                 const activo = sel.has(r.id);
+                const granel = esGranel(r);
                 return (
-                  <label
+                  <div
                     key={r.id}
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+                    className={`flex items-center gap-3 rounded-xl border p-3 transition ${
                       activo
                         ? "border-primary bg-primary-light/25"
                         : "border-brand-border bg-surface hover:border-primary/50"
@@ -304,9 +367,12 @@ export default function EnviosPage() {
                       type="checkbox"
                       checked={activo}
                       onChange={() => toggle(r.id)}
-                      className="h-4 w-4"
+                      className="h-4 w-4 cursor-pointer"
                     />
-                    <div className="min-w-0 flex-1">
+                    <label
+                      onClick={() => toggle(r.id)}
+                      className="min-w-0 flex-1 cursor-pointer"
+                    >
                       <p className="truncate text-sm font-semibold text-brand-dark">
                         {r.numero} · {r.clienteNombre || "Consumidor final"}
                       </p>
@@ -314,16 +380,33 @@ export default function EnviosPage() {
                         {formatDate(r.fecha)} · {r.items.length} producto
                         {r.items.length === 1 ? "" : "s"}
                       </p>
-                    </div>
-                    <div className="shrink-0 text-right text-xs">
+                    </label>
+                    {/* Cómo se despacha: palletizado (va al pallet) o a granel
+                        (suelto, para fletes chicos). */}
+                    <button
+                      onClick={() =>
+                        setModoDespacho(r.id, granel ? "palletizado" : "granel")
+                      }
+                      title="Cambiar cómo se despacha este pedido"
+                      className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                        granel
+                          ? "bg-orange-100 text-orange-800 hover:bg-orange-200"
+                          : "bg-primary-light text-primary hover:bg-primary hover:text-white"
+                      }`}
+                    >
+                      {granel ? "🧺 A granel" : "📦 Palletizado"}
+                    </button>
+                    <div className="w-20 shrink-0 text-right text-xs">
                       <p className="font-semibold text-brand-dark">
-                        {v.m3} m³ · {v.bultos} bultos
+                        {v.m3} m³ · {v.bultos} b.
                       </p>
                       <p className="text-brand-dark/50">
-                        ~{v.pallets} pallet{v.pallets === 1 ? "" : "s"}
+                        {granel
+                          ? "a granel"
+                          : `~${v.pallets} pallet${v.pallets === 1 ? "" : "s"}`}
                       </p>
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>
@@ -337,7 +420,12 @@ export default function EnviosPage() {
                   </p>
                   <p className="text-sm text-brand-dark">
                     Total: <b>{volumenSel.m3} m³</b> · {volumenSel.bultos} bultos ·{" "}
-                    <b>~{volumenSel.pallets} pallet{volumenSel.pallets === 1 ? "" : "s"}</b>
+                    <b>{selData.pallets} pallet{selData.pallets === 1 ? "" : "s"}</b>
+                    {selData.nGranel > 0 && (
+                      <span className="text-orange-700">
+                        {" "}· {selData.nGranel} a granel
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -351,7 +439,7 @@ export default function EnviosPage() {
                     />
                   </label>
                   <label className="text-xs font-semibold uppercase text-brand-dark/55">
-                    Flete / retiro
+                    ¿Cómo sale? (retiro o flete)
                     <select
                       value={transporte}
                       onChange={(e) => setTransporte(e.target.value)}
@@ -361,6 +449,9 @@ export default function EnviosPage() {
                         <option key={t}>{t}</option>
                       ))}
                     </select>
+                    <span className="mt-1 block">
+                      <TransporteBadge t={transporte} />
+                    </span>
                   </label>
                   <label className="text-xs font-semibold uppercase text-brand-dark/55">
                     Observaciones
@@ -414,6 +505,12 @@ export default function EnviosPage() {
                 })
               );
               const v = volumenDeEnvio(items);
+              const nGranel = rs.filter(esGranel).length;
+              const pallets = armarPallet(
+                bultosDeEnvio(rs.filter((r) => !esGranel(r))),
+                PALLET_ESTANDAR,
+                { separarPedidos: true }
+              ).pallets;
               const idxEstado = FLUJO.indexOf(e.estado);
               const proximo = FLUJO[idxEstado + 1];
               return (
@@ -423,13 +520,21 @@ export default function EnviosPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-brand-dark">
-                        {formatDate(e.fecha)} · {e.transporte}
-                      </p>
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-brand-dark">
+                          {formatDate(e.fecha)}
+                        </p>
+                        <TransporteBadge t={e.transporte} />
+                      </div>
                       <p className="text-xs text-brand-dark/55">
                         {rs.length} pedido{rs.length === 1 ? "" : "s"} · {v.m3} m³
-                        · {v.bultos} bultos · ~{v.pallets} pallet
-                        {v.pallets === 1 ? "" : "s"}
+                        · {v.bultos} bultos · {pallets} pallet
+                        {pallets === 1 ? "" : "s"}
+                        {nGranel > 0 && (
+                          <span className="text-orange-700">
+                            {" "}· {nGranel} a granel
+                          </span>
+                        )}
                       </p>
                     </div>
                     <span
@@ -503,15 +608,18 @@ export default function EnviosPage() {
             className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl bg-surface p-5 shadow-2xl"
             onClick={(ev) => ev.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-serif text-xl text-brand-dark">
                   Armado del pallet
                 </h3>
-                <p className="text-xs text-brand-dark/55">
-                  {formatDate(pallet3d.envio.fecha)} · {pallet3d.envio.transporte}{" "}
-                  · {armado.cajas.length} bultos · {armado.pallets} pallet
-                  {armado.pallets === 1 ? "" : "s"}
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-brand-dark/55">
+                  <span>{formatDate(pallet3d.envio.fecha)}</span>
+                  <TransporteBadge t={pallet3d.envio.transporte} />
+                  <span>
+                    · {armado.pallets} pallet{armado.pallets === 1 ? "" : "s"}
+                    {armado.pallets > 0 ? " (uno por cliente)" : ""}
+                  </span>
                 </p>
               </div>
               <button
@@ -522,52 +630,84 @@ export default function EnviosPage() {
               </button>
             </div>
 
-            {/* Selector de pallet (si hay más de uno) */}
-            {armado.pallets > 1 && (
-              <div className="mb-2 flex gap-1">
-                {Array.from({ length: armado.pallets }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPalletActivo(i)}
-                    className={`rounded-lg px-3 py-1 text-xs font-semibold ${
-                      palletActivo === i
-                        ? "bg-primary text-white"
-                        : "bg-primary-light text-primary"
-                    }`}
-                  >
-                    Pallet {i + 1}
-                  </button>
-                ))}
+            {rsPallet.length === 0 ? (
+              <div className="grid h-[220px] place-items-center rounded-xl bg-orange-50 text-center text-sm font-medium text-orange-800">
+                🧺 Todos los pedidos de este envío van a granel — no se arman en pallet.
+              </div>
+            ) : (
+              <>
+                {/* Selector de pallet: uno por cliente */}
+                {armado.pallets > 1 && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {palletsInfo.map((info, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPalletActivo(i)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold ${
+                          palletActivo === i
+                            ? "bg-primary text-white"
+                            : "bg-primary-light text-primary"
+                        }`}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-sm"
+                          style={{ background: info.color }}
+                        />
+                        Pallet {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="mb-2 text-xs text-brand-dark">
+                  Mostrando <b>Pallet {palletActivo + 1}</b> —{" "}
+                  {palletsInfo[palletActivo]?.etiqueta}
+                </p>
+
+                <PalletViewer3D
+                  cajas={armado.cajas}
+                  pallet={PALLET_ESTANDAR}
+                  palletIndex={palletActivo}
+                />
+
+                {/* Referencia de colores por pedido (palletizados) */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {rsPallet.map((r, i) => (
+                    <span
+                      key={r.id}
+                      className="inline-flex items-center gap-1.5 text-xs text-brand-dark/70"
+                    >
+                      <span
+                        className="h-3 w-3 rounded-sm"
+                        style={{
+                          background: COLORES_PEDIDO[i % COLORES_PEDIDO.length],
+                        }}
+                      />
+                      {r.numero} · {r.clienteNombre || "s/cliente"}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Pedidos a granel (van sueltos, sin pallet) */}
+            {rsGranel.length > 0 && (
+              <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3">
+                <p className="text-xs font-bold text-orange-800">
+                  🧺 A granel (sin pallet)
+                </p>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                  {rsGranel.map((r) => (
+                    <span key={r.id} className="text-xs text-orange-900/80">
+                      {r.numero} · {r.clienteNombre || "s/cliente"}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 
-            <PalletViewer3D
-              cajas={armado.cajas}
-              pallet={PALLET_ESTANDAR}
-              palletIndex={palletActivo}
-            />
-
-            {/* Referencia de colores por pedido */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {pallet3d.rs.map((r, i) => (
-                <span
-                  key={r.id}
-                  className="inline-flex items-center gap-1.5 text-xs text-brand-dark/70"
-                >
-                  <span
-                    className="h-3 w-3 rounded-sm"
-                    style={{
-                      background: COLORES_PEDIDO[i % COLORES_PEDIDO.length],
-                    }}
-                  />
-                  {r.numero} · {r.clienteNombre || "s/cliente"}
-                </span>
-              ))}
-            </div>
-
             <p className="mt-3 text-center text-[11px] text-brand-dark/45">
-              Girá con el mouse o el dedo · rueda para acercar. Los pedidos van
-              agrupados por color para descargarlos juntos.
+              Girá con el mouse o el dedo · rueda para acercar. Cada cliente
+              arma sus propios pallets (no se surten con otro cliente).
             </p>
           </div>
         </div>

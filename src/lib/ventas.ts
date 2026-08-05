@@ -319,6 +319,17 @@ export function subscribeRemitosRange(
 }
 
 /**
+ * Modo de despacho del pedido: "palletizado" (se arma en pallet) o "granel"
+ * (suelto, para fletes chicos). Se elige en Envíos → Pendientes de despacho.
+ */
+export async function setModoDespacho(
+  remitoId: string,
+  modo: "palletizado" | "granel"
+): Promise<void> {
+  await updateDoc(doc(db, "remitos", remitoId), { modoDespacho: modo });
+}
+
+/**
  * Marca un remito como COBRADO en la fecha indicada (por defecto, ahora). La
  * `fechaCobro` define en qué mes cae la comisión del vendedor. Ver lib/cobros.
  */

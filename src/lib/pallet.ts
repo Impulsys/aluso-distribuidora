@@ -45,13 +45,24 @@ export interface ResultadoPallet {
   pallets: number; // cantidad de pallets usados
 }
 
+export interface OpcionesPallet {
+  /**
+   * No surtir: cada pedido arma SUS propios pallets, nunca compartidos con
+   * otro cliente. Al cambiar de pedido se abre un pallet nuevo aunque sobre
+   * lugar en el anterior. Es como despacha ALUSO la mayoría de las veces.
+   */
+  separarPedidos?: boolean;
+}
+
 /**
  * @param bultos  todos los bultos a cargar (uno por bulto físico)
  * @param pallet  medidas del pallet
+ * @param opts    separarPedidos = un pallet por cliente (no surtir)
  */
 export function armarPallet(
   bultos: BultoAColocar[],
-  pallet: PalletDims = PALLET_ESTANDAR
+  pallet: PalletDims = PALLET_ESTANDAR,
+  opts: OpcionesPallet = {}
 ): ResultadoPallet {
   // Los pedidos se procesan juntos (para descargar por cliente), y dentro de
   // cada pedido los bultos más grandes primero (van abajo, más estables).
@@ -73,8 +84,24 @@ export function armarPallet(
     z = 0;
   let profFila = 0; // profundidad máxima de la fila actual
   let altoCapa = 0; // altura máxima de la capa actual
+  let pedidoActual: string | null = null;
 
   for (const b of orden) {
+    // Sin surtir: al cambiar de cliente, pallet nuevo (aunque sobre lugar).
+    if (
+      opts.separarPedidos &&
+      pedidoActual !== null &&
+      b.pedidoId !== pedidoActual
+    ) {
+      pIdx += 1;
+      x = 0;
+      y = 0;
+      z = 0;
+      profFila = 0;
+      altoCapa = 0;
+    }
+    pedidoActual = b.pedidoId;
+
     // Si el bulto es más ancho que el pallet, lo apoyamos igual (se sale un
     // poco): mejor mostrarlo que perderlo. Caso raro.
     if (x + b.ancho > pallet.ancho + 0.01) {
