@@ -27,6 +27,7 @@ import {
   borrarEnvio,
 } from "@/lib/envios";
 import { volumenDeEnvio, type ItemVolumen } from "@/lib/logistica";
+import { subscribeFleteros } from "@/lib/fletes";
 import { LOGISTICA_POR_EAN } from "@/data/logistica";
 import { useProducts } from "@/hooks/useProducts";
 import { proformaHTML } from "@/lib/remito-print";
@@ -38,9 +39,10 @@ import {
   type Remito,
   type Envio,
   type EstadoLogistica,
+  type Fletero,
 } from "@/lib/types";
 
-const TRANSPORTES = ["Retira en depósito", "Flete propio", "Otro flete"];
+const RETIRO = "Retira en depósito";
 
 function hoyISO() {
   const d = new Date();
@@ -133,6 +135,8 @@ export default function EnviosPage() {
   const productos = useProducts();
   const [remitos, setRemitos] = useState<Remito[]>([]);
   const [envios, setEnvios] = useState<Envio[]>([]);
+  const [fleteros, setFleteros] = useState<Fletero[]>([]);
+  useEffect(() => subscribeFleteros(setFleteros), []);
   // Los remitos se leen de un rango amplio (últimos 60 días) para tener los
   // pendientes de despacho aunque la venta sea de días atrás.
   useEffect(() => {
@@ -248,9 +252,14 @@ export default function EnviosPage() {
   // --- Armado de un envío nuevo ---
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [fecha, setFecha] = useState(hoyISO());
-  const [transporte, setTransporte] = useState(TRANSPORTES[0]);
+  const [transporte, setTransporte] = useState(RETIRO);
   const [obs, setObs] = useState("");
   const [busy, setBusy] = useState(false);
+  // Fletero elegido (si no es retiro), según el nombre seleccionado.
+  const fleteroSel = useMemo(
+    () => fleteros.find((f) => f.nombre === transporte) ?? null,
+    [fleteros, transporte]
+  );
 
   const toggle = (id: string) =>
     setSel((s) => {
@@ -300,6 +309,7 @@ export default function EnviosPage() {
       await crearEnvio({
         fecha: tsFromISO(fecha),
         transporte,
+        fleteroId: fleteroSel?.id,
         remitoIds: [...sel],
         observaciones: obs.trim() || undefined,
         createdBy: user?.uid,
@@ -445,13 +455,40 @@ export default function EnviosPage() {
                       onChange={(e) => setTransporte(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-brand-border bg-surface px-3 py-2 text-sm normal-case outline-none focus:border-primary"
                     >
-                      {TRANSPORTES.map((t) => (
-                        <option key={t}>{t}</option>
-                      ))}
+                      <option value={RETIRO}>{RETIRO}</option>
+                      {fleteros.length > 0 && (
+                        <optgroup label="Fletes">
+                          {fleteros.map((f) => (
+                            <option key={f.id} value={f.nombre}>
+                              {f.nombre}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                     <span className="mt-1 block">
                       <TransporteBadge t={transporte} />
                     </span>
+                    {fleteroSel?.camiones && fleteroSel.camiones.length > 0 && (
+                      <span className="mt-1 block text-[11px] normal-case text-brand-dark/55">
+                        🚛{" "}
+                        {fleteroSel.camiones
+                          .map(
+                            (c) =>
+                              `${c.nombre}${
+                                c.altoCm || c.anchoCm || c.largoCm
+                                  ? ` (${c.altoCm ?? "?"}×${c.anchoCm ?? "?"}×${c.largoCm ?? "?"})`
+                                  : ""
+                              }`
+                          )
+                          .join(" · ")}
+                      </span>
+                    )}
+                    {fleteros.length === 0 && (
+                      <span className="mt-1 block text-[11px] normal-case text-brand-dark/45">
+                        Cargá tus fletes en la sección 🚛 Fletes para elegirlos acá.
+                      </span>
+                    )}
                   </label>
                   <label className="text-xs font-semibold uppercase text-brand-dark/55">
                     Observaciones

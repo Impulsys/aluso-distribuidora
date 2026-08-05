@@ -101,6 +101,9 @@ service cloud.firestore {
     match /proveedores/{id}      { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /purchases/{id}        { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /supplierPayments/{id} { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    // Fletes: fleteros (transportistas) y su cuenta corriente (cargos y pagos)
+    match /fleteros/{id}         { allow read: if isVendedorOrUp(); allow write: if isSuperadmin(); }
+    match /movimientosFlete/{id} { allow read: if isVendedorOrUp(); allow write: if isSuperadmin(); }
     // Ventas: remitos (descuentan stock) y facturas
     // El contador también puede LEER remitos y facturas (su área de consulta).
     match /remitos/{id}          { allow read: if isSocioOrUp() || isContador(); allow write: if isSuperadmin(); }

@@ -292,9 +292,51 @@ export interface Envio {
   id: string;
   fecha: number; // día de entrega (timestamp)
   transporte: string; // nombre del flete, o "Retira en depósito"
+  fleteroId?: string; // fletero elegido (si no es retiro). Ver módulo Fletes.
   estado: EstadoLogistica; // asignado → preparacion → listo → entregado
   remitoIds: string[]; // los remitos (pedidos) que van en este envío
   observaciones?: string;
+  createdBy?: string;
+  createdAt: number;
+}
+
+// ===== Módulo Fletes — transportistas y su cuenta corriente =====
+
+/** Un camión del fletero, con sus medidas (para saber qué entra). */
+export interface CamionFlete {
+  nombre: string; // "Chico", "Chasis", patente, etc.
+  altoCm?: number;
+  anchoCm?: number;
+  largoCm?: number;
+  capacidadKg?: number;
+}
+
+/** Un transportista/fletero con el que trabaja ALUSO. */
+export interface Fletero {
+  id: string;
+  nombre: string;
+  contacto?: string;
+  telefono?: string;
+  camiones?: CamionFlete[];
+  notas?: string;
+  createdAt: number;
+}
+
+export type TipoMovFlete = "cargo" | "pago";
+
+/**
+ * Movimiento de la cuenta corriente de un fletero. `cargo` = un flete que te
+ * cobró (aumenta la deuda); `pago` = lo que le pagaste (la baja). El saldo es
+ * cargos − pagos (ver lib/fleteSaldo). Cada cuenta es independiente por fletero.
+ */
+export interface MovimientoFlete {
+  id: string;
+  fleteroId: string;
+  tipo: TipoMovFlete;
+  monto: number;
+  fecha: number;
+  detalle?: string;
+  envioId?: string; // si el cargo corresponde a un envío puntual
   createdBy?: string;
   createdAt: number;
 }

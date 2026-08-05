@@ -25,6 +25,7 @@ export function subscribeEnvios(cb: (xs: Envio[]) => void): () => void {
 export interface NewEnvioInput {
   fecha: number;
   transporte: string;
+  fleteroId?: string;
   remitoIds: string[];
   observaciones?: string;
   createdBy?: string;
@@ -35,6 +36,7 @@ export async function crearEnvio(input: NewEnvioInput): Promise<string> {
   const ref = await addDoc(collection(db, "envios"), {
     fecha: input.fecha,
     transporte: input.transporte,
+    fleteroId: input.fleteroId ?? null,
     estado: "asignado" as EstadoLogistica,
     remitoIds: input.remitoIds,
     observaciones: input.observaciones ?? null,

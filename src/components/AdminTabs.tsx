@@ -41,6 +41,7 @@ const GRUPOS: Grupo[] = [
     tabs: [
       { href: "/admin/cuentas-clientes", label: "💳 Ctas clientes" },
       { href: "/admin/cuentas", label: "🏭 Ctas proveedores" },
+      { href: "/admin/fletes", label: "🚛 Fletes" },
       { href: "/admin/gastos", label: "💸 Egresos" },
       { href: "/admin/logistica", label: "🧮 Costo flete" },
       { href: "/contador", label: "📒 Contaduría" },
