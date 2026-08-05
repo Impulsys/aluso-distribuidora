@@ -85,15 +85,36 @@ export default function FletesPage() {
   };
 
   const borrarFletero = async (f: Fletero) => {
+    // Chequeo LOCAL primero (en tiempo real, lo que el usuario ve): si todavía
+    // tiene movimientos, ni intentamos.
+    const misMovs = movs.filter((m) => m.fleteroId === f.id).length;
+    if (misMovs > 0) {
+      alert(
+        `No se puede eliminar: tiene ${misMovs} movimiento(s) en su cuenta. ` +
+          "Borrá primero los movimientos."
+      );
+      return;
+    }
     if (!confirm(`¿Eliminar al fletero "${f.nombre}"?`)) return;
     try {
       await deleteFletero(f.id);
     } catch (err) {
-      alert(
-        (err as Error).message === "FLETERO_CON_MOVIMIENTOS"
-          ? "No se puede eliminar: tiene movimientos en su cuenta. Borrá primero los movimientos."
-          : "No se pudo eliminar el fletero."
-      );
+      // El guard del servidor puede ver movimientos recién borrados por
+      // consistencia eventual. Como local ya está en 0, reintentamos una vez.
+      if ((err as Error).message === "FLETERO_CON_MOVIMIENTOS") {
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          await deleteFletero(f.id);
+          return;
+        } catch {
+          alert(
+            "No se pudo eliminar todavía (los movimientos se están sincronizando). " +
+              "Probá de nuevo en unos segundos."
+          );
+          return;
+        }
+      }
+      alert("No se pudo eliminar el fletero.");
     }
   };
 
