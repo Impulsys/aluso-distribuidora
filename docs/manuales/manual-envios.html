@@ -1,0 +1,254 @@
+<title>Manual de Envíos y armado de pallet — ALUSO</title>
+<style>
+  :root {
+    --ink: #10262f;
+    --ink-soft: #3d5560;
+    --primary: #0a6480;
+    --primary-deep: #073a4b;
+    --accent: #d5852a;
+    --good: #2f8a66;
+    --surface: #ffffff;
+    --paper: #f4f1ea;
+    --line: #e2dccf;
+    --line-soft: #ece7db;
+    --chip: #eef4f6;
+    --shadow: 0 1px 2px rgba(16,38,47,.06), 0 8px 24px rgba(16,38,47,.06);
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eaf1f3; --ink-soft: #a6bcc4; --primary: #4fb6d4; --primary-deep: #8fd3e6;
+      --accent: #f0a94a; --good: #59c298; --surface: #12242c; --paper: #0c1a20;
+      --line: #223942; --line-soft: #1a2e36; --chip: #16303a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eaf1f3; --ink-soft: #a6bcc4; --primary: #4fb6d4; --primary-deep: #8fd3e6;
+    --accent: #f0a94a; --good: #59c298; --surface: #12242c; --paper: #0c1a20;
+    --line: #223942; --line-soft: #1a2e36; --chip: #16303a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ink: #10262f; --ink-soft: #3d5560; --primary: #0a6480; --primary-deep: #073a4b;
+    --accent: #d5852a; --good: #2f8a66; --surface: #ffffff; --paper: #f4f1ea;
+    --line: #e2dccf; --line-soft: #ece7db; --chip: #eef4f6;
+    --shadow: 0 1px 2px rgba(16,38,47,.06), 0 8px 24px rgba(16,38,47,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 830px; margin: 0 auto; padding: clamp(20px, 5vw, 56px) clamp(16px, 4vw, 32px) 80px; }
+
+  /* Header */
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--sans);
+    font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 13px; color: var(--primary); }
+  .brand .dot { width: 9px; height: 9px; border-radius: 2px; background: var(--accent); }
+  header.hero { border-bottom: 2px solid var(--line); padding-bottom: 26px; margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-weight: 700; line-height: 1.08; text-wrap: balance;
+    font-size: clamp(30px, 6vw, 46px); margin: 16px 0 8px; color: var(--ink); }
+  .lede { font-size: clamp(16px, 2.4vw, 18px); color: var(--ink-soft); max-width: 60ch; margin: 0; }
+
+  /* Quick-start callout */
+  .quick { display: flex; gap: 16px; align-items: flex-start; margin: 30px 0 8px;
+    background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .quick .ico { font-size: 26px; line-height: 1.2; }
+  .quick b { color: var(--ink); }
+  .quick p { margin: 2px 0 0; color: var(--ink-soft); font-size: 15px; }
+
+  /* Section titles */
+  h2 { font-family: var(--serif); font-weight: 700; font-size: clamp(21px, 3.4vw, 27px);
+    color: var(--ink); margin: 46px 0 6px; }
+  h2 .kicker { display:block; font-family: var(--sans); font-weight: 700; font-size: 12px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--primary); margin-bottom: 4px; }
+  .section-note { color: var(--ink-soft); margin: 0 0 20px; max-width: 62ch; }
+
+  /* Steps */
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 0 0 22px 62px; }
+  ol.steps > li::before {
+    content: counter(s); position: absolute; left: 0; top: 0;
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--primary); color: #fff; font-family: var(--serif); font-size: 19px; font-weight: 700;
+    box-shadow: var(--shadow); }
+  ol.steps > li::after {
+    content: ""; position: absolute; left: 19px; top: 44px; bottom: 2px; width: 2px; background: var(--line); }
+  ol.steps > li:last-child::after { display: none; }
+  ol.steps h3 { margin: 6px 0 4px; font-size: 18px; color: var(--ink); font-weight: 700; }
+  ol.steps p { margin: 0 0 6px; color: var(--ink-soft); }
+  .tag { display:inline-block; font-size: 12px; font-weight: 700; color: var(--primary-deep);
+    background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+
+  /* Generic card */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px; box-shadow: var(--shadow); margin: 8px 0; }
+
+  /* 3D reading: pallet illo */
+  .grid2 { display: grid; grid-template-columns: 1.1fr .9fr; gap: 22px; align-items: start; }
+  @media (max-width: 640px){ .grid2 { grid-template-columns: 1fr; } }
+  .pallet-illo { background: linear-gradient(180deg, var(--chip), var(--surface));
+    border: 1px solid var(--line); border-radius: 14px; padding: 20px; text-align: center; }
+  .stack { display:flex; flex-direction: column; align-items: center; gap: 4px; }
+  .row { display:flex; gap: 4px; }
+  .box { width: 46px; height: 26px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.10); }
+  .base { width: 190px; height: 12px; border-radius: 3px; background: #9a7b4f; margin-top: 5px;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.18); }
+  .c1{background:#e0524d}.c2{background:#f0902f}.c3{background:#2f9e7a}.c4{background:#3b7fd6}.c5{background:#8a5cd6}
+
+  ul.clean { list-style: none; padding: 0; margin: 0; }
+  ul.clean li { position: relative; padding-left: 26px; margin-bottom: 10px; color: var(--ink-soft); }
+  ul.clean li::before { content: "→"; position: absolute; left: 0; color: var(--primary); font-weight: 700; }
+  .legend { display:flex; align-items:center; gap: 9px; margin-bottom: 8px; }
+  .legend .sw { width: 15px; height: 15px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.15); }
+  .legend b { color: var(--ink); }
+  .legend span { color: var(--ink-soft); font-size: 14px; }
+
+  /* Estados flow */
+  .flow { display:flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 4px; }
+  .estado { font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); }
+  .e1{background:#e8f1f6;color:#1c6484}.e2{background:#fbf1dd;color:#8a5a13}.e3{background:#efe9fb;color:#5b3ba6}.e4{background:#e4f4ec;color:#1f6f4f}
+  @media (prefers-color-scheme: dark){ .estado{ background: var(--chip)!important; color: var(--primary-deep)!important; } }
+  :root[data-theme="dark"] .estado{ background: var(--chip)!important; color: var(--primary-deep)!important; }
+  .arrow { color: var(--ink-soft); font-weight: 700; }
+
+  /* FAQ */
+  .faq { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
+  .faq dt { font-weight: 700; color: var(--ink); margin-top: 16px; }
+  .faq dd { margin: 4px 0 0; color: var(--ink-soft); }
+
+  .foot { margin-top: 54px; border-top: 2px solid var(--line); padding-top: 18px;
+    color: var(--ink-soft); font-size: 13px; display:flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  strong.k { color: var(--ink); }
+  .pill-btn { display:inline-flex; align-items:center; gap:6px; background: var(--primary); color:#fff;
+    font-weight:700; font-size:13px; padding:4px 11px; border-radius: 8px; white-space: nowrap; }
+
+  @media print {
+    body { background: #fff; }
+    .quick, .card, .pallet-illo { box-shadow: none; }
+    ol.steps > li::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="brand"><span class="dot"></span> ALUSO Distribuidora</div>
+    <h1>Envíos y armado de pallet</h1>
+    <p class="lede">Cómo programar una entrega, imprimir la orden de armado y ver en 3D cómo se acomoda la mercadería en el pallet para descargarla más fácil.</p>
+  </header>
+
+  <div class="quick">
+    <div class="ico">👁️</div>
+    <div>
+      <b>¿Querés verlo funcionando ya, sin cargar nada?</b>
+      <p>Entrá a <strong class="k">Envíos</strong> y tocá el botón <span class="pill-btn">👁️ Ver ejemplo de armado 3D</span>. Abre un pallet de muestra con pedidos reales. No carga datos ni ensucia nada — es solo para mirar y practicar cómo se gira.</p>
+    </div>
+  </div>
+
+  <h2><span class="kicker">Qué es</span>La sección Envíos</h2>
+  <p class="section-note">Es donde se planifican las entregas. Agrupás varios pedidos en un <strong class="k">envío</strong> (mismo día, mismo flete), el sistema te dice cuánto volumen y cuántos pallets ocupan, te imprime la orden para armarlo y te muestra en 3D dónde va cada caja. Todo se calcula con las <strong class="k">medidas reales</strong> de cada bulto (cargadas de la planilla).</p>
+
+  <h2><span class="kicker">Paso a paso</span>Cómo programar un envío</h2>
+  <p class="section-note">El circuito completo, de la venta a la entrega:</p>
+  <ol class="steps">
+    <li>
+      <h3>Cargás las ventas como siempre</h3>
+      <p>Cada venta que hacés en <span class="tag">Ventas</span> genera un remito. Los remitos que todavía no salieron aparecen solos arriba, en <strong class="k">“Pendientes de despacho”</strong>. No hay que cargar nada aparte.</p>
+    </li>
+    <li>
+      <h3>Elegís qué pedidos entran y cómo van</h3>
+      <p>Tildás los pedidos que vas a mandar juntos. A la derecha de cada uno ves cuánto ocupa (<strong class="k">m³</strong>, <strong class="k">bultos</strong> y <strong class="k">pallets</strong>). Con el botón de cada pedido elegís si va <strong class="k">📦 Palletizado</strong> o <strong class="k">🧺 A granel</strong> (suelto, para esos fletes chicos donde no entra un pallet). Cada pedido palletizado arma <strong class="k">sus propios pallets</strong> — no se surten con los de otro cliente.</p>
+    </li>
+    <li>
+      <h3>Ponés día, cómo sale y una nota</h3>
+      <p>Elegís el <strong class="k">día de entrega</strong> y <strong class="k">cómo sale</strong>: <span class="pill-btn" style="background:#0a6480">🏢 Retira en depósito</span> o uno de tus <strong class="k">fletes</strong> (los que cargaste en la sección Fletes). El cartel queda con color distinto para que no haya confusión. Sumás una observación opcional y tocás <span class="pill-btn">🚚 Programar envío</span>.</p>
+    </li>
+    <li>
+      <h3>Armás, imprimís y despachás</h3>
+      <p>El envío pasa a <strong class="k">“Envíos programados”</strong>. Desde ahí, por cada pedido tenés un botón <strong class="k">🖨️ proforma</strong> (la orden de armado <em>sin precios</em>, con casilleros para tildar), el botón <strong class="k">🧊 Ver armado del pallet 3D</strong>, y podés ir marcando el estado a medida que avanza.</p>
+    </li>
+  </ol>
+
+  <h2><span class="kicker">Lo nuevo</span>Cómo leer el pallet en 3D</h2>
+  <p class="section-note">Cuando tocás <strong class="k">🧊 Ver armado del pallet 3D</strong>, el sistema calcula cómo entran las cajas y te lo dibuja. Regla importante: <strong class="k">cada cliente arma sus propios pallets</strong> — nunca se surten con los de otro cliente. Si en el envío hay tres clientes, vas a ver un pallet por cada uno.</p>
+
+  <div class="grid2">
+    <div class="pallet-illo">
+      <div class="stack">
+        <div class="row"><span class="box c3"></span><span class="box c3"></span><span class="box c3"></span></div>
+        <div class="row"><span class="box c3"></span><span class="box c3"></span><span class="box c3"></span></div>
+        <div class="row"><span class="box c3"></span><span class="box c3"></span><span class="box c3"></span></div>
+        <div class="base"></div>
+      </div>
+      <p style="margin:14px 0 0;font-size:13px;color:var(--ink-soft)">Un pallet = un cliente (un solo color). No se surte con otro.</p>
+    </div>
+    <div>
+      <ul class="clean">
+        <li><strong class="k">Girá</strong> el pallet arrastrando con el mouse (o el dedo en el celu).</li>
+        <li><strong class="k">Acercá</strong> con la rueda del mouse o pellizcando la pantalla.</li>
+        <li>Arriba, los botones <strong class="k">Pallet 1 / Pallet 2…</strong> (con el color de cada cliente) te dejan pasar de un cliente a otro. Dice <strong class="k">de quién es</strong> el que estás mirando.</li>
+        <li>Si un mismo cliente lleva mucho, arma <strong class="k">varios pallets suyos</strong>.</li>
+        <li>Los pedidos marcados <strong class="k">🧺 a granel</strong> no van al pallet: aparecen listados aparte, abajo.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <p style="margin:0 0 8px;font-weight:700;color:var(--ink)">Ejemplo: 3 clientes → 3 pallets</p>
+    <div class="legend"><span class="sw c1"></span><span><b>Pallet 1 · Kiosco La Esquina</b> — algodón + toallas</span></div>
+    <div class="legend"><span class="sw c2"></span><span><b>Pallet 2 · Almacén Doña Rosa</b> — algodón grande + pañales</span></div>
+    <div class="legend"><span class="sw c3"></span><span><b>Pallet 3 · Farmacia del Pueblo</b> — gasas + cofias</span></div>
+    <p style="margin:8px 0 0;font-size:13px;color:var(--ink-soft)">Cada uno tiene su pallet, con su color. En la vida real son tus pedidos del envío.</p>
+  </div>
+
+  <h2><span class="kicker">Seguimiento</span>Los estados del envío</h2>
+  <p class="section-note">A medida que el pedido avanza, lo vas marcando con el botón verde. Queda registrado en la bitácora quién lo movió y cuándo.</p>
+  <div class="flow">
+    <span class="estado e1">Asignado</span><span class="arrow">→</span>
+    <span class="estado e2">En preparación</span><span class="arrow">→</span>
+    <span class="estado e3">Listo</span><span class="arrow">→</span>
+    <span class="estado e4">Entregado</span>
+  </div>
+  <ul class="clean" style="margin-top:12px">
+    <li><strong class="k">Asignado</strong>: recién programado, todavía no se empezó a armar.</li>
+    <li><strong class="k">En preparación</strong>: se está juntando la mercadería (usá la proforma para tildar).</li>
+    <li><strong class="k">Listo</strong>: armado y esperando que pase el flete o el cliente.</li>
+    <li><strong class="k">Entregado</strong>: salió. Cierra el circuito.</li>
+  </ul>
+
+  <h2><span class="kicker">Dudas comunes</span>Preguntas frecuentes</h2>
+  <dl class="faq">
+    <dt>¿De dónde salen las medidas de las cajas?</dt>
+    <dd>De la planilla de datos logísticos que nos pasaron (alto × ancho × profundidad de cada bulto). Por eso el pallet no es un dibujo genérico: refleja el tamaño real de cada producto.</dd>
+
+    <dt>¿Qué es la “proforma” que imprimo?</dt>
+    <dd>Es el remito <strong class="k">sin precios</strong>, pensado como orden de armado: lista los productos con un casillero al lado para ir tildando lo que vas cargando. Se puede imprimir en A4 o guardar como PDF.</dd>
+
+    <dt>¿Qué es mandar “a granel”?</dt>
+    <dd>Es despachar el pedido suelto, sin armar pallet — para esos fletes chicos donde no entra un pallet. Lo marcás con el botón <strong class="k">🧺 A granel</strong> en cada pedido de “Pendientes de despacho”. Esos pedidos no entran al 3D; quedan listados aparte en el envío.</dd>
+
+    <dt>¿Cómo elijo con qué flete sale?</dt>
+    <dd>En “¿Cómo sale?” elegís <strong class="k">Retira en depósito</strong> o uno de tus fletes. Los fletes se cargan una vez en la sección <strong class="k">🚛 Fletes</strong> (con las medidas de sus camiones y su cuenta corriente) y después aparecen para elegir acá.</dd>
+
+    <dt>Me equivoqué en un envío, ¿lo puedo deshacer?</dt>
+    <dd>Sí. En el envío tocás <strong class="k">Borrar</strong> y los pedidos vuelven solos a “Pendientes de despacho” para rearmarlos. No se pierde ninguna venta.</dd>
+
+    <dt>¿El botón “Ver ejemplo” carga datos falsos?</dt>
+    <dd>No. Es solo una demostración para ver el 3D funcionando; no toca la base ni genera ventas, deudas ni envíos. Podés apretarlo las veces que quieras.</dd>
+
+    <dt>Un producto no aparece en el pallet 3D, ¿por qué?</dt>
+    <dd>Porque todavía no tiene las medidas cargadas. Se agregan a la planilla y a partir de ahí entra al cálculo automáticamente.</dd>
+  </dl>
+
+  <div class="foot">
+    <span>ALUSO Distribuidora · Manual de Envíos y armado de pallet</span>
+    <span>Se abre desde el panel: <strong class="k">🚚 Envíos</strong></span>
+  </div>
+</div>

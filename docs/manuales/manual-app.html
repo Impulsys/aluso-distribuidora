@@ -1,0 +1,391 @@
+<title>Manual de uso del sistema — ALUSO Distribuidora</title>
+<style>
+  :root {
+    --ink: #10262f; --ink-soft: #3d5560; --primary: #0a6480; --primary-deep: #073a4b;
+    --accent: #d5852a; --good: #2f8a66; --surface: #ffffff; --paper: #f4f1ea;
+    --line: #e2dccf; --line-soft: #ece7db; --chip: #eef4f6;
+    --shadow: 0 1px 2px rgba(16,38,47,.06), 0 8px 24px rgba(16,38,47,.06);
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eaf1f3; --ink-soft: #a6bcc4; --primary: #4fb6d4; --primary-deep: #8fd3e6;
+      --accent: #f0a94a; --good: #59c298; --surface: #12242c; --paper: #0c1a20;
+      --line: #223942; --line-soft: #1a2e36; --chip: #16303a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eaf1f3; --ink-soft: #a6bcc4; --primary: #4fb6d4; --primary-deep: #8fd3e6;
+    --accent: #f0a94a; --good: #59c298; --surface: #12242c; --paper: #0c1a20;
+    --line: #223942; --line-soft: #1a2e36; --chip: #16303a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ink: #10262f; --ink-soft: #3d5560; --primary: #0a6480; --primary-deep: #073a4b;
+    --accent: #d5852a; --good: #2f8a66; --surface: #ffffff; --paper: #f4f1ea;
+    --line: #e2dccf; --line-soft: #ece7db; --chip: #eef4f6;
+    --shadow: 0 1px 2px rgba(16,38,47,.06), 0 8px 24px rgba(16,38,47,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
+    line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: clamp(20px,5vw,56px) clamp(16px,4vw,32px) 80px; }
+
+  .brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.14em;
+    text-transform:uppercase; font-size:13px; color:var(--primary); }
+  .brand .dot { width:9px; height:9px; border-radius:2px; background:var(--accent); }
+  header.hero { border-bottom:2px solid var(--line); padding-bottom:26px; }
+  h1 { font-family:var(--serif); font-weight:700; line-height:1.08; text-wrap:balance;
+    font-size:clamp(30px,6vw,46px); margin:16px 0 8px; }
+  .lede { font-size:clamp(16px,2.4vw,18px); color:var(--ink-soft); max-width:60ch; margin:0; }
+
+  h2 { font-family:var(--serif); font-weight:700; font-size:clamp(21px,3.4vw,28px);
+    margin:48px 0 4px; scroll-margin-top:16px; }
+  h2 .kicker { display:block; font-family:var(--sans); font-weight:700; font-size:12px;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--primary); margin-bottom:4px; }
+  .section-note { color:var(--ink-soft); margin:0 0 18px; max-width:64ch; }
+
+  /* TOC */
+  .toc { background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:20px 22px; box-shadow:var(--shadow); margin:30px 0 8px; }
+  .toc h3 { margin:0 0 12px; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--primary); }
+  .toc-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px 24px; }
+  .toc-col b { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--accent); margin-bottom:6px; }
+  .toc-col a { display:block; color:var(--ink-soft); text-decoration:none; padding:2px 0; font-size:14px; }
+  .toc-col a:hover { color:var(--primary); }
+
+  /* Screen cards */
+  .screen { background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; box-shadow:var(--shadow); margin:14px 0; }
+  .screen .top { display:flex; align-items:center; gap:12px; }
+  .screen .ico { font-size:24px; width:44px; height:44px; flex:none; display:grid; place-items:center;
+    background:var(--chip); border:1px solid var(--line); border-radius:11px; }
+  .screen h3 { margin:0; font-size:19px; font-family:var(--serif); }
+  .screen .grp { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--primary); }
+  .screen .para { margin:12px 0 8px; color:var(--ink); }
+  .screen .para b { color:var(--ink); }
+  ul.how { list-style:none; padding:0; margin:6px 0 0; }
+  ul.how li { position:relative; padding-left:24px; margin-bottom:7px; color:var(--ink-soft); font-size:15px; }
+  ul.how li::before { content:"→"; position:absolute; left:0; color:var(--primary); font-weight:700; }
+  ul.how b { color:var(--ink); }
+
+  .callout { display:flex; gap:14px; align-items:flex-start; background:var(--surface);
+    border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:14px;
+    padding:16px 20px; box-shadow:var(--shadow); margin:22px 0; }
+  .callout .ico { font-size:22px; }
+  .callout p { margin:2px 0 0; color:var(--ink-soft); font-size:15px; }
+  .callout b { color:var(--ink); }
+
+  .steps { counter-reset:s; list-style:none; padding:0; margin:0; }
+  .steps > li { counter-increment:s; position:relative; padding:0 0 18px 54px; }
+  .steps > li::before { content:counter(s); position:absolute; left:0; top:0; width:36px; height:36px;
+    border-radius:50%; display:grid; place-items:center; background:var(--primary); color:#fff;
+    font-family:var(--serif); font-size:17px; font-weight:700; box-shadow:var(--shadow); }
+  .steps > li::after { content:""; position:absolute; left:17px; top:40px; bottom:2px; width:2px; background:var(--line); }
+  .steps > li:last-child::after { display:none; }
+  .steps h3 { margin:4px 0 3px; font-size:17px; }
+  .steps p { margin:0; color:var(--ink-soft); }
+
+  .roles { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; overflow:hidden;
+    border:1px solid var(--line); border-radius:12px; }
+  .roles th, .roles td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+  .roles thead th { background:var(--chip); color:var(--primary-deep); font-size:12px;
+    letter-spacing:.06em; text-transform:uppercase; }
+  .roles td b { color:var(--ink); }
+  .roles tr:last-child td { border-bottom:none; }
+  .tablescroll { overflow-x:auto; }
+
+  .tag { display:inline-block; font-size:12px; font-weight:700; color:var(--primary-deep);
+    background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:1px 9px; }
+  strong.k { color:var(--ink); }
+  .faq { border-top:1px solid var(--line); padding-top:10px; }
+  .faq dt { font-weight:700; color:var(--ink); margin-top:16px; }
+  .faq dd { margin:4px 0 0; color:var(--ink-soft); }
+
+  .foot { margin-top:54px; border-top:2px solid var(--line); padding-top:18px; color:var(--ink-soft);
+    font-size:13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+
+  @media print {
+    body { background:#fff; }
+    .toc, .screen, .callout { box-shadow:none; break-inside:avoid; }
+    .steps > li::before, .screen .ico, .roles thead th { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    h2 { break-after:avoid; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="brand"><span class="dot"></span> ALUSO Distribuidora</div>
+    <h1>Manual de uso del sistema</h1>
+    <p class="lede">Guía práctica del panel de administración: para qué sirve cada sección y cómo se usa en el día a día del negocio.</p>
+  </header>
+
+  <div class="callout">
+    <div class="ico">🔑</div>
+    <div>
+      <b>Para entrar</b>
+      <p>Ingresás con tu <strong class="k">usuario y contraseña</strong> en la pantalla de inicio. Cada persona tiene su propio usuario, así que todo lo que se hace queda registrado a nombre de quien lo hizo (ver <strong class="k">Bitácora</strong>). El menú de arriba está agrupado por temas: <em>Operación, Catálogo, Clientes y equipo, Plata y Sistema</em>.</p>
+    </div>
+  </div>
+
+  <div class="toc">
+    <h3>Qué vas a encontrar</h3>
+    <div class="toc-grid">
+      <div class="toc-col"><b>Operación</b>
+        <a href="#resumen">📊 Resumen</a>
+        <a href="#ventas">🧾 Ventas</a>
+        <a href="#envios">🚚 Envíos</a>
+      </div>
+      <div class="toc-col"><b>Catálogo</b>
+        <a href="#productos">📦 Productos</a>
+        <a href="#precios">🏷️ Precios</a>
+        <a href="#promociones">⭐ Promociones</a>
+      </div>
+      <div class="toc-col"><b>Clientes y equipo</b>
+        <a href="#clientes">👤 Clientes</a>
+        <a href="#usuarios">👥 Usuarios</a>
+        <a href="#comisiones">💼 Comisiones</a>
+      </div>
+      <div class="toc-col"><b>Plata</b>
+        <a href="#ctasclientes">💳 Ctas clientes</a>
+        <a href="#ctasprov">🏭 Ctas proveedores</a>
+        <a href="#fletes">🚛 Fletes</a>
+        <a href="#egresos">💸 Egresos</a>
+        <a href="#flete">🧮 Costo flete</a>
+        <a href="#contaduria">📒 Contaduría</a>
+      </div>
+      <div class="toc-col"><b>Sistema</b>
+        <a href="#bitacora">📋 Bitácora</a>
+        <a href="#config">⚙️ Configuración</a>
+        <a href="#reportes">📅 Reportes</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OPERACIÓN ============ -->
+  <h2><span class="kicker">Operación</span>El día a día</h2>
+
+  <div class="screen" id="resumen">
+    <div class="top"><div class="ico">📊</div><div><span class="grp">Operación</span><h3>Resumen</h3></div></div>
+    <p class="para"><b>Para qué:</b> la pantalla de inicio. De un vistazo ves cómo viene el negocio hoy.</p>
+    <ul class="how">
+      <li>Muestra <b>venta del día</b>, <b>ganancia del día</b>, <b>deuda a proveedores</b> y <b>patrimonio en stock</b> (mercadería en depósito).</li>
+      <li>También cuántos <b>pedidos nuevos</b> hay, usuarios y productos activos.</li>
+      <li>Es solo de lectura: para operar, entrás a la sección que corresponda.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="ventas">
+    <div class="top"><div class="ico">🧾</div><div><span class="grp">Operación</span><h3>Ventas</h3></div></div>
+    <p class="para"><b>Para qué:</b> el corazón del sistema. Acá cargás cada venta, cerrás la caja del día y facturás.</p>
+    <ul class="how">
+      <li><b>Armar una venta:</b> elegís el <b>cliente</b> (del listado), opcionalmente el <b>vendedor</b>, agregás productos y cantidades. El sistema aplica solo la lista de precios y los descuentos del cliente, y podés sumar un descuento adicional.</li>
+      <li>Elegís <b>forma de pago</b> (efectivo o transferencia) y cerrás: se genera el <b>remito</b>, que <b>descuenta el stock</b> automáticamente. Lo imprimís en A4 o lo guardás como PDF.</li>
+      <li><b>Caja del día:</b> ves lo vendido, los gastos y cuánto efectivo debería haber. Al cerrar hacés el <b>arqueo</b> (contar los billetes) y el sistema te marca si hay diferencia.</li>
+      <li><b>Facturar:</b> desde el nº de remito emitís la factura electrónica en AFIP (cuando AFIP esté configurado).</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="envios">
+    <div class="top"><div class="ico">🚚</div><div><span class="grp">Operación</span><h3>Envíos</h3></div></div>
+    <p class="para"><b>Para qué:</b> planificar las entregas y ver en 3D cómo se arma el pallet. <span class="tag">Tiene su propio manual</span></p>
+    <ul class="how">
+      <li>Agrupás pedidos en un <b>envío</b> (día + retiro/flete) y ves el <b>pallet en 3D</b>: cada cliente arma <b>sus propios pallets</b> (no se surten con otro).</li>
+      <li>Cada pedido va <b>📦 palletizado</b> o <b>🧺 a granel</b> (suelto, para fletes chicos). Imprimís la <b>orden de armado</b> (proforma sin precios).</li>
+      <li>Elegís con qué <b>flete</b> sale (de los cargados en la sección Fletes) y marcás el estado: <b>asignado → en preparación → listo → entregado</b>.</li>
+      <li>Botón <b>👁️ Ver ejemplo de armado 3D</b> para verlo funcionando sin cargar nada.</li>
+    </ul>
+  </div>
+
+  <!-- ============ CATÁLOGO ============ -->
+  <h2><span class="kicker">Catálogo</span>Los productos y sus precios</h2>
+
+  <div class="screen" id="productos">
+    <div class="top"><div class="ico">📦</div><div><span class="grp">Catálogo</span><h3>Productos</h3></div></div>
+    <p class="para"><b>Para qué:</b> el listado de todo lo que vendés, con precios, stock y fotos.</p>
+    <ul class="how">
+      <li>Cargás o editás un producto: <b>nombre</b>, <b>marca</b>, <b>categoría</b>, <b>precio de venta</b> y <b>de costo</b>, <b>stock</b> y foto.</li>
+      <li>El <b>stock</b> se ajusta a mano acá (o baja solo con cada venta). Los precios aceptan centavos.</li>
+      <li>Podés marcar hasta <b>3 productos destacados</b> y activar o desactivar un producto del catálogo.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="precios">
+    <div class="top"><div class="ico">🏷️</div><div><span class="grp">Catálogo</span><h3>Precios</h3></div></div>
+    <p class="para"><b>Para qué:</b> definir las <b>listas de precios</b> y los parámetros del cálculo.</p>
+    <ul class="how">
+      <li>Configurás los distintos <b>recargos</b> (listas) que después se asignan a cada cliente o vendedor.</li>
+      <li>Cada cliente ve <b>su</b> precio según la lista que tenga, calculado sobre el precio base, sin exponer el costo.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="promociones">
+    <div class="top"><div class="ico">⭐</div><div><span class="grp">Catálogo</span><h3>Promociones</h3></div></div>
+    <p class="para"><b>Para qué:</b> los carteles de oferta que se muestran en el catálogo.</p>
+    <ul class="how">
+      <li>Armás un cartel sobre un producto, con su texto, colores y orden.</li>
+      <li>Podés activarlo o desactivarlo cuando quieras.</li>
+    </ul>
+  </div>
+
+  <!-- ============ CLIENTES Y EQUIPO ============ -->
+  <h2><span class="kicker">Clientes y equipo</span>Con quién trabajás</h2>
+
+  <div class="screen" id="clientes">
+    <div class="top"><div class="ico">👤</div><div><span class="grp">Clientes y equipo</span><h3>Clientes</h3></div></div>
+    <p class="para"><b>Para qué:</b> la agenda de clientes (el CRM). Lo que cargás acá se usa en cada venta y factura.</p>
+    <ul class="how">
+      <li>Datos del cliente: <b>nombre / razón social</b>, <b>CUIT</b>, condición de IVA, contacto y <b>dirección de entrega</b>.</li>
+      <li><b>Lista de precios</b> y <b>descuento extra</b>: se aplican solos al elegir el cliente en la venta.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="usuarios">
+    <div class="top"><div class="ico">👥</div><div><span class="grp">Clientes y equipo</span><h3>Usuarios</h3></div></div>
+    <p class="para"><b>Para qué:</b> las personas que entran al sistema y qué puede hacer cada una.</p>
+    <ul class="how">
+      <li>Das de alta un usuario con su <b>rol</b> (ver la tabla de roles más abajo) y su contraseña.</li>
+      <li>A un <b>vendedor</b> le fijás su <b>% de comisión</b> y, si corresponde, quién lo <b>reclutó</b> (para el override).</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="comisiones">
+    <div class="top"><div class="ico">💼</div><div><span class="grp">Clientes y equipo</span><h3>Comisiones</h3></div></div>
+    <p class="para"><b>Para qué:</b> cuánto cobra cada vendedor en un período.</p>
+    <ul class="how">
+      <li>Elegís un rango de fechas y ves lo que le corresponde a cada vendedor, más el <b>override</b> por los vendedores que reclutó.</li>
+      <li>Por defecto paga sobre lo <b>cobrado</b> (regla del negocio): si se vendió a fin de mes y se cobró al siguiente, la comisión cae al mes siguiente. Hay un botón para ver también <b>por venta</b>, solo como referencia.</li>
+    </ul>
+  </div>
+
+  <!-- ============ PLATA ============ -->
+  <h2><span class="kicker">Plata</span>Cuentas, cobros y pagos</h2>
+
+  <div class="screen" id="ctasclientes">
+    <div class="top"><div class="ico">💳</div><div><span class="grp">Plata</span><h3>Ctas clientes</h3></div></div>
+    <p class="para"><b>Para qué:</b> lo que te debe cada cliente y registrar los cobros.</p>
+    <ul class="how">
+      <li>Ves el <b>total en la calle</b> y la deuda de cada cliente (los remitos que todavía no se cobraron), con la antigüedad del más viejo.</li>
+      <li>Cuando te pagan, tocás <b>Cobrar</b> y elegís la fecha. Esa fecha define en qué mes cae la comisión del vendedor.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="ctasprov">
+    <div class="top"><div class="ico">🏭</div><div><span class="grp">Plata</span><h3>Ctas proveedores</h3></div></div>
+    <p class="para"><b>Para qué:</b> lo que le debés a cada proveedor y registrar los pagos.</p>
+    <ul class="how">
+      <li><b>Registrar compra:</b> cargás la <b>factura (A)</b> o el <b>remito (B)</b> que te dejó el proveedor; queda como deuda en su cuenta.</li>
+      <li><b>Registrar pago:</b> elegís proveedor, monto y vía (transferencia, depósito, financiera o efectivo). Podés imputarlo a un comprobante puntual o dejarlo a cuenta.</li>
+      <li>La <b>cuenta corriente</b> de cada proveedor muestra compras, pagos y saldo.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="fletes">
+    <div class="top"><div class="ico">🚛</div><div><span class="grp">Plata</span><h3>Fletes</h3></div></div>
+    <p class="para"><b>Para qué:</b> los transportistas con los que trabajás, cada uno con su propia cuenta corriente.</p>
+    <ul class="how">
+      <li>Cargás cada <b>fletero</b> con su contacto y <b>las medidas de sus camiones</b> (alto × ancho × largo y kg).</li>
+      <li>Cada fletero tiene su <b>cuenta</b>: registrás los <b>cargos</b> (los fletes que te cobra) y los <b>pagos</b>. El saldo es lo que le debés.</li>
+      <li>Después, en <b>Envíos</b>, elegís con qué flete sale cada pedido.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="egresos">
+    <div class="top"><div class="ico">💸</div><div><span class="grp">Plata</span><h3>Egresos</h3></div></div>
+    <p class="para"><b>Para qué:</b> los gastos del día que no son compra de mercadería.</p>
+    <ul class="how">
+      <li>Cargás cada gasto con su <b>categoría</b> (impuestos, insumos, mantenimiento, sueldos, fletes, adelantos), monto y forma de pago.</li>
+      <li>Lo que pagás en efectivo se descuenta de la caja del día.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="flete">
+    <div class="top"><div class="ico">🧮</div><div><span class="grp">Plata</span><h3>Costo flete</h3></div></div>
+    <p class="para"><b>Para qué:</b> una calculadora para repartir el costo de un flete entre los productos de la carga.</p>
+    <ul class="how">
+      <li>Ponés el <b>costo del flete</b> y elegís del <b>desplegable</b> qué productos y cuántos bultos vinieron.</li>
+      <li>El sistema reparte el flete por <b>volumen</b> o por <b>peso</b> y te dice cuánto sumarle al costo de cada paquete.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="contaduria">
+    <div class="top"><div class="ico">📒</div><div><span class="grp">Plata</span><h3>Contaduría</h3></div></div>
+    <p class="para"><b>Para qué:</b> una vista pensada para el contador, con los remitos y las facturas.</p>
+    <ul class="how">
+      <li>Sirve para revisar los comprobantes emitidos sin tocar el resto del sistema.</li>
+    </ul>
+  </div>
+
+  <!-- ============ SISTEMA ============ -->
+  <h2><span class="kicker">Sistema</span>Control y ajustes</h2>
+
+  <div class="screen" id="bitacora">
+    <div class="top"><div class="ico">📋</div><div><span class="grp">Sistema</span><h3>Bitácora</h3></div></div>
+    <p class="para"><b>Para qué:</b> el registro de todo lo que pasa en el sistema.</p>
+    <ul class="how">
+      <li>Muestra <b>quién</b> hizo <b>qué</b> y <b>cuándo</b> (una venta, un cobro, un cambio de precio…). Sirve para controlar y para resolver dudas.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="config">
+    <div class="top"><div class="ico">⚙️</div><div><span class="grp">Sistema</span><h3>Configuración</h3></div></div>
+    <p class="para"><b>Para qué:</b> elegir qué parte de los reportes ven los socios.</p>
+    <ul class="how">
+      <li>Con tres interruptores decidís si un <b>socio</b> ve la <b>ganancia</b>, los <b>gastos detallados</b> y la <b>caja física</b>. El superadmin siempre ve todo.</li>
+    </ul>
+  </div>
+
+  <div class="screen" id="reportes">
+    <div class="top"><div class="ico">📅</div><div><span class="grp">Sistema</span><h3>Reportes</h3></div></div>
+    <p class="para"><b>Para qué:</b> mirar el negocio en el tiempo. Se entra desde el acceso a Reportes.</p>
+    <ul class="how">
+      <li><b>Calendario anual:</b> cada día pintado según si hubo ventas. Tocás un día y ves el <b>reporte del día</b>: ventas, gastos, ganancia y cierre de caja.</li>
+      <li><b>Proveedores</b> y <b>Ventas:</b> los totales y las cuentas corrientes en detalle.</li>
+    </ul>
+  </div>
+
+  <!-- ============ ROLES ============ -->
+  <h2><span class="kicker">Permisos</span>Quién puede hacer qué</h2>
+  <p class="section-note">Cada usuario tiene un rol que define qué ve y qué puede tocar. De mayor a menor alcance:</p>
+  <div class="tablescroll">
+    <table class="roles">
+      <thead><tr><th>Rol</th><th>Para quién</th><th>Qué puede hacer</th></tr></thead>
+      <tbody>
+        <tr><td><b>Superadmin</b></td><td>Los dueños</td><td>Todo: vender, cargar, cobrar, pagar, precios, usuarios y configuración. Ve toda la información.</td></tr>
+        <tr><td><b>Socio</b></td><td>Socios administradores</td><td>Ve los reportes del negocio; qué tanto detalle (ganancia, gastos, caja) lo define el superadmin en Configuración.</td></tr>
+        <tr><td><b>Contador</b></td><td>Contaduría</td><td>Ve remitos y facturas para su trabajo, sin operar el resto.</td></tr>
+        <tr><td><b>Vendedor</b></td><td>El equipo de ventas</td><td>Carga sus pedidos y ve sus precios. Sus ventas comisionan.</td></tr>
+        <tr><td><b>Cliente</b></td><td>Clientes con usuario</td><td>Ve el catálogo con su lista de precios y hace pedidos.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ NOTAS ============ -->
+  <h2><span class="kicker">Buenas a saber</span>Preguntas frecuentes</h2>
+  <dl class="faq">
+    <dt>¿Cómo imprimo un remito, una factura o un reporte?</dt>
+    <dd>Todo se imprime en <strong class="k">hoja A4</strong>. Desde el navegador podés imprimirlo o elegir “Guardar como PDF”. No hace falta impresora de tickets.</dd>
+
+    <dt>Los precios, ¿aceptan centavos?</dt>
+    <dd>Sí. Todos los campos de plata y de porcentajes aceptan decimales.</dd>
+
+    <dt>¿Por qué todavía no puedo facturar en AFIP?</dt>
+    <dd>La facturación electrónica queda lista cuando se cargan los datos y el certificado de AFIP de ALUSO. Hasta entonces, la venta y el remito funcionan igual; solo se posterga la factura fiscal.</dd>
+
+    <dt>Me equivoqué en una venta, ¿cómo la corrijo?</dt>
+    <dd>Se <strong class="k">anula</strong> la venta (devuelve el stock) y se vuelve a cargar bien. Todo queda asentado en la Bitácora.</dd>
+
+    <dt>¿Dónde cargo los datos del negocio (CUIT, domicilio, teléfono)?</dt>
+    <dd>En el formulario de datos de ALUSO. Esos datos son los que salen en la cabecera de los remitos y comprobantes.</dd>
+  </dl>
+
+  <div class="foot">
+    <span>ALUSO Distribuidora · Manual de uso del sistema</span>
+    <span>Complemento: <strong class="k">Manual de Envíos y armado de pallet</strong></span>
+  </div>
+</div>
