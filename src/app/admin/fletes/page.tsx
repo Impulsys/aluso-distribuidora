@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   subscribeFleteros,
@@ -58,9 +58,11 @@ export default function FletesPage() {
   const rmCamion = (i: number) =>
     setNCamiones((c) => c.filter((_, k) => k !== i));
 
+  const crearRef = useRef(false);
   const crear = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nNombre.trim() || busy) return;
+    if (!nNombre.trim() || crearRef.current) return;
+    crearRef.current = true;
     setBusy(true);
     try {
       await createFletero({
@@ -81,6 +83,7 @@ export default function FletesPage() {
       alert("No se pudo crear el fletero.");
     } finally {
       setBusy(false);
+      crearRef.current = false;
     }
   };
 
@@ -369,10 +372,12 @@ function FleteroDetalle({
   const [fecha, setFecha] = useState(hoyISO());
   const [detalle, setDetalle] = useState("");
   const [busy, setBusy] = useState(false);
+  const regRef = useRef(false);
 
   const registrar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (monto <= 0 || busy) return;
+    if (monto <= 0 || regRef.current) return;
+    regRef.current = true;
     setBusy(true);
     try {
       await registrarMovimientoFlete({
@@ -389,6 +394,7 @@ function FleteroDetalle({
       alert("No se pudo registrar el movimiento.");
     } finally {
       setBusy(false);
+      regRef.current = false;
     }
   };
 

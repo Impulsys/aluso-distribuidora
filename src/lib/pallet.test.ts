@@ -90,6 +90,13 @@ test("separarPedidos: dos clientes chicos = dos pallets (no se surten)", () => {
   assert.equal(r.cajas.find((c) => c.pedidoId === "p2")!.pallet, 1);
 });
 
+test("un primer bulto más alto que el pallet no deja un pallet vacío", () => {
+  // Bulto de 200 de alto en un pallet de 150: se apoya igual, no abre uno vacío.
+  const r = armarPallet([caja("p1", 40, 30, 200)], { ancho: 120, prof: 100, alto: 150 });
+  assert.equal(r.pallets, 1);
+  assert.equal(r.cajas[0].pallet, 0);
+});
+
 test("separarPedidos: un mismo pedido grande sigue usando varios pallets", () => {
   const bultos = [caja("p1", 40, 30, 100), caja("p1", 40, 30, 100)];
   const r = armarPallet(bultos, { ancho: 40, prof: 30, alto: 150 }, { separarPedidos: true });

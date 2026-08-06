@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { subscribeRemitosRange, setModoDespacho } from "@/lib/ventas";
 import {
@@ -27,10 +27,10 @@ import {
   borrarEnvio,
 } from "@/lib/envios";
 import { volumenDeEnvio, type ItemVolumen } from "@/lib/logistica";
-import { subscribeFleteros } from "@/lib/fletes";
+import { subscribeFleteros, registrarMovimientoFlete } from "@/lib/fletes";
 import { LOGISTICA_POR_EAN } from "@/data/logistica";
 import { useProducts } from "@/hooks/useProducts";
-import { proformaHTML } from "@/lib/remito-print";
+import { proformaHTML, hojaArmadoHTML } from "@/lib/remito-print";
 import { abrirA4 } from "@/lib/a4";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate, tsFromISO } from "@/lib/format";
@@ -49,6 +49,7 @@ function hoyISO() {
   d.setHours(0, 0, 0, 0);
   return d.toISOString().slice(0, 10);
 }
+const num = (v: string) => Math.max(0, Number(v) || 0);
 
 const ESTADO_COLOR: Record<EstadoLogistica, string> = {
   pendiente: "bg-slate-100 text-slate-700",
@@ -176,7 +177,13 @@ export default function EnviosPage() {
   // Arma la lista de bultos físicos de un envío para el optimizador 3D: expande
   // cada renglón (unidades → bultos) con las medidas de cada producto, y le da
   // un color a cada pedido.
-  const bultosDeEnvio = (rs: Remito[]): BultoAColocar[] => {
+  // capLinea: tope de bultos por renglón. Solo para el VISOR 3D (no renderizar
+  // miles de cajas). Para CONTAR pallets se llama sin tope (Infinity), si no el
+  // conteo mentiría hacia abajo en pedidos muy grandes.
+  const bultosDeEnvio = (
+    rs: Remito[],
+    capLinea = Number.POSITIVE_INFINITY
+  ): BultoAColocar[] => {
     const bultos: BultoAColocar[] = [];
     rs.forEach((r, i) => {
       const color = COLORES_PEDIDO[i % COLORES_PEDIDO.length];
@@ -187,8 +194,7 @@ export default function EnviosPage() {
         if (!d) return;
         const nBultos = Math.max(1, Math.ceil(it.cantidad / (d.paqPorBulto || 1)));
         const med = medidasBulto(d);
-        // Tope de seguridad para no renderizar miles de cajas.
-        for (let k = 0; k < Math.min(nBultos, 120); k++) {
+        for (let k = 0; k < Math.min(nBultos, capLinea); k++) {
           bultos.push({
             pedidoId: r.id,
             etiqueta,
@@ -222,7 +228,7 @@ export default function EnviosPage() {
   const armado = useMemo(
     () =>
       pallet3d
-        ? armarPallet(bultosDeEnvio(rsPallet), PALLET_ESTANDAR, {
+        ? armarPallet(bultosDeEnvio(rsPallet, 120), PALLET_ESTANDAR, {
             separarPedidos: true,
           })
         : null,
@@ -255,6 +261,9 @@ export default function EnviosPage() {
   const [transporte, setTransporte] = useState(RETIRO);
   const [obs, setObs] = useState("");
   const [busy, setBusy] = useState(false);
+  // Costo del flete (opcional): si se completa, se registra como deuda (cargo)
+  // en la cuenta del fletero al programar el envío.
+  const [costoFlete, setCostoFlete] = useState(0);
   // Fletero elegido (si no es retiro), según el nombre seleccionado.
   const fleteroSel = useMemo(
     () => fleteros.find((f) => f.nombre === transporte) ?? null,
@@ -300,13 +309,57 @@ export default function EnviosPage() {
     ).pallets;
     return { nGranel, pallets };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, remitoPorId]);
+  }, [sel, remitoPorId, eanPorId]);
 
+  // Chequeo "¿entra en el camión?": compara volumen (m³) y peso (kg) de la
+  // selección contra el camión más grande del fletero elegido. Es una estimación
+  // (el armado real no llena el 100%), sirve como aviso.
+  const chequeoCamion = useMemo(() => {
+    if (!fleteroSel?.camiones || fleteroSel.camiones.length === 0) return null;
+    let kg = 0;
+    sel.forEach((id) => {
+      remitoPorId.get(id)?.items.forEach((it) => {
+        const ean = eanPorId.get(it.productId) ?? it.productId;
+        const d = LOGISTICA_POR_EAN[ean];
+        if (d?.pesoBultoKg && d.paqPorBulto) {
+          kg += Math.ceil(it.cantidad / d.paqPorBulto) * d.pesoBultoKg;
+        }
+      });
+    });
+    const cams = fleteroSel.camiones.map((c) => ({
+      nombre: c.nombre,
+      volM3:
+        c.altoCm && c.anchoCm && c.largoCm
+          ? (c.altoCm * c.anchoCm * c.largoCm) / 1e6
+          : 0,
+      capacidadKg: c.capacidadKg ?? 0,
+    }));
+    const best = cams.reduce((a, b) => (b.volM3 > a.volM3 ? b : a), cams[0]);
+    const m3 = volumenSel.m3;
+    const problemas: string[] = [];
+    if (best.volM3 > 0 && m3 > best.volM3)
+      problemas.push(
+        `el volumen (${m3} m³) supera al camión “${best.nombre}” (${best.volM3.toFixed(1)} m³)`
+      );
+    if (best.capacidadKg > 0 && kg > best.capacidadKg)
+      problemas.push(
+        `el peso (~${Math.round(kg)} kg) supera la capacidad (${best.capacidadKg} kg)`
+      );
+    const ajustado =
+      problemas.length === 0 && best.volM3 > 0 && m3 > best.volM3 * 0.8;
+    return { problemas, ajustado, camion: best.nombre };
+  }, [fleteroSel, sel, volumenSel, remitoPorId, eanPorId]);
+
+  // Candado SINCRÓNICO contra doble-click: `busy` (estado) recién frena tras el
+  // re-render, así que dos clicks rápidos crearían dos envíos (y dos cargos).
+  const programandoRef = useRef(false);
   const programar = async () => {
-    if (sel.size === 0) return;
+    if (sel.size === 0 || programandoRef.current) return;
+    programandoRef.current = true;
     setBusy(true);
+    let envioId: string;
     try {
-      await crearEnvio({
+      envioId = await crearEnvio({
         fecha: tsFromISO(fecha),
         transporte,
         fleteroId: fleteroSel?.id,
@@ -319,9 +372,34 @@ export default function EnviosPage() {
     } catch (e) {
       console.error(e);
       alert("No se pudo programar el envío.");
-    } finally {
+      programandoRef.current = false;
       setBusy(false);
+      return;
     }
+    // El envío YA quedó creado. El cargo del flete va aparte: si falla, NO
+    // decimos que falló el envío (si no, el usuario reintenta y lo duplica).
+    if (fleteroSel && costoFlete > 0) {
+      try {
+        await registrarMovimientoFlete({
+          fleteroId: fleteroSel.id,
+          tipo: "cargo",
+          monto: Number(costoFlete),
+          fecha: tsFromISO(fecha),
+          detalle: `Envío del ${fecha}`,
+          envioId,
+          createdBy: user?.uid,
+        });
+      } catch (e) {
+        console.error(e);
+        alert(
+          "El envío se programó, pero no se pudo registrar el costo del flete. " +
+            "Cargalo a mano en la sección Fletes."
+        );
+      }
+    }
+    setCostoFlete(0);
+    programandoRef.current = false;
+    setBusy(false);
   };
 
   return (
@@ -500,6 +578,46 @@ export default function EnviosPage() {
                     />
                   </label>
                 </div>
+
+                {/* Costo del flete (opcional) → deuda del fletero */}
+                {fleteroSel && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-brand-border bg-surface px-3 py-2">
+                    <label className="text-xs font-semibold uppercase text-brand-dark/55">
+                      Costo del flete (opcional)
+                    </label>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-brand-dark/40">$</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={costoFlete || ""}
+                        onChange={(e) => setCostoFlete(num(e.target.value))}
+                        placeholder="0"
+                        className="w-28 rounded-lg border border-brand-border bg-surface px-2 py-1 text-sm outline-none focus:border-primary"
+                      />
+                    </div>
+                    {costoFlete > 0 && (
+                      <span className="text-[11px] text-brand-dark/55">
+                        se registra como deuda de <b>{fleteroSel.nombre}</b>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Aviso: ¿entra en el camión? */}
+                {chequeoCamion && chequeoCamion.problemas.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+                    ⚠️ <b>Puede no entrar</b> en el camión: {chequeoCamion.problemas.join(" y ")}.
+                    Quizás necesites otro camión o dividir el envío. (Es una estimación.)
+                  </div>
+                )}
+                {chequeoCamion && chequeoCamion.ajustado && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    ⚠️ Va <b>justo</b> en el camión “{chequeoCamion.camion}”. Revisá antes de cargar.
+                  </div>
+                )}
+
                 <button
                   onClick={programar}
                   disabled={busy}
@@ -581,7 +699,17 @@ export default function EnviosPage() {
                     </span>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2 border-t border-brand-border pt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-brand-border pt-3">
+                    <button
+                      onClick={() => abrirA4(hojaArmadoHTML(e, rs))}
+                      title="Imprimir la hoja de armado de todo el envío"
+                      className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
+                    >
+                      🖨️ Hoja de armado
+                    </button>
+                    <span className="text-[11px] text-brand-dark/45">
+                      o proforma por pedido:
+                    </span>
                     {rs.map((r) => (
                       <button
                         key={r.id}
@@ -589,7 +717,7 @@ export default function EnviosPage() {
                         title="Imprimir proforma sin precio (para armar)"
                         className="rounded-lg bg-primary-light px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white"
                       >
-                        🖨️ {r.numero} · {r.clienteNombre || "s/cliente"}
+                        {r.numero} · {r.clienteNombre || "s/cliente"}
                       </button>
                     ))}
                   </div>

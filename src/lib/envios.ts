@@ -9,6 +9,8 @@ import {
   deleteDoc,
   onSnapshot,
   query,
+  where,
+  getDocs,
   orderBy,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -87,6 +89,12 @@ export async function borrarEnvio(envio: Envio): Promise<void> {
       })
     )
   );
+  // Si el envío generó un cargo automático en la cuenta de un fletero, se borra
+  // también: si no, quedaba una deuda fantasma sumando para siempre.
+  const cargos = await getDocs(
+    query(collection(db, "movimientosFlete"), where("envioId", "==", envio.id))
+  );
+  await Promise.all(cargos.docs.map((d) => deleteDoc(d.ref)));
   await deleteDoc(doc(db, "envios", envio.id));
   logActivity("Borró un envío", { entidad: "envio", entidadId: envio.id });
 }

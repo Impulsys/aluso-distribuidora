@@ -201,7 +201,6 @@ export default function AdminCuentasPage() {
       setCMontoB(0);
       setCProvB("");
       setCreado(prov.nombre);
-      setTimeout(() => setCreado(null), 4000);
     } catch (err) {
       console.error(err);
       setError("No se pudo registrar la compra.");
@@ -297,8 +296,9 @@ export default function AdminCuentasPage() {
     setGTransferTitular("");
     setGDepCuenta("");
     setGDepTitular("");
+    // El aviso queda fijo hasta el próximo pago (se limpia al empezar otro),
+    // igual que el de la compra: así el operador no se lo pierde.
     setGMsg("✓ Pago registrado con éxito.");
-    setTimeout(() => setGMsg(null), 3000);
   };
 
   const handleAddPago = async (e: React.FormEvent) => {

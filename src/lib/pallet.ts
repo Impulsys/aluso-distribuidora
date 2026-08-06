@@ -85,6 +85,7 @@ export function armarPallet(
   let profFila = 0; // profundidad máxima de la fila actual
   let altoCapa = 0; // altura máxima de la capa actual
   let pedidoActual: string | null = null;
+  let hayEnPallet = false; // ¿el pallet actual ya tiene algo?
 
   for (const b of orden) {
     // Sin surtir: al cambiar de cliente, pallet nuevo (aunque sobre lugar).
@@ -99,6 +100,7 @@ export function armarPallet(
       z = 0;
       profFila = 0;
       altoCapa = 0;
+      hayEnPallet = false;
     }
     pedidoActual = b.pedidoId;
 
@@ -118,17 +120,21 @@ export function armarPallet(
       z += altoCapa;
       altoCapa = 0;
     }
-    if (z + b.alto > pallet.alto + 0.01) {
-      // No entra en altura → pallet nuevo.
+    if (z + b.alto > pallet.alto + 0.01 && hayEnPallet) {
+      // No entra en altura → pallet nuevo. Solo si el pallet ya tiene algo: si
+      // el primer bulto ya es más alto que el pallet, lo apoyamos igual (como
+      // el caso "más ancho que el pallet") en vez de dejar un pallet vacío.
       pIdx += 1;
       x = 0;
       y = 0;
       z = 0;
       profFila = 0;
       altoCapa = 0;
+      hayEnPallet = false;
     }
 
     cajas.push({ ...b, pallet: pIdx, x, y, z });
+    hayEnPallet = true;
 
     x += b.ancho;
     profFila = Math.max(profFila, b.prof);
