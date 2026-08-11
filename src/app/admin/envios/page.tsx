@@ -30,7 +30,13 @@ import { volumenDeEnvio, type ItemVolumen } from "@/lib/logistica";
 import { subscribeFleteros, registrarMovimientoFlete } from "@/lib/fletes";
 import { LOGISTICA_POR_EAN } from "@/data/logistica";
 import { useProducts } from "@/hooks/useProducts";
-import { proformaHTML, hojaArmadoHTML } from "@/lib/remito-print";
+import {
+  hojaArmadoHTML,
+  proformasControlHTML,
+  identificacionPalletHTML,
+  constanciaTransportistaHTML,
+  protocoloPreparacionHTML,
+} from "@/lib/remito-print";
 import { abrirA4 } from "@/lib/a4";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate, tsFromISO } from "@/lib/format";
@@ -412,18 +418,27 @@ export default function EnviosPage() {
           Programá las entregas: agrupá pedidos en un envío, con su flete y día.
           El volumen y los pallets se calculan con las medidas de cada producto.
         </p>
-        <button
-          onClick={() => {
-            setPalletActivo(0);
-            setPallet3d(ejemploEnvio());
-          }}
-          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-light/40 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
-        >
-          👁️ Ver ejemplo de armado 3D
-          <span className="text-[11px] font-normal opacity-70">
-            (demostración — no carga datos)
-          </span>
-        </button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setPalletActivo(0);
+              setPallet3d(ejemploEnvio());
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-light/40 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
+          >
+            👁️ Ver ejemplo de armado 3D
+            <span className="text-[11px] font-normal opacity-70">
+              (demostración — no carga datos)
+            </span>
+          </button>
+          <button
+            onClick={() => abrirA4(protocoloPreparacionHTML())}
+            title="Protocolo de preparación, control y despacho (para el depósito)"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-border bg-surface px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-primary-light"
+          >
+            📋 Protocolo de armado
+          </button>
+        </div>
       </div>
 
       {/* ===== Armar un envío ===== */}
@@ -699,27 +714,40 @@ export default function EnviosPage() {
                     </span>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-brand-border pt-3">
-                    <button
-                      onClick={() => abrirA4(hojaArmadoHTML(e, rs))}
-                      title="Imprimir la hoja de armado de todo el envío"
-                      className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
-                    >
-                      🖨️ Hoja de armado
-                    </button>
-                    <span className="text-[11px] text-brand-dark/45">
-                      o proforma por pedido:
-                    </span>
-                    {rs.map((r) => (
+                  <div className="mt-3 border-t border-brand-border pt-3">
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-dark/45">
+                      Documentos para el depósito
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
-                        key={r.id}
-                        onClick={() => abrirA4(proformaHTML(r))}
-                        title="Imprimir proforma sin precio (para armar)"
+                        onClick={() => abrirA4(proformasControlHTML(rs))}
+                        title="Proformas de control por área (racks + preparación, y carga a granel si aplica)"
+                        className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
+                      >
+                        🖨️ Proformas de control
+                      </button>
+                      <button
+                        onClick={() => abrirA4(identificacionPalletHTML(e, rs))}
+                        title="Una hoja de identificación por pallet, prellenada"
                         className="rounded-lg bg-primary-light px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white"
                       >
-                        {r.numero} · {r.clienteNombre || "s/cliente"}
+                        🏷️ Identificación de pallets
                       </button>
-                    ))}
+                      <button
+                        onClick={() => abrirA4(constanciaTransportistaHTML(e, rs))}
+                        title="Constancia que firma el transportista (se imprimen 2)"
+                        className="rounded-lg bg-primary-light px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white"
+                      >
+                        📄 Constancia transportista (×2)
+                      </button>
+                      <button
+                        onClick={() => abrirA4(hojaArmadoHTML(e, rs))}
+                        title="Resumen del armado de todo el envío"
+                        className="rounded-lg bg-primary-light px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white"
+                      >
+                        🧾 Hoja de armado
+                      </button>
+                    </div>
                   </div>
 
                   {e.observaciones && (
