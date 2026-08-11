@@ -163,7 +163,10 @@ function NuevaVentaView({
   // Vendedor al que se le atribuye la venta (para la comisión).
   const [vendedorId, setVendedorId] = useState("");
   const [vendedores, setVendedores] = useState<AppUser[]>([]);
-  const [formaPago, setFormaPago] = useState<FormaPago>("efectivo");
+  // Arranca en "transferencia" para que el descuento de efectivo NO se aplique
+  // solo (pedido de Anabela). El operador pone "efectivo" cuando el cliente paga
+  // en mano, y ahí sí entra el 2,5%.
+  const [formaPago, setFormaPago] = useState<FormaPago>("transferencia");
   // Condiciones de descuento que el operador confirma al cerrar la venta.
   const [retiraDeposito, setRetiraDeposito] = useState(false);
   const [porVolumen, setPorVolumen] = useState(false);
