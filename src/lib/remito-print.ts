@@ -18,10 +18,15 @@ function itemsHTML(r: Remito): string {
   return r.items
     .map((it) => {
       const cod = it.codigo ? `<span class="cod">${esc(it.codigo)}</span><br>` : "";
+      const b = bultosDe(it.productId, it.cantidad);
+      const bultosTxt =
+        b != null
+          ? `<br><span style="font-size:10px;color:#667">${b} bulto${b === 1 ? "" : "s"}</span>`
+          : "";
       return `
       <tr>
         <td>${cod}${esc(it.nombre)}</td>
-        <td class="num">${it.cantidad}</td>
+        <td class="num">${it.cantidad}${bultosTxt}</td>
         <td class="num">${ars(it.precioVenta)}</td>
         <td class="num">${ars(it.precioVenta * it.cantidad)}</td>
       </tr>`;

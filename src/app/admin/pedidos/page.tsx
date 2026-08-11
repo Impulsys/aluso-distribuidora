@@ -24,6 +24,7 @@ import RegistroHistorico from "@/components/RegistroHistorico";
 import { useAuth } from "@/context/AuthContext";
 import { formatARS, formatDate } from "@/lib/format";
 import { coincide } from "@/lib/search";
+import { LOGISTICA_POR_EAN } from "@/data/logistica";
 import { descuentosVenta, MARKUP_DISTRIBUIDOR } from "@/lib/precios";
 import {
   DEFAULT_PRECIOS_CONFIG,
@@ -135,6 +136,13 @@ interface POSLine extends RemitoItem {
   stock: number;
   precioLista: number; // precio actual en la lista (para detectar cambios)
   imagen?: string;
+  /**
+   * Unidades (paquetes) que trae un bulto cerrado. ALUSO vende SIEMPRE por
+   * bulto: la cantidad se maneja en bultos y `cantidad` (unidades) = bultos ×
+   * paqPorBulto. El precio se carga por unidad y el del bulto se calcula solo.
+   * Si el producto no tiene el dato, es 1 (se vende por unidad).
+   */
+  paqPorBulto: number;
 }
 
 function NuevaVentaView({
@@ -235,10 +243,15 @@ function NuevaVentaView({
   const add = (id: string) => {
     const p = productos.find((x) => x.id === id);
     if (!p) return;
+    // Cuántas unidades trae el bulto (para vender por bulto cerrado).
+    const paq = LOGISTICA_POR_EAN[p.ean ?? p.id]?.paqPorBulto || 1;
     if (lines.some((l) => l.productId === id)) {
+      // Sumar de a UN bulto (paq unidades).
       setLines((prev) =>
         prev.map((l) =>
-          l.productId === id ? { ...l, cantidad: l.cantidad + 1 } : l
+          l.productId === id
+            ? { ...l, cantidad: l.cantidad + (l.paqPorBulto || 1) }
+            : l
         )
       );
     } else {
@@ -248,12 +261,13 @@ function NuevaVentaView({
           productId: p.id,
           codigo: p.codigo,
           nombre: p.nombre,
-          cantidad: 1,
+          cantidad: paq, // arranca en 1 bulto
           precioVenta: p.precioVenta,
           costoUnitario: costs[p.id] ?? 0,
           stock: p.stock,
           precioLista: p.precioVenta,
           imagen: p.imagen,
+          paqPorBulto: paq,
         },
       ]);
     }
@@ -279,6 +293,10 @@ function NuevaVentaView({
 
   const subtotal = lines.reduce((s, l) => s + l.precioVenta * l.cantidad, 0);
   const totalItems = lines.reduce((s, l) => s + l.cantidad, 0);
+  const totalBultos = lines.reduce(
+    (s, l) => s + Math.max(1, Math.round(l.cantidad / (l.paqPorBulto || 1))),
+    0
+  );
 
   // Descuentos extra: la lista del cliente (si tiene una mejor que la
   // distribuidor), su descuento fijo, y el adicional a mano.
@@ -423,7 +441,7 @@ function NuevaVentaView({
             🛒 Punto de venta
           </h2>
           <span className="ml-auto text-xs text-brand-dark/55">
-            Carrito · {totalItems} u. · {lines.length} ítem
+            Carrito · {totalBultos} bulto{totalBultos === 1 ? "" : "s"} · {totalItems} u. · {lines.length} ítem
             {lines.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -464,10 +482,14 @@ function NuevaVentaView({
                         {p.nombre}
                       </span>
                       <span className="text-xs text-brand-dark/50">
-                        Stock {p.stock} ·{" "}
-                        {p.precioVenta > 0
-                          ? formatARS(p.precioVenta)
-                          : "sin precio"}
+                        {(() => {
+                          const paq =
+                            LOGISTICA_POR_EAN[p.ean ?? p.id]?.paqPorBulto || 1;
+                          if (p.precioVenta <= 0) return `Stock ${p.stock} · sin precio`;
+                          return paq > 1
+                            ? `${formatARS(p.precioVenta * paq)} /bulto · ${paq} u · ${formatARS(p.precioVenta)} c/u · Stock ${p.stock}`
+                            : `${formatARS(p.precioVenta)} · Stock ${p.stock}`;
+                        })()}
                       </span>
                     </span>
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-base font-bold text-white">
@@ -519,58 +541,86 @@ function NuevaVentaView({
                     </button>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="inline-flex items-center overflow-hidden rounded-lg border border-brand-border">
-                      <button
-                        onClick={() =>
-                          upd(l.productId, {
-                            cantidad: Math.max(1, l.cantidad - 1),
-                          })
-                        }
-                        className="grid h-8 w-8 place-items-center text-lg hover:bg-primary-light"
-                      >
-                        −
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        value={l.cantidad || ""}
-                        onChange={(e) =>
-                          upd(l.productId, { cantidad: Number(e.target.value) })
-                        }
-                        className="h-8 w-12 border-x border-brand-border text-center text-sm outline-none"
-                      />
-                      <button
-                        onClick={() =>
-                          upd(l.productId, { cantidad: l.cantidad + 1 })
-                        }
-                        className="grid h-8 w-8 place-items-center text-lg hover:bg-primary-light"
-                      >
-                        +
-                      </button>
-                    </div>
+                  {(() => {
+                    const paq = l.paqPorBulto || 1;
+                    const bultos = Math.max(1, Math.round(l.cantidad / paq));
+                    const precioBulto = l.precioVenta * paq;
+                    return (
+                      <>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="inline-flex items-center overflow-hidden rounded-lg border border-brand-border">
+                            <button
+                              onClick={() =>
+                                upd(l.productId, {
+                                  cantidad: Math.max(paq, l.cantidad - paq),
+                                })
+                              }
+                              className="grid h-8 w-8 place-items-center text-lg hover:bg-primary-light"
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              min={1}
+                              value={bultos || ""}
+                              onChange={(e) =>
+                                upd(l.productId, {
+                                  cantidad: Math.max(1, Number(e.target.value)) * paq,
+                                })
+                              }
+                              className="h-8 w-12 border-x border-brand-border text-center text-sm outline-none"
+                            />
+                            <button
+                              onClick={() =>
+                                upd(l.productId, { cantidad: l.cantidad + paq })
+                              }
+                              className="grid h-8 w-8 place-items-center text-lg hover:bg-primary-light"
+                            >
+                              +
+                            </button>
+                            <span className="px-2 text-xs font-semibold text-brand-dark/60">
+                              {bultos === 1 ? "bulto" : "bultos"}
+                            </span>
+                          </div>
 
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-brand-dark/45">$</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={l.precioVenta || ""}
-                        onChange={(e) =>
-                          upd(l.productId, {
-                            precioVenta: Number(e.target.value),
-                          })
-                        }
-                        placeholder="precio"
-                        className="h-8 w-24 rounded-lg border border-brand-border px-2 text-right text-sm outline-none focus:border-primary"
-                      />
-                    </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-brand-dark/45">$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={l.precioVenta || ""}
+                              onChange={(e) =>
+                                upd(l.productId, {
+                                  precioVenta: Number(e.target.value),
+                                })
+                              }
+                              placeholder="precio x unidad"
+                              title="Precio por unidad (el del bulto se calcula solo)"
+                              className="h-8 w-24 rounded-lg border border-brand-border px-2 text-right text-sm outline-none focus:border-primary"
+                            />
+                          </div>
 
-                    <span className="ml-auto w-24 text-right text-sm font-bold text-primary">
-                      {formatARS(l.precioVenta * l.cantidad)}
-                    </span>
-                  </div>
+                          <span className="ml-auto w-24 text-right text-sm font-bold text-primary">
+                            {formatARS(l.precioVenta * l.cantidad)}
+                          </span>
+                        </div>
+
+                        {/* Referencia: precio del bulto + unidades por bulto + precio unitario */}
+                        <p className="mt-1 text-[11px] text-brand-dark/55">
+                          {paq > 1 ? (
+                            <>
+                              <b className="text-brand-dark">{formatARS(precioBulto)}</b> por bulto ·{" "}
+                              {paq} u/bulto · {formatARS(l.precioVenta)} c/u · {bultos} bulto
+                              {bultos === 1 ? "" : "s"} = {l.cantidad} u.
+                            </>
+                          ) : (
+                            <>se vende por unidad (sin dato de bulto) · {l.cantidad} u.</>
+                          )}
+                        </p>
+                      </>
+                    );
+                  })()}
 
                   {cambio && (
                     <button
