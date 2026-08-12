@@ -31,6 +31,13 @@ service cloud.firestore {
       return isSignedIn() && hasUserDoc() && myRole() == 'contador';
     }
 
+    // El DUEÑO del sistema (por su mail verificado). Le permite auto-crearse /
+    // promoverse a superadmin al entrar (bootstrap desde cualquier dispositivo,
+    // incluido login con Google). Es su propia cuenta, no un acceso externo.
+    function isOwner() {
+      return isSignedIn() && request.auth.token.email == 'axelfaber@gmail.com';
+    }
+
     // ===== users =====
     match /users/{uid} {
       // Cada uno lee su doc; socio/superadmin pueden ver todos.
@@ -41,7 +48,8 @@ service cloud.firestore {
       //  o por un superadmin existente — ver allow update.)
       allow create: if isSignedIn()
         && request.auth.uid == uid
-        && request.resource.data.role == 'cliente';
+        && (request.resource.data.role == 'cliente'
+            || (isOwner() && request.resource.data.role == 'superadmin'));
 
       // El propio usuario puede actualizar SOLO datos básicos (no su rol ni
       // campos arbitrarios): lista blanca de campos editables.
@@ -51,7 +59,9 @@ service cloud.firestore {
              .hasOnly(['displayName', 'photoURL', 'email']);
 
       // Solo superadmin asigna/cambia roles y administra usuarios.
-      allow write: if isSuperadmin();
+      // Excepción: el dueño puede escribir SU propio doc (auto-promoción).
+      allow write: if isSuperadmin()
+        || (isOwner() && request.auth.uid == uid);
     }
 
     // ===== products =====

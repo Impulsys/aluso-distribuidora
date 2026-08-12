@@ -20,7 +20,11 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { setBitacoraActor } from "@/lib/bitacora";
+import { OWNER_EMAIL } from "@/lib/licencia";
 import type { AppUser, Role } from "@/lib/types";
+
+const esOwner = (email?: string | null) =>
+  (email ?? "").toLowerCase() === OWNER_EMAIL.toLowerCase();
 
 /** Mantiene sincronizado el actor de la bitácora con el usuario logueado. */
 function syncBitacora(u: AppUser | null) {
@@ -60,14 +64,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const ref = doc(db, "users", fb.uid);
         const snap = await getDoc(ref);
+        const owner = esOwner(fb.email);
         if (snap.exists()) {
-          setUser(snap.data() as AppUser);
+          const existing = snap.data() as AppUser;
+          // El dueño (OWNER_EMAIL) entra SIEMPRE como superadmin: si su doc
+          // quedó con un rol menor, se corrige solo (las reglas lo permiten
+          // solo para ese mail). Así entra directo con Google desde cualquier
+          // dispositivo, sin depender de la consola.
+          if (owner && existing.role !== "superadmin") {
+            await setDoc(ref, { role: "superadmin" }, { merge: true });
+            setUser({ ...existing, role: "superadmin" });
+          } else {
+            setUser(existing);
+          }
         } else {
-          // Primer ingreso: SIEMPRE rol "cliente" (lo exigen las reglas
-          // de Firestore). La promoción a superadmin/vendedor/socio se
-          // hace desde la consola (la 1ra vez para Maxi) o por un
-          // superadmin existente desde el panel de usuarios.
-          const role: Role = "cliente";
+          // Primer ingreso: rol "cliente", salvo que sea el dueño (superadmin).
+          const role: Role = owner ? "superadmin" : "cliente";
           const newUser: AppUser = {
             uid: fb.uid,
             email: fb.email ?? "",
