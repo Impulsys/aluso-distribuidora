@@ -189,23 +189,25 @@ export function descuentosVenta(
   }
 
   // Descuentos SUCESIVOS (uno sobre otro), como los aplica ALUSO: 2,5% y 3% NO
-  // es 5,5%, es × 0,975 × 0,97 (Anabela, 12/08). El total no depende de ninguna
-  // config: siempre se aplican encadenados.
-  let total = subtotal;
-  for (const d of descuentos) total = total * (1 - d.pct / 100);
-  total = Math.round((total + Number.EPSILON) * 100) / 100;
-
-  // Repartir el monto total del descuento entre los conceptos (para el detalle),
-  // dándole el resto al último así la suma cierra exacto con (subtotal - total).
+  // es 5,5%, es × 0,975 × 0,97 (Anabela, 12/08). El monto de cada línea es su
+  // PASO REAL (el 1er descuento sobre el subtotal, el 2º sobre lo que quedó…),
+  // así el desglose coincide con la cuenta hecha a mano en el Excel.
+  let running = subtotal;
+  const pasos: number[] = [];
+  for (const d of descuentos) {
+    const after = running * (1 - d.pct / 100);
+    pasos.push(after - running); // negativo (descuenta)
+    running = after;
+  }
+  const total = Math.round((running + Number.EPSILON) * 100) / 100;
+  // El último recibe el resto exacto, así la suma de montos == (total - subtotal).
   const deltaTotal = Math.round((total - subtotal + Number.EPSILON) * 100) / 100;
-  const pctTotal = descuentos.reduce((s, d) => s + d.pct, 0);
   let acum = 0;
   descuentos.forEach((d, i) => {
-    if (pctTotal === 0) return;
     const monto =
       i === descuentos.length - 1
         ? Math.round((deltaTotal - acum) * 100) / 100
-        : Math.round((deltaTotal * d.pct) / pctTotal * 100) / 100;
+        : Math.round((pasos[i] + Number.EPSILON) * 100) / 100;
     d.monto = monto;
     acum = Math.round((acum + monto) * 100) / 100;
   });
@@ -329,27 +331,29 @@ export function calcularPrecio(
   const pctRecargo =
     cond.formaPago === "transferencia" ? perfil.recargoTransferenciaPct ?? 0 : 0;
 
-  // ---- 4. Aplicar: descuentos SUCESIVOS (uno sobre otro), siempre. ----
+  // ---- 4. Aplicar: descuentos SUCESIVOS (uno sobre otro), siempre. El monto de
+  //         cada ajuste es su PASO REAL sobre lo que quedó del anterior. ----
   let final = base;
-  for (const a of ajustes) final = final * (1 + a.pct / 100);
+  const pasos: number[] = [];
+  for (const a of ajustes) {
+    const after = final * (1 + a.pct / 100);
+    pasos.push(after - final);
+    final = after;
+  }
   if (pctRecargo > 0) {
     ajustes.push({ concepto: "Recargo por transferencia", pct: pctRecargo, monto: 0 });
-    final = final * (1 + pctRecargo / 100);
+    const after = final * (1 + pctRecargo / 100);
+    pasos.push(after - final);
+    final = after;
   }
   final = r2(final);
 
-  // Repartir el monto de cada ajuste para que el desglose cierre con el total.
+  // El último recibe el resto exacto, así la suma de montos == (final - base).
   const deltaTotal = r2(final - base);
-  const pctTotal = ajustes.reduce((s, a) => s + Math.abs(a.pct), 0);
   let acumulado = 0;
   ajustes.forEach((a, i) => {
-    if (pctTotal === 0) return;
     const esUltimo = i === ajustes.length - 1;
-    // Al último se le da el resto, así la suma de los montos == deltaTotal
-    // exactamente y no queda un centavo bailando por el redondeo.
-    const monto = esUltimo
-      ? r2(deltaTotal - acumulado)
-      : r2((deltaTotal * Math.abs(a.pct)) / pctTotal);
+    const monto = esUltimo ? r2(deltaTotal - acumulado) : r2(pasos[i]);
     a.monto = monto;
     acumulado = r2(acumulado + monto);
   });
