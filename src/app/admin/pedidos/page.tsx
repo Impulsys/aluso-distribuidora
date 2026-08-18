@@ -298,8 +298,11 @@ function NuevaVentaView({
   // exponía al cliente el precio distribuidor), se BAJA cada renglón a su precio
   // neto. Así el remito muestra directamente el precio del cliente. El precio de
   // catálogo (distribuidor) se sigue editando/guardando aparte.
+  // Aplica la lista del cliente para CUALQUIER lista distinta de la distribuidor:
+  // las menores (15, 18…) bajan el precio y las mayores ("Locales" 33%) lo suben.
+  // precioParaLista maneja los dos casos.
   const markupCli = clienteSel?.markupLista;
-  const aplicaLista = markupCli != null && markupCli < MARKUP_DISTRIBUIDOR;
+  const aplicaLista = markupCli != null && markupCli !== MARKUP_DISTRIBUIDOR;
   const precioNeto = (l: POSLine) =>
     aplicaLista ? precioParaLista(l.precioVenta, markupCli) : l.precioVenta;
 
@@ -591,7 +594,9 @@ function NuevaVentaView({
                           </div>
 
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-brand-dark/45">$</span>
+                            <span className="text-xs text-brand-dark/45">
+                              {aplicaLista ? "lista $" : "$"}
+                            </span>
                             <input
                               type="number"
                               min={0}
@@ -603,8 +608,14 @@ function NuevaVentaView({
                                 })
                               }
                               placeholder="precio x unidad"
-                              title="Precio por unidad (el del bulto se calcula solo)"
-                              className="h-8 w-24 rounded-lg border border-brand-border px-2 text-right text-sm outline-none focus:border-primary"
+                              title={
+                                aplicaLista
+                                  ? "Precio de LISTA DISTRIBUIDOR. El cliente paga su lista (ver abajo), no este número."
+                                  : "Precio por unidad (el del bulto se calcula solo)"
+                              }
+                              className={`h-8 w-24 rounded-lg border px-2 text-right text-sm outline-none focus:border-primary ${
+                                aplicaLista ? "border-amber-300 bg-amber-50/40" : "border-brand-border"
+                              }`}
                             />
                           </div>
 
@@ -709,9 +720,10 @@ function NuevaVentaView({
               ))}
           </select>
           {clienteSel &&
-            (clienteSel.markupLista || clienteSel.descuentoExtraPct) && (
+            (aplicaLista || (clienteSel.descuentoExtraPct ?? 0) > 0) && (
               <p className="mt-1 text-[11px] text-emerald-700">
                 Condición del cliente aplicada
+                {aplicaLista ? ` · lista ${markupCli}%` : ""}
                 {clienteSel.descuentoExtraPct
                   ? ` · -${clienteSel.descuentoExtraPct}%`
                   : ""}
