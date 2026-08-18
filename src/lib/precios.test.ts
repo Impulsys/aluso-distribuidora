@@ -78,13 +78,14 @@ test("efectivo descuenta 2,5% del subtotal de la venta", () => {
   assert.equal(r.descuentos.length, 1);
 });
 
-test("efectivo + retiro + volumen suman 8,5%", () => {
+test("efectivo + retiro + volumen se aplican SUCESIVOS (no sumados)", () => {
   const r = descuentosVenta(100000, {
     formaPago: "efectivo",
     retiraEnDeposito: true,
     porVolumen: true,
   });
-  assert.equal(r.total, 91500);
+  // 100000 × 0,975 × 0,97 × 0,97 = 91737,75 (sumando daría 91500, de menos).
+  assert.equal(r.total, 91737.75);
   assert.equal(r.descuentos.length, 3);
 });
 
@@ -179,14 +180,14 @@ test("149 bultos NO alcanza el descuento por volumen", () => {
   assert.equal(d.final, 10000);
 });
 
-// "Los descuentos pueden ser acumulables"
-test("los tres descuentos juntos suman 8,5%", () => {
+// "Los descuentos son SUCESIVOS" (Anabela, 12/08)
+test("los tres descuentos juntos, aplicados sucesivos", () => {
   const d = calcularPrecio(10000, 6000, DISTRIBUIDOR, {
     formaPago: "efectivo",
     retiraEnDeposito: true,
     bultos: 200,
   });
-  assert.equal(d.final, 9150); // 10000 - 8,5%
+  assert.equal(d.final, 9173.78); // 10000 × 0,975 × 0,97 × 0,97
   assert.equal(d.ajustes.length, 3);
 });
 
@@ -199,7 +200,7 @@ test("un vendedor reclutado NO da el descuento por volumen, pero sí los otros",
     bultos: 200,
     vendedorReclutado: true,
   });
-  assert.equal(d.final, 9450); // solo 2,5 + 3 = 5,5%
+  assert.equal(d.final, 9457.5); // 10000 × 0,975 × 0,97 (efectivo + retiro)
   assert.equal(d.ajustes.length, 2);
 });
 
@@ -246,24 +247,24 @@ test("el desglose cierra exactamente con el total", () => {
   assert.equal(Math.round((d.base + suma) * 100) / 100, d.final);
 });
 
-test("modo sucesivo da menos descuento que sumando", () => {
+test("los descuentos son SIEMPRE sucesivos (el flag acumulaSumando ya no cambia el cálculo)", () => {
   const cond: CondicionesVenta = {
     formaPago: "efectivo",
     retiraEnDeposito: true,
     bultos: 200,
   };
-  const sumando = calcularPrecio(10000, 6000, DISTRIBUIDOR, cond);
-  const sucesivo = calcularPrecio(10000, 6000, DISTRIBUIDOR, cond, {
+  // Cualquiera sea el flag, el resultado es el sucesivo: 10000 ×0,975×0,97×0,97.
+  const conFlagTrue = calcularPrecio(10000, 6000, DISTRIBUIDOR, cond, {
+    ...CONFIG_PRECIOS_DEFAULT,
+    acumulaSumando: true,
+  });
+  const conFlagFalse = calcularPrecio(10000, 6000, DISTRIBUIDOR, cond, {
     ...CONFIG_PRECIOS_DEFAULT,
     acumulaSumando: false,
   });
-  // sumando:  10000 - 8,5%                        = 9150
-  // sucesivo: 10000 × 0,975 × 0,97 × 0,97         = 9173,78
-  // Son $23,78 de diferencia cada $10.000 vendidos: sobre una venta de
-  // $500.000 son casi $1.200. Por eso hay que preguntárselo y no elegirlo yo.
-  assert.equal(sumando.final, 9150);
-  assert.equal(sucesivo.final, 9173.78);
-  assert.ok(sucesivo.final > sumando.final);
+  assert.equal(conFlagTrue.final, 9173.78);
+  assert.equal(conFlagFalse.final, 9173.78);
+  assert.ok(conFlagTrue.final === conFlagFalse.final);
 });
 
 test("precio 0 (Consultar precio) no se rompe ni inventa números", () => {

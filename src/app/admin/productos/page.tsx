@@ -13,7 +13,63 @@ import {
 } from "@/lib/admin";
 import { formatARS } from "@/lib/format";
 import { coincide } from "@/lib/search";
+import { LOGISTICA_POR_EAN } from "@/data/logistica";
 import { MARCAS, type Marca, type Product } from "@/lib/types";
+
+/** Unidades que trae un bulto de ese producto (1 si no hay dato). */
+const paqDe = (ean?: string) => LOGISTICA_POR_EAN[ean ?? ""]?.paqPorBulto || 1;
+
+/**
+ * Campo de stock que se carga POR BULTO cuando el producto tiene el dato. Se
+ * ingresa la cantidad de bultos y el sistema guarda las unidades (bultos ×
+ * unidades del bulto), mostrando el equivalente. Preserva las unidades sueltas
+ * que ya hubiera. Si el producto no tiene dato de bulto, es un campo de unidades.
+ */
+function StockPorBulto({
+  ean,
+  stock,
+  setStock,
+  inputCls,
+}: {
+  ean?: string;
+  stock: number;
+  setStock: (n: number) => void;
+  inputCls: string;
+}) {
+  const paq = paqDe(ean);
+  if (paq <= 1) {
+    return (
+      <Field label="Stock (unidades)">
+        <input
+          type="number"
+          min={0}
+          value={stock || ""}
+          onChange={(e) => setStock(Math.max(0, Number(e.target.value) || 0))}
+          className={inputCls}
+        />
+      </Field>
+    );
+  }
+  const bultos = Math.floor(stock / paq);
+  const sueltas = stock - bultos * paq;
+  return (
+    <Field label="Stock (en bultos)">
+      <input
+        type="number"
+        min={0}
+        value={bultos || ""}
+        onChange={(e) =>
+          setStock(Math.max(0, Math.floor(Number(e.target.value) || 0)) * paq + sueltas)
+        }
+        className={inputCls}
+      />
+      <p className="mt-1 text-[11px] text-brand-dark/55">
+        {paq} u/bulto · = <b>{stock} unidades</b>
+        {sueltas > 0 ? ` (${bultos} bultos + ${sueltas} sueltas)` : ""}
+      </p>
+    </Field>
+  );
+}
 
 const MARCA_CHIP: Record<Marca, string> = {
   doncella: "bg-rose-600",
@@ -296,15 +352,12 @@ function CrearProductoModal({ onClose }: { onClose: () => void }) {
                 className={inputCls}
               />
             </Field>
-            <Field label="Stock (unidades)">
-              <input
-                type="number"
-                min={0}
-                value={stock || ""}
-                onChange={(e) => setStock(Number(e.target.value))}
-                className={inputCls}
-              />
-            </Field>
+            <StockPorBulto
+              ean={ean}
+              stock={stock}
+              setStock={setStock}
+              inputCls={inputCls}
+            />
           </div>
 
           <Field label="Foto del producto">
@@ -453,6 +506,11 @@ function ProductRow({
           }`}
         >
           {p.stock}
+          {paqDe(p.ean) > 1 && (
+            <span className="block text-[10px] text-brand-dark/45">
+              {Math.floor((p.stock || 0) / paqDe(p.ean))} bultos
+            </span>
+          )}
         </span>
         <span className="hidden text-right text-brand-dark/70 md:block">
           {(p.stock || 0) * costo > 0
@@ -726,16 +784,12 @@ function EditForm({
           className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
         />
       </Field>
-      <Field label="Stock (unidades)">
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={stock}
-          onChange={(e) => setStock(Number(e.target.value))}
-          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
-        />
-      </Field>
+      <StockPorBulto
+        ean={ean}
+        stock={stock}
+        setStock={setStock}
+        inputCls="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+      />
       <Field label="Precio de OFERTA (0 = sin oferta)">
         <input
           type="number"

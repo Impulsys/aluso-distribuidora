@@ -179,17 +179,10 @@ export default function AdminPreciosPage() {
             suffix="bultos"
           />
         </div>
-        <label className="mt-4 flex items-center gap-2 text-sm text-brand-dark/70">
-          <input
-            type="checkbox"
-            checked={cfg.acumulaSumando}
-            onChange={(e) =>
-              setCfg({ ...cfg, acumulaSumando: e.target.checked })
-            }
-            className="h-4 w-4"
-          />
-          Los descuentos se SUMAN (si lo destildás, se aplican uno sobre otro)
-        </label>
+        <p className="mt-4 rounded-lg bg-primary-light/40 px-3 py-2 text-xs text-brand-dark/70">
+          Los descuentos se aplican <b>sucesivos</b> (uno sobre otro), como los
+          hace ALUSO. Ej: 2,5% y 3% = × 0,975 × 0,97, no 5,5%.
+        </p>
         <button
           onClick={() =>
             guardar({
@@ -197,7 +190,6 @@ export default function AdminPreciosPage() {
               descuentoRetiroPct: cfg.descuentoRetiroPct,
               descuentoVolumenPct: cfg.descuentoVolumenPct,
               volumenMinBultos: cfg.volumenMinBultos,
-              acumulaSumando: cfg.acumulaSumando,
             })
           }
           className="mt-4 rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-white hover:bg-primary-dark"

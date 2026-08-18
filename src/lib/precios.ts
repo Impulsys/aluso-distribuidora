@@ -24,11 +24,11 @@
  *     guarda BASE y el recargo se aplica según la forma de pago, así cambiar de
  *     transferencia a efectivo recalcula solo.
  *
- * ⚠️ PENDIENTE DE CONFIRMAR CON EL CLIENTE: si "acumulables" significa sumar los
- *    porcentajes (2,5+3+3 = 8,5%) o aplicarlos uno sobre otro (queda 8,27%).
- *    Sobre $100.000 la diferencia es $230 por venta. Se dejó configurable en
- *    `acumulaSumando` y por defecto SUMA, que es la lectura literal de lo que
- *    escribieron y la más fácil de verificar a mano para ellos.
+ * ✔ CONFIRMADO (Anabela, 12/08/2026): los descuentos son SUCESIVOS, uno sobre
+ *   otro (2,5% y 3% = × 0,975 × 0,97, NO 5,5%). El motor SIEMPRE los encadena;
+ *   el viejo modo "sumando" quedó descartado (daba de menos). El flag
+ *   `acumulaSumando` se conserva en la config por compatibilidad, pero ya no se
+ *   usa para calcular.
  */
 
 import type { FormaPago } from "./types";
@@ -174,35 +174,25 @@ export function descuentosVenta(
   extras: { concepto: string; pct: number }[] = []
 ): ResultadoVenta {
   const descuentos: DescuentoAplicado[] = [];
-  let pct = 0;
 
   for (const e of extras) {
-    if (e.pct > 0) {
-      pct += e.pct;
-      descuentos.push({ concepto: e.concepto, pct: e.pct, monto: 0 });
-    }
+    if (e.pct > 0) descuentos.push({ concepto: e.concepto, pct: e.pct, monto: 0 });
   }
-
   if (cond.formaPago === "efectivo" && config.descuentoEfectivoPct > 0) {
-    pct += config.descuentoEfectivoPct;
     descuentos.push({ concepto: "Pago en efectivo", pct: config.descuentoEfectivoPct, monto: 0 });
   }
   if (cond.retiraEnDeposito && config.descuentoRetiroPct > 0) {
-    pct += config.descuentoRetiroPct;
     descuentos.push({ concepto: "Retira en depósito", pct: config.descuentoRetiroPct, monto: 0 });
   }
   if (cond.porVolumen && config.descuentoVolumenPct > 0) {
-    pct += config.descuentoVolumenPct;
     descuentos.push({ concepto: "Por volumen", pct: config.descuentoVolumenPct, monto: 0 });
   }
 
-  let total: number;
-  if (config.acumulaSumando) {
-    total = subtotal * (1 - pct / 100);
-  } else {
-    total = subtotal;
-    for (const d of descuentos) total = total * (1 - d.pct / 100);
-  }
+  // Descuentos SUCESIVOS (uno sobre otro), como los aplica ALUSO: 2,5% y 3% NO
+  // es 5,5%, es × 0,975 × 0,97 (Anabela, 12/08). El total no depende de ninguna
+  // config: siempre se aplican encadenados.
+  let total = subtotal;
+  for (const d of descuentos) total = total * (1 - d.pct / 100);
   total = Math.round((total + Number.EPSILON) * 100) / 100;
 
   // Repartir el monto total del descuento entre los conceptos (para el detalle),
@@ -262,7 +252,9 @@ export const CONFIG_PRECIOS_DEFAULT: ConfigPrecios = {
   descuentoRetiroPct: 3,
   descuentoVolumenPct: 3,
   volumenMinBultos: 150,
-  acumulaSumando: true,
+  // Ya no se usa para calcular (los descuentos son siempre sucesivos); se deja
+  // en false por claridad y compatibilidad con la config guardada.
+  acumulaSumando: false,
 };
 
 export interface AjustePrecio {
@@ -315,20 +307,16 @@ export function calcularPrecio(
   // Las listas especiales ya son un precio negociado sobre el costo; encima de
   // eso no corresponde descontar (si no, se vende por debajo del costo).
   const ajustes: AjustePrecio[] = [];
-  let pctDescuento = 0;
 
   if (origenBase === "lista_distribuidor") {
     if (cond.formaPago === "efectivo" && config.descuentoEfectivoPct > 0) {
-      pctDescuento += config.descuentoEfectivoPct;
       ajustes.push({ concepto: "Pago en efectivo", pct: -config.descuentoEfectivoPct, monto: 0 });
     }
     if (cond.retiraEnDeposito && config.descuentoRetiroPct > 0) {
-      pctDescuento += config.descuentoRetiroPct;
       ajustes.push({ concepto: "Retira en depósito", pct: -config.descuentoRetiroPct, monto: 0 });
     }
     const califica = cond.bultos >= config.volumenMinBultos;
     if (califica && !cond.vendedorReclutado && config.descuentoVolumenPct > 0) {
-      pctDescuento += config.descuentoVolumenPct;
       ajustes.push({
         concepto: `Más de ${config.volumenMinBultos} bultos`,
         pct: -config.descuentoVolumenPct,
@@ -341,14 +329,9 @@ export function calcularPrecio(
   const pctRecargo =
     cond.formaPago === "transferencia" ? perfil.recargoTransferenciaPct ?? 0 : 0;
 
-  // ---- 4. Aplicar ----
+  // ---- 4. Aplicar: descuentos SUCESIVOS (uno sobre otro), siempre. ----
   let final = base;
-
-  if (config.acumulaSumando) {
-    final = base * (1 - pctDescuento / 100);
-  } else {
-    for (const a of ajustes) final = final * (1 + a.pct / 100);
-  }
+  for (const a of ajustes) final = final * (1 + a.pct / 100);
   if (pctRecargo > 0) {
     ajustes.push({ concepto: "Recargo por transferencia", pct: pctRecargo, monto: 0 });
     final = final * (1 + pctRecargo / 100);
