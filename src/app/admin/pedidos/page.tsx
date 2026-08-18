@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatARS, formatDate } from "@/lib/format";
 import { coincide } from "@/lib/search";
 import { LOGISTICA_POR_EAN } from "@/data/logistica";
-import { descuentosVenta, MARKUP_DISTRIBUIDOR } from "@/lib/precios";
+import { descuentosVenta, precioParaLista, MARKUP_DISTRIBUIDOR } from "@/lib/precios";
 import {
   DEFAULT_PRECIOS_CONFIG,
   subscribePreciosConfig,
@@ -294,25 +294,26 @@ function NuevaVentaView({
     }
   };
 
-  const subtotal = lines.reduce((s, l) => s + l.precioVenta * l.cantidad, 0);
+  // Lista del cliente: en vez de mostrarla como un descuento "Lista X%" (que le
+  // exponía al cliente el precio distribuidor), se BAJA cada renglón a su precio
+  // neto. Así el remito muestra directamente el precio del cliente. El precio de
+  // catálogo (distribuidor) se sigue editando/guardando aparte.
+  const markupCli = clienteSel?.markupLista;
+  const aplicaLista = markupCli != null && markupCli < MARKUP_DISTRIBUIDOR;
+  const precioNeto = (l: POSLine) =>
+    aplicaLista ? precioParaLista(l.precioVenta, markupCli) : l.precioVenta;
+
+  const subtotal = lines.reduce((s, l) => s + precioNeto(l) * l.cantidad, 0);
   const totalItems = lines.reduce((s, l) => s + l.cantidad, 0);
   const totalBultos = lines.reduce(
     (s, l) => s + Math.max(1, Math.round(l.cantidad / (l.paqPorBulto || 1))),
     0
   );
 
-  // Descuentos extra: la lista del cliente (si tiene una mejor que la
-  // distribuidor), su descuento fijo, y el adicional a mano.
+  // Descuentos extra que SÍ se muestran como línea: el fijo del cliente y el
+  // adicional a mano. (La lista ya está adentro del precio de cada renglón.)
   const extrasDesc = useMemo(() => {
     const e: { concepto: string; pct: number }[] = [];
-    const m = clienteSel?.markupLista;
-    if (m != null && m < MARKUP_DISTRIBUIDOR) {
-      // La lista del cliente, expresada como descuento sobre el precio
-      // distribuidor: precioCliente = distribuidor × (1+m) / (1+28).
-      const pct =
-        (1 - (1 + m / 100) / (1 + MARKUP_DISTRIBUIDOR / 100)) * 100;
-      e.push({ concepto: `Lista ${m}%`, pct: Math.round(pct * 100) / 100 });
-    }
     if (clienteSel?.descuentoExtraPct && clienteSel.descuentoExtraPct > 0)
       e.push({ concepto: "Descuento del cliente", pct: clienteSel.descuentoExtraPct });
     if (descAdicional > 0)
@@ -354,13 +355,15 @@ function NuevaVentaView({
       );
       return;
     }
-    // Sanitizar cantidades/precios (evita NaN o 0 que contaminan totales)
+    // El remito guarda el PRECIO NETO DEL CLIENTE (su lista ya aplicada en cada
+    // renglón), igual que lo que se ve en pantalla. Así el comprobante NO muestra
+    // el precio distribuidor ni una línea "Lista X%".
     const items: RemitoItem[] = lines.map((l) => ({
       productId: l.productId,
       codigo: l.codigo,
       nombre: l.nombre,
       cantidad: Math.max(1, Math.floor(Number(l.cantidad) || 0)),
-      precioVenta: Math.max(0, Number(l.precioVenta) || 0),
+      precioVenta: Math.max(0, precioNeto(l) || 0),
       costoUnitario: l.costoUnitario,
     }));
     const totalCalc = items.reduce((s, it) => s + it.precioVenta * it.cantidad, 0);
@@ -547,7 +550,8 @@ function NuevaVentaView({
                   {(() => {
                     const paq = l.paqPorBulto || 1;
                     const bultos = Math.max(1, Math.round(l.cantidad / paq));
-                    const precioBulto = l.precioVenta * paq;
+                    const pn = precioNeto(l); // precio que paga el cliente (con su lista)
+                    const precioBulto = pn * paq;
                     return (
                       <>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -605,7 +609,7 @@ function NuevaVentaView({
                           </div>
 
                           <span className="ml-auto w-24 text-right text-sm font-bold text-primary">
-                            {formatARS(l.precioVenta * l.cantidad)}
+                            {formatARS(pn * l.cantidad)}
                           </span>
                         </div>
 
@@ -614,13 +618,19 @@ function NuevaVentaView({
                           {paq > 1 ? (
                             <>
                               <b className="text-brand-dark">{formatARS(precioBulto)}</b> por bulto ·{" "}
-                              {paq} u/bulto · {formatARS(l.precioVenta)} c/u · {bultos} bulto
+                              {paq} u/bulto · {formatARS(pn)} c/u · {bultos} bulto
                               {bultos === 1 ? "" : "s"} = {l.cantidad} u.
                             </>
                           ) : (
                             <>se vende por unidad (sin dato de bulto) · {l.cantidad} u.</>
                           )}
                         </p>
+                        {aplicaLista && (
+                          <p className="mt-0.5 text-[11px] text-emerald-700">
+                            Precio cliente (lista {markupCli}%) — el de arriba es
+                            el de lista distribuidor que se edita/guarda.
+                          </p>
+                        )}
                       </>
                     );
                   })()}
