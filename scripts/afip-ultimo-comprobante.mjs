@@ -25,7 +25,7 @@ if (!CUIT || String(CUIT).length !== 11) {
 }
 const WSAA_URL = "https://wsaa.afip.gov.ar/ws/services/LoginCms?wsdl";
 const WSFE_URL = "https://servicios1.afip.gov.ar/wsfev1/service.asmx?wsdl";
-const PUNTOS = [5, 6];
+const PUNTOS = [3];
 const TIPOS = [
   { cod: 1, nombre: "Factura A" },
   { cod: 6, nombre: "Factura B" },

@@ -26,12 +26,26 @@ export function facturaHTML(
     )
     .join("");
 
+  // Factura A: IVA discriminado (neto + IVA + total).
+  // Factura B: NO discrimina, pero la Ley 27.743 (Transparencia Fiscal) obliga a
+  // mostrar el IVA CONTENIDO en el precio, informativo, debajo del total (no se
+  // suma: el cliente paga el total de arriba) + la leyenda del régimen.
   const totales =
     f.tipo === "A"
       ? `<div class="row"><span>Neto gravado</span><span>${ars(f.neto)}</span></div>
          <div class="row"><span>IVA 21%</span><span>${ars(f.iva)}</span></div>
          <div class="row total"><span>TOTAL</span><span>${ars(f.total)}</span></div>`
-      : `<div class="row total"><span>TOTAL</span><span>${ars(f.total)}</span></div>`;
+      : `<div class="row total"><span>TOTAL</span><span>${ars(f.total)}</span></div>
+         <div class="row" style="margin-top:8px;color:#555;font-size:11.5px">
+           <span>IVA contenido</span><span>${ars(f.iva)}</span>
+         </div>`;
+
+  const leyendaTransparencia =
+    f.tipo === "A"
+      ? ""
+      : `<p style="margin-top:14px;border:1px solid #333;border-radius:6px;padding:6px 10px;font-size:10.5px;font-weight:600;color:#333;text-align:center">
+           Régimen de Transparencia Fiscal al Consumidor Final (Ley 27.743)
+         </p>`;
 
   const cliente = f.consumidorFinal
     ? "Consumidor Final"
@@ -85,6 +99,8 @@ export function facturaHTML(
     </table>
 
     <div class="totales">${totales}</div>
+
+    ${leyendaTransparencia}
 
     <div class="pie-fiscal">
       <div>${cae}</div>

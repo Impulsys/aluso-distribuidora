@@ -99,7 +99,8 @@ export function a4Header(): string {
   return `
   <div class="encabezado">
     <div class="marca">
-      <span class="logo">AD</span>
+      <img src="https://alusodistribuidora.web.app/logo-comprobante.png"
+           alt="${esc(E.nombre)}" style="height:96px;width:auto;display:block;margin-bottom:2px" />
       <h1>${esc(E.nombre)}</h1>
       <div class="sub">${esc(E.subtitulo)}</div>
     </div>
