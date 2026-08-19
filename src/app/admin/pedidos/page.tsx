@@ -17,7 +17,7 @@ import {
 } from "@/lib/ventas";
 import { useProducts } from "@/hooks/useProducts";
 import { remitoHTML } from "@/lib/remito-print";
-import { printFactura } from "@/lib/factura-print";
+import { printFactura, openFactura } from "@/lib/factura-print";
 import { emitirFacturaAfip, mensajeFacturaError } from "@/lib/factura-afip";
 import CajaView from "@/components/CajaView";
 import RegistroHistorico from "@/components/RegistroHistorico";
@@ -1185,6 +1185,7 @@ function FacturarView() {
   const { user } = useAuth();
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [remitos, setRemitos] = useState<Remito[]>([]);
+  const [clientesFac, setClientesFac] = useState<Cliente[]>([]);
   const [numero, setNumero] = useState("");
   const [remito, setRemito] = useState<Remito | null>(null);
   const [tipo, setTipo] = useState<TipoFactura>("B");
@@ -1197,15 +1198,57 @@ function FacturarView() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes" | "todo">("mes");
+
+  // Facturas del período elegido (se acumulan y se filtran por día/semana/mes).
+  const facturasFiltradas = useMemo(() => {
+    const now = new Date();
+    let desde = 0;
+    if (periodo === "dia") {
+      const d = new Date(now); d.setHours(0, 0, 0, 0); desde = d.getTime();
+    } else if (periodo === "semana") {
+      const d = new Date(now);
+      const dow = (d.getDay() + 6) % 7; // lunes = 0
+      d.setDate(d.getDate() - dow); d.setHours(0, 0, 0, 0); desde = d.getTime();
+    } else if (periodo === "mes") {
+      desde = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    }
+    return facturas.filter((f) => (f.fecha ?? 0) >= desde);
+  }, [facturas, periodo]);
+  const totalFacturado = facturasFiltradas.reduce((s, f) => s + (f.total || 0), 0);
 
   useEffect(() => {
     const u1 = subscribeFacturas(setFacturas);
     const u2 = subscribeRemitos(setRemitos);
+    const u3 = subscribeClientes(setClientesFac);
     return () => {
       u1();
       u2();
+      u3();
     };
   }, []);
+
+  // Al elegir un remito, autocompleta CUIT y razón social con lo del cliente
+  // (del CRM, o lo que se guardó en el remito). Quedan editables.
+  const seleccionarRemito = (r: Remito) => {
+    setRemito(r);
+    setNumero(r.numero);
+    setError(null);
+    setMsg(null);
+    const cli = clientesFac.find((c) => c.id === r.clienteId);
+    const cuitDigits = (cli?.cuit || r.clienteCuit || "").replace(/\D/g, "");
+    setCuit(cuitDigits);
+    setRazonSocial(cli?.razonSocial || cli?.nombre || r.clienteNombre || "");
+    // Si el cliente está identificado con CUIT, no es consumidor final.
+    if (cuitDigits.length >= 11) {
+      setConsumidorFinal(false);
+      if (cli?.condicionIva === "monotributo" || cli?.condicionIva === "exento") {
+        setTipo("B");
+      } else {
+        setTipo("A");
+      }
+    }
+  };
 
   // Búsqueda en vivo por nº de remito (parcial; no hace falta el número completo)
   const coincidencias = useMemo(() => {
@@ -1254,9 +1297,12 @@ function FacturarView() {
       setMsg(
         `✓ Factura ${f.tipo} ${f.numero} emitida. CAE ${f.cae}.${
           f.yaExistia ? " (ya existía)" : ""
-        }`
+        } Quedó guardada abajo en “Facturas generadas”.`
       );
-      void printFactura(f); // abre el PDF con QR
+      // Abre la factura para verla. Envuelto para que NUNCA rompa la pantalla:
+      // si el navegador bloquea el popup o falla el QR, la venta ya está emitida
+      // y la factura queda en la lista de abajo igual.
+      openFactura(f).catch((e) => console.error("No se pudo abrir la factura:", e));
       setRemito(null);
       setNumero("");
       setCuit("");
@@ -1299,10 +1345,7 @@ function FacturarView() {
             {coincidencias.map((r) => (
               <button
                 key={r.id}
-                onClick={() => {
-                  setRemito(r);
-                  setNumero(r.numero);
-                }}
+                onClick={() => seleccionarRemito(r)}
                 className="flex w-full items-center justify-between gap-2 border-b border-brand-border/60 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-primary-light/40"
               >
                 <span className="min-w-0 truncate">
@@ -1440,18 +1483,52 @@ function FacturarView() {
         )}
       </div>
 
-      {/* Facturas emitidas */}
+      {/* Facturas emitidas — se acumulan acá y se filtran por período */}
       <div>
-        <h2 className="mb-3 font-serif text-lg text-brand-dark">
-          Facturas generadas
-        </h2>
-        {facturas.length === 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-serif text-lg text-brand-dark">
+            Facturas generadas
+          </h2>
+          <div className="inline-flex rounded-lg border border-brand-border bg-surface p-0.5 text-xs">
+            {([
+              ["dia", "Día"],
+              ["semana", "Semana"],
+              ["mes", "Mes"],
+              ["todo", "Todas"],
+            ] as const).map(([k, lbl]) => (
+              <button
+                key={k}
+                onClick={() => setPeriodo(k)}
+                className={`rounded-md px-3 py-1 font-semibold transition ${
+                  periodo === k ? "bg-primary text-white" : "text-brand-dark/60 hover:text-brand-dark"
+                }`}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {facturasFiltradas.length > 0 && (
+          <div className="mb-2 flex items-center justify-between rounded-lg bg-primary-light/40 px-3 py-2 text-sm">
+            <span className="text-brand-dark/70">
+              {facturasFiltradas.length} factura
+              {facturasFiltradas.length === 1 ? "" : "s"}
+              {periodo !== "todo" ? ` (${periodo === "dia" ? "hoy" : periodo === "semana" ? "esta semana" : "este mes"})` : ""}
+            </span>
+            <span className="font-bold text-primary">{formatARS(totalFacturado)}</span>
+          </div>
+        )}
+
+        {facturasFiltradas.length === 0 ? (
           <p className="rounded-xl border border-brand-border bg-surface p-6 text-center text-sm text-brand-dark/55">
-            Todavía no hay facturas.
+            {facturas.length === 0
+              ? "Todavía no hay facturas."
+              : "No hay facturas en este período. Probá con “Todas”."}
           </p>
         ) : (
           <div className="space-y-2">
-            {facturas.map((f) => (
+            {facturasFiltradas.map((f) => (
               <article
                 key={f.id}
                 className="rounded-xl border border-brand-border bg-surface p-3 text-sm"
@@ -1473,17 +1550,30 @@ function FacturarView() {
                     {formatARS(f.total)}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center justify-between">
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-brand-dark/55">
                     {formatDate(f.fecha)} ·{" "}
                     {f.consumidorFinal ? "Consumidor final" : `CUIT ${f.cuit}`}
+                    {f.cae ? ` · CAE ${f.cae}` : ""}
                   </p>
-                  <button
-                    onClick={() => printFactura(f)}
-                    className="rounded-lg border border-brand-border px-3 py-1 text-xs font-medium hover:bg-primary-light"
-                  >
-                    🖨️ Imprimir factura
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() =>
+                        openFactura(f).catch((e) => console.error(e))
+                      }
+                      className="rounded-lg border border-brand-border px-3 py-1 text-xs font-medium hover:bg-primary-light"
+                    >
+                      👁️ Ver
+                    </button>
+                    <button
+                      onClick={() =>
+                        printFactura(f).catch((e) => console.error(e))
+                      }
+                      className="rounded-lg border border-brand-border px-3 py-1 text-xs font-medium hover:bg-primary-light"
+                    >
+                      🖨️ Imprimir
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
