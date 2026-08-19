@@ -102,16 +102,15 @@ export function facturaHTML(
 
     ${leyendaTransparencia}
 
-    <div class="pie-fiscal">
-      <div>${cae}</div>
-      <div class="qr">${qr}</div>
-    </div>
-
-    <p class="nota">${
-      f.cae
-        ? "Comprobante autorizado por AFIP."
-        : "Documento interno (sin CAE de AFIP)."
-    }</p>`;
+    <div style="margin-top:24px;text-align:center">
+      ${qr ? `<div style="margin-bottom:8px">${qr}</div>` : ""}
+      <div style="display:inline-block;text-align:center;font-size:12px;line-height:1.7">${cae}</div>
+      <p style="margin-top:8px;font-size:11px;color:#555;font-weight:600">${
+        f.cae
+          ? "Comprobante autorizado por AFIP"
+          : "Documento interno (sin CAE de AFIP)"
+      }</p>
+    </div>`;
 
   return a4Doc(`Factura ${f.tipo} ${f.numero || ""}`, inner, opts);
 }
