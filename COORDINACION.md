@@ -35,6 +35,12 @@ Agregar las entradas nuevas ARRIBA de las anteriores, con este formato:
 
 ## Registro
 
+### 2026-08-25 14:45 | DESKTOP-LAUTARO · Claude | commit (protocolo entre agentes: Codex con permisos completos solo con OK explícito)
+- Rama: main
+- Qué se hizo: Lautaro amplió el modo 2 de Codex: con OK explícito por tarea puede hacer TODO lo que Lautaro nombre (editar, commitear, pushear, deployar); el permiso cubre exactamente lo que dijo y no arrastra a la tarea siguiente. Sin OK explícito, sigue siendo solo lectura. Se regeneró `AGENTS.md` desde la plantilla vigente conservando la descripción y las reglas propias de este repo, y se reemplazó la sección de protocolo en `CLAUDE.md`. Prohibiciones que quedan en cualquier modo (seguridad, no permisos): reescribir historial compartido, subir secretos o datos de clientes, reescribir entradas ajenas, pisar lo que figura en curso.
+- Hash / ID: (este commit)
+- Avisos: NADA deployado.
+
 ### 2026-08-25 14:20 | DESKTOP-LAUTARO · Claude | commit (protocolo entre agentes instalado)
 - Rama: main
 - Qué se hizo: instalado el protocolo Claude/Codex replicado desde nodoarquitectura: `AGENTS.md` (Codex solo-lectura por defecto, edición solo con OK explícito de Lautaro por tarea, subida de auditorías por script), `AUDITORIAS.md`, este archivo con el bloque "Estado actual", la sección de protocolo en `CLAUDE.md` y `scripts/subir-auditoria.mjs`. Un hook global de Claude Code lee este archivo y hace `git pull` al abrir cada sesión.

@@ -27,15 +27,18 @@ cuatro se ponen al día es **`COORDINACION.md`** (raíz del repo). Viaja por git
 Codex lee `AGENTS.md`, no este archivo ni la memoria. Las reglas que a mí me
 tocan:
 
-- **Codex es solo-lectura por defecto.** Edita archivos únicamente cuando
-  Lautaro se lo dice explícito para una tarea. Si aparece una entrada
-  `edición Codex` en COORDINACION, la reviso archivo por archivo antes de
-  commitearla; el commit lo hago yo con OK de Lautaro y registro el hash.
-- **Codex sí puede subir a git su auditoría**, y solo eso: `AUDITORIAS.md` +
-  su entrada en `COORDINACION.md`, siempre vía `scripts/subir-auditoria.mjs`.
-  Es la única excepción a "un solo integrador". Si veo un commit
-  `audit(codex):` con otros archivos adentro, es una violación: avisar a
-  Lautaro, no arreglarlo en silencio.
+- **Codex es solo-lectura por defecto.** Con OK explícito de Lautaro, por
+  tarea, puede hacer todo lo que Lautaro nombre: editar, commitear, pushear,
+  deployar. Lo que aparezca en COORDINACION como `edición Codex` sin commit,
+  lo reviso archivo por archivo y lo commiteo con OK de Lautaro. Lo que Codex
+  ya commiteó o deployó con OK de Lautaro **no lo deshago**: leo su entrada,
+  verifico lo que tocó (sobre todo reglas de seguridad, dinero y datos) y
+  registro lo que encuentre.
+- **Codex puede subir a git su auditoría sin pedir permiso**, y solo eso:
+  `AUDITORIAS.md` + su entrada en `COORDINACION.md`, siempre vía
+  `scripts/subir-auditoria.mjs`. Si veo un commit `audit(codex):` con otros
+  archivos adentro, es una violación: avisar a Lautaro, no arreglarlo en
+  silencio.
 - **Cuando Codex deja una auditoría**, mi trabajo es: verificar cada hallazgo
   contra el código, poner estado, completar "Plan de acción" en la misma
   entrada, y registrar. No borro ni reescribo lo que él escribió.

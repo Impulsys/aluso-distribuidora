@@ -23,15 +23,16 @@ Es la última versión del contexto. Antes de opinar, auditar o tocar algo:
 3. Leé las entradas del registro que no conocías. Lo que parece faltante
    puede haberse hecho ayer en la otra máquina o por el otro agente.
 
-Y después de cada tarea tuya que deje algo (una auditoría, una edición
-aprobada, una pregunta que quede abierta), dejás tu entrada ahí. Formato en
+Y después de cada tarea tuya que deje algo (una auditoría, una edición,
+un commit, una pregunta que quede abierta), dejás tu entrada ahí. Formato en
 el mismo archivo.
 
 ## Tus tres modos de trabajo
 
-Tenés **un modo por defecto** y dos que solo se habilitan con permiso
-explícito de Lautaro. El permiso se da por tarea, en la conversación en
-curso; no arrastra a la tarea siguiente ni a otra sesión.
+La regla de este repo no es de capacidad, es de **autorización**: podés hacer
+todo lo que Lautaro te pida, pero solo cuando te lo pide explícitamente para
+esa tarea. Sin ese OK, sos solo lectura. El permiso se da por tarea, en la
+conversación en curso; no arrastra a la tarea siguiente ni a otra sesión.
 
 ### Modo 1 — LECTURA Y ANÁLISIS (por defecto, siempre)
 
@@ -44,28 +45,37 @@ curso; no arrastra a la tarea siguiente ni a otra sesión.
   edites, entregás la propuesta (diff o archivo aparte) y preguntás. No
   aplicás.
 
-### Modo 2 — EDICIÓN (solo con OK explícito de Lautaro para esa tarea)
+### Modo 2 — TRABAJO COMPLETO (solo con OK explícito de Lautaro para esa tarea)
 
-Se habilita únicamente cuando Lautaro, en esta conversación y para esta
-tarea, dice algo inequívoco: "editá", "aplicalo", "implementalo vos",
-"hacé el cambio". Un "dale" a una propuesta ambigua **no** alcanza:
-preguntá antes de tocar.
+Con OK explícito de Lautaro podés hacer **todo** lo que él te pida para esa
+tarea: editar archivos, instalar dependencias, correr builds, commitear,
+pushear y deployar.
 
+- Se habilita únicamente cuando Lautaro, en esta conversación y para esta
+  tarea, dice algo inequívoco: "editá", "aplicalo", "implementalo vos",
+  "hacé el cambio", "commiteá", "pusheá", "deployá". Un "dale" a una
+  propuesta ambigua **no** alcanza: preguntá antes de tocar.
+- **El permiso cubre exactamente lo que dijo.** "Editá" no incluye commit;
+  "commiteá" no incluye push; "pusheá" no incluye deploy. Cada paso
+  siguiente, pedilo. Aprobar un deploy una vez no aprueba los siguientes.
+- Es por tarea y por conversación. Terminada la tarea, volvés al modo 1.
 - Editás solo los archivos que la tarea necesita. Nada de "ya que estoy".
-- Siguen prohibidos los archivos y datos listados más abajo.
-- **No commiteás ni pusheás el cambio.** Al terminar, dejás una entrada en
-  `COORDINACION.md` (tipo `edición Codex`) con la lista exacta de archivos
-  tocados y qué se cambió. La sesión de Claude lo revisa, lo commitea con
-  aprobación de Lautaro y registra el hash.
-- Si en el medio te das cuenta de que el cambio es más grande de lo
-  acordado, frenás y avisás. El permiso cubre lo que se pidió, no lo que
-  apareció.
+  Si en el medio el cambio resulta más grande de lo acordado, frenás y
+  avisás: el permiso cubre lo que se pidió, no lo que apareció.
+- Al terminar dejás tu entrada en `COORDINACION.md` — tipo `edición Codex`
+  si solo editaste, `commit` o `deploy` si llegaste hasta ahí — con la lista
+  exacta de archivos, el hash y qué verificaste. **Si commiteás, la entrada
+  va en el mismo commit** (regla del repo). Si deployás, verificación
+  post-deploy y registro apenas termina. Después de un commit o deploy,
+  reescribís también el bloque "Estado actual".
+- Si la tarea toca reglas de seguridad, dinero o datos de clientes, decilo
+  en la entrada para que Claude lo revise en su próxima sesión.
 
 ### Modo 3 — SUBIR TU AUDITORÍA A GIT (permiso permanente, alcance cerrado)
 
-Es la ÚNICA excepción a la regla de "un solo integrador por repo", y está
-acotada a dos archivos: **`AUDITORIAS.md`** y **tu entrada en
-`COORDINACION.md`**. Nada más viaja en un commit tuyo.
+No necesita OK: es permanente, pero está acotado a dos archivos:
+**`AUDITORIAS.md`** y **tu entrada en `COORDINACION.md`**. Nada más viaja en
+un commit de este modo.
 
 - Para subir, usás **siempre** el script, nunca `git add`/`commit`/`push` a
   mano:
@@ -82,16 +92,22 @@ acotada a dos archivos: **`AUDITORIAS.md`** y **tu entrada en
   rama no es la principal, o hay staging de otra sesión), no hay atajo: el
   rechazo es la regla.
 
-### Lo que sigue prohibido en cualquier modo
+### Lo que sigue prohibido en cualquier modo (no son permisos: es seguridad)
 
-`git commit`, `git push`, `git merge`, `git rebase`, `git reset`,
-`git checkout` de ramas, deploys de cualquier tipo, tocar el remoto o el
-historial, instalar dependencias, cambiar configuración del proyecto. La
-única vía a git es el script del modo 3.
+- **Reescribir historial compartido**: `git push --force`, `git reset --hard`
+  sobre commits ya pusheados, `rebase` de ramas publicadas. Rompe el trabajo
+  de las otras tres sesiones.
+- **Subir, pegar o mandar a la nube** secretos o datos de clientes (sección
+  "Datos que NO se tocan").
+- **Reescribir o borrar entradas ajenas** en `COORDINACION.md` o
+  `AUDITORIAS.md`.
+- **Actuar sobre algo que en "Estado actual" figura "en curso" por otra
+  sesión** sin preguntar antes.
 
 ## Dónde dejás tu trabajo: `AUDITORIAS.md`
 
-Tu entregable principal es una entrada en **`AUDITORIAS.md`** (raíz). Reglas:
+Tu entregable principal como revisor es una entrada en **`AUDITORIAS.md`**
+(raíz). Reglas:
 
 - Usá el formato que está en ese archivo, sin cambiarlo: una entrada nueva
   ARRIBA de las anteriores, con `auditor: Codex`.
@@ -146,8 +162,7 @@ Tu entregable principal es una entrada en **`AUDITORIAS.md`** (raíz). Reglas:
 
 - Castellano rioplatense en comentarios y textos de UI ("vos", nunca "tú").
 - Sin jerga marketinera en código, comentarios ni commits.
-- Commits narrativos (los escribe quien integra): qué pasó, por qué se
-  decidió así, cómo se verificó.
+- Commits narrativos: qué pasó, por qué se decidió así, cómo se verificó.
 
 ---
 
