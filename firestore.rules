@@ -31,6 +31,12 @@ service cloud.firestore {
       return isSignedIn() && hasUserDoc() && myRole() == 'contador';
     }
 
+    // El depósito: solo LECTURA de lo que necesita para armar y despachar
+    // (envíos y remitos, sin precios en la vista). No escribe nada.
+    function isDeposito() {
+      return isSignedIn() && hasUserDoc() && myRole() == 'deposito';
+    }
+
     // El DUEÑO del sistema (por su mail verificado). Le permite auto-crearse /
     // promoverse a superadmin al entrar (bootstrap desde cualquier dispositivo,
     // incluido login con Google). Es su propia cuenta, no un acceso externo.
@@ -103,7 +109,7 @@ service cloud.firestore {
 
     // ===== Reportes: camiones, cheques, gastos, cajas ===== (gestión interna)
     match /trucks/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
-    match /envios/{id}         { allow read: if isVendedorOrUp(); allow write: if isSuperadmin(); }
+    match /envios/{id}         { allow read: if isVendedorOrUp() || isDeposito(); allow write: if isSuperadmin(); }
     match /checks/{id}         { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /expenses/{id}       { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
     match /cashClosings/{id}   { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
@@ -116,8 +122,12 @@ service cloud.firestore {
     match /movimientosFlete/{id} { allow read: if isVendedorOrUp(); allow write: if isSuperadmin(); }
     // Ventas: remitos (descuentan stock) y facturas
     // El contador también puede LEER remitos y facturas (su área de consulta).
-    match /remitos/{id}          { allow read: if isSocioOrUp() || isContador(); allow write: if isSuperadmin(); }
+    match /remitos/{id}          { allow read: if isSocioOrUp() || isContador() || isDeposito(); allow write: if isSuperadmin(); }
     match /facturas/{id}         { allow read: if isSocioOrUp() || isContador(); allow write: if isSuperadmin(); }
+    // Presupuestos: ventas que el cliente evalúa (no mueven stock). Como remitos.
+    match /presupuestos/{id}     { allow read: if isSocioOrUp(); allow write: if isSuperadmin(); }
+    // Documentación complementaria (metadatos; el archivo vive en Storage).
+    match /documentos/{id}       { allow read: if isVendedorOrUp(); allow create: if isVendedorOrUp(); allow delete: if isSocioOrUp(); }
 
     // Bitácora (auditoría): registro INMUTABLE. La crea quien opera; la leen
     // socio/superadmin (control interno). Nadie la edita ni borra.
@@ -130,6 +140,11 @@ service cloud.firestore {
     // habilitar/bloquear; NADIE lo escribe desde la app (solo consola/admin SDK).
     match /config/licencia     { allow read: if true;          allow write: if isSignedIn() && request.auth.token.email == 'axelfaber@gmail.com'; }
     match /config/{id}         { allow read: if isSignedIn();   allow write: if isSuperadmin() && id != 'licencia'; }
+
+    // ===== secretos ===== (API keys, ej. OpenAI del cliente)
+    // LECTURA DENEGADA a todos desde el navegador: solo la Cloud Function los lee
+    // por Admin SDK (que saltea reglas). Escritura solo superadmin (BYO-key).
+    match /secretos/{id}       { allow read: if false;          allow write: if isSuperadmin(); }
 
     // ===== formularioDatos ===== (configuración inicial, la carga el cliente)
     // Lo llenan Anabela y Luciano SIN estar logueados (todavía no tienen cuenta),

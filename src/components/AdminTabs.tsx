@@ -41,6 +41,7 @@ const GRUPOS: Grupo[] = [
     tabs: [
       { href: "/admin/cuentas-clientes", label: "💳 Ctas clientes" },
       { href: "/admin/cuentas", label: "🏭 Ctas proveedores" },
+      { href: "/admin/pedido-proveedor", label: "🛒 Pedido al prov." },
       { href: "/admin/fletes", label: "🚛 Fletes" },
       { href: "/admin/gastos", label: "💸 Egresos" },
       { href: "/admin/logistica", label: "🧮 Costo flete" },
@@ -51,7 +52,10 @@ const GRUPOS: Grupo[] = [
     titulo: "Sistema",
     tabs: [
       { href: "/admin/bitacora", label: "📋 Bitácora" },
+      { href: "/admin/documentos", label: "📎 Documentos" },
       { href: "/admin/configuracion", label: "⚙️ Configuración" },
+      { href: "/admin/asistente", label: "🤖 Asistente IA" },
+      { href: "/admin/ia", label: "⚙️ IA (config)" },
     ],
   },
 ];

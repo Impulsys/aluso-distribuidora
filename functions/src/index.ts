@@ -10,6 +10,7 @@
  */
 import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
+import axios from "axios";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -37,7 +38,14 @@ const AFIP_KEY = defineSecret("AFIP_KEY"); // .key en base64
 // Debe coincidir con el dominio sintético usado en el login del front
 // (src/lib/userAdmin.ts). Era `dlanoa.com`, de Los Amigos NOA.
 const USER_DOMAIN = "alusodistribuidora.web.app";
-const ROLES = ["cliente", "vendedor", "socio", "superadmin"] as const;
+const ROLES = [
+  "cliente",
+  "vendedor",
+  "socio",
+  "superadmin",
+  "contador",
+  "deposito",
+] as const;
 type Role = (typeof ROLES)[number];
 
 /** Corta la ejecución si quien llama no es un superadmin autenticado. */
@@ -469,3 +477,475 @@ export const emitirFactura = onCall(
   }
 );
 
+/**
+ * Emite una NOTA DE CRÉDITO o DÉBITO asociada a una factura ya emitida.
+ * En AFIP no existe "anular": una factura se revierte con una Nota de Crédito
+ * (total o parcial). La Nota de Débito suma un cargo. Ambas apuntan a la factura
+ * original (CbtesAsoc, obligatorio).
+ * data: { facturaId, clase: 'credito'|'debito', total?, motivo? }
+ *   - total ausente en crédito = anula el TOTAL de la factura.
+ */
+export const emitirNotaAfip = onCall(
+  { secrets: [AFIP_CERT, AFIP_KEY, AFIP_CUIT, AFIP_PTO_VENTA], timeoutSeconds: 300 },
+  async (request) => {
+    await assertStaff(request);
+    const db = getFirestore();
+    const data = request.data ?? {};
+
+    const afipCuit = Number(AFIP_CUIT.value());
+    const afipPtoVenta = Number(AFIP_PTO_VENTA.value());
+    if (!Number.isInteger(afipCuit) || String(afipCuit).length !== 11) {
+      throw new HttpsError("failed-precondition", "Falta el CUIT de ALUSO (AFIP_CUIT).");
+    }
+    if (!Number.isInteger(afipPtoVenta) || afipPtoVenta <= 0) {
+      throw new HttpsError("failed-precondition", "Falta el punto de venta (AFIP_PTO_VENTA).");
+    }
+    const certPem = Buffer.from(AFIP_CERT.value(), "base64").toString("utf8");
+    const keyPem = Buffer.from(AFIP_KEY.value(), "base64").toString("utf8");
+    if (!certPem.includes("BEGIN CERTIFICATE") || !keyPem.includes("PRIVATE KEY")) {
+      throw new HttpsError("failed-precondition", "Falta el certificado de ARCA.");
+    }
+
+    const clase = data.clase === "debito" ? "debito" : "credito";
+    const facturaId = String(data.facturaId ?? "");
+    if (!facturaId) throw new HttpsError("invalid-argument", "Falta la factura.");
+
+    const facRef = db.collection("facturas").doc(facturaId);
+    const facSnap = await facRef.get();
+    if (!facSnap.exists) throw new HttpsError("not-found", "No existe la factura.");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fac = facSnap.data() as any;
+    if (fac.estado !== "emitida") {
+      throw new HttpsError("failed-precondition", "La factura no está emitida.");
+    }
+    if (fac.esNota) {
+      throw new HttpsError("failed-precondition", "No se puede emitir una nota sobre otra nota.");
+    }
+    if (clase === "credito" && fac.anulada) {
+      throw new HttpsError("failed-precondition", "La factura ya fue anulada con una nota de crédito.");
+    }
+
+    const tipo = fac.tipo === "A" ? "A" : "B";
+    const totalNota = r2(Number(data.total) || Number(fac.total) || 0);
+    if (totalNota <= 0) throw new HttpsError("invalid-argument", "Importe inválido.");
+    if (clase === "credito" && totalNota > Number(fac.total) + 0.01) {
+      throw new HttpsError("invalid-argument", "La nota de crédito no puede superar el total de la factura.");
+    }
+
+    const neto = r2(totalNota / 1.21);
+    const iva = r2(totalNota - neto);
+    const ivaArray: IvaEntry[] = [{ Id: 5, BaseImp: neto, Importe: iva }];
+
+    // Receptor = el de la factura
+    const cuitDigits = String(fac.cuit ?? "").replace(/\D/g, "");
+    let docTipo = 99;
+    let docNro = 0;
+    if (cuitDigits.length === 11) {
+      docTipo = 80;
+      docNro = Number(cuitDigits);
+    }
+
+    // Tipo de comprobante: NC A=3 · NC B=8 · ND A=2 · ND B=7
+    const cbteTipo =
+      clase === "credito" ? (tipo === "A" ? 3 : 8) : (tipo === "A" ? 2 : 7);
+    const facTipoCmp = tipo === "A" ? 1 : 6;
+    const facNumero = Number(String(fac.numero ?? "").split("-").pop() || 0);
+    const facPtoVta = Number(fac.puntoVenta) || afipPtoVenta;
+    if (!facNumero) {
+      throw new HttpsError("failed-precondition", "No se pudo leer el número de la factura original.");
+    }
+
+    const fechaStr = fechaHoyAfip();
+    const condRec = fac.consumidorFinal ? 5 : 1;
+
+    // Reserva (estado "emitiendo") para no dejar una nota sin CAE si algo falla.
+    const notaRef = db.collection("facturas").doc();
+    await notaRef.set({
+      esNota: true,
+      clase,
+      facturaAsociadaId: facturaId,
+      tipo,
+      estado: "emitiendo",
+      createdBy: request.auth?.uid ?? null,
+      createdAt: Date.now(),
+    });
+
+    let cae;
+    try {
+      cae = await requestCAE({
+        certPem,
+        keyPem,
+        cuit: afipCuit,
+        puntoVenta: afipPtoVenta,
+        tipoComprobante: cbteTipo,
+        importeNeto: neto,
+        importeIVA: iva,
+        importeTotal: totalNota,
+        ivaArray,
+        docTipo,
+        docNro,
+        condicionIvaReceptorId: condRec,
+        fechaStr,
+        cbtesAsoc: [{ tipo: facTipoCmp, ptoVenta: facPtoVta, numero: facNumero }],
+      });
+    } catch (e) {
+      await notaRef.delete().catch(() => undefined);
+      throw new HttpsError("internal", (e as Error).message);
+    }
+
+    const numeroFmt = `${String(afipPtoVenta).padStart(4, "0")}-${String(
+      cae.numero
+    ).padStart(8, "0")}`;
+    const fechaISO = `${fechaStr.slice(0, 4)}-${fechaStr.slice(4, 6)}-${fechaStr.slice(6, 8)}`;
+    const qrUrl = buildAfipQrUrl({
+      fecha: fechaISO,
+      cuit: afipCuit,
+      ptoVta: afipPtoVenta,
+      tipoCmp: cbteTipo,
+      nroCmp: cae.numero,
+      importe: totalNota,
+      tipoDocRec: docTipo,
+      nroDocRec: docNro,
+      cae: cae.cae,
+    });
+
+    const notaDoc = {
+      esNota: true,
+      clase, // 'credito' | 'debito'
+      cbteTipo,
+      facturaAsociadaId: facturaId,
+      facturaNumero: fac.numero ?? null,
+      remitoId: fac.remitoId ?? null,
+      remitoNumero: fac.remitoNumero ?? null,
+      tipo,
+      consumidorFinal: fac.consumidorFinal ?? docTipo === 99,
+      cuit: fac.cuit ?? null,
+      razonSocial: fac.razonSocial ?? null,
+      items: fac.items ?? [],
+      motivo: (data.motivo ?? "").toString().trim() || null,
+      neto,
+      iva,
+      total: totalNota,
+      puntoVenta: afipPtoVenta,
+      numero: numeroFmt,
+      cae: cae.cae,
+      caeVto: cae.caeVto,
+      qrUrl,
+      verification: cae.verification,
+      verificationDetail: cae.verificationDetail ?? null,
+      estado: "emitida",
+      createdBy: request.auth?.uid ?? null,
+      createdAt: Date.now(),
+      fecha: Date.now(),
+    };
+    await notaRef.set(notaDoc);
+
+    // Marcar la factura original: crédito total la deja ANULADA.
+    const esTotal = clase === "credito" && totalNota >= Number(fac.total) - 0.01;
+    await facRef.set(
+      clase === "credito"
+        ? { notaCreditoId: notaRef.id, anulada: esTotal ? true : fac.anulada ?? false }
+        : { notaDebitoId: notaRef.id },
+      { merge: true }
+    );
+
+    return { id: notaRef.id, ...notaDoc };
+  }
+);
+
+
+// ==================== IA: leer factura de proveedor por foto ====================
+// Recibe una imagen de la factura/remito del proveedor y usa OpenAI (visión)
+// para extraer los datos en JSON estructurado. La API key es del CLIENTE: se
+// guarda en Firestore `secretos/ia` (lectura denegada al navegador) y solo esta
+// función la lee por Admin SDK. El consumo lo paga la cuenta de OpenAI del cliente.
+const PROMPT_FACTURA = `Sos un extractor de datos de facturas y remitos de PROVEEDORES argentinos.
+Te paso la foto de un comprobante de COMPRA (lo que un proveedor le entrega a la distribuidora).
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{
+  "proveedor": "razón social del proveedor tal como figura",
+  "cuit": "CUIT del proveedor sin guiones, o null",
+  "fecha": "AAAA-MM-DD (fecha del comprobante) o null",
+  "numero": "número del comprobante tal como figura, o null",
+  "tipo": "A" | "B" | "otro",
+  "total": número (importe total, punto decimal) o null,
+  "items": [
+    { "descripcion": "texto", "codigo": "código/SKU si figura o null",
+      "cantidad": número, "costoUnitario": número (precio unitario sin IVA si se ve, o el que figure) }
+  ]
+}
+Reglas: si un dato no está o no se lee, poné null (no inventes). Los números sin separador de miles, con punto decimal. Si no hay ítems legibles, devolvé "items": [].`;
+
+export const leerFacturaProveedor = onCall(
+  { timeoutSeconds: 120, memory: "512MiB" },
+  async (request: CallableRequest) => {
+    await assertSuperadmin(request);
+
+    const data = request.data ?? {};
+    const imageBase64 = String(data.imageBase64 ?? "");
+    const mimeType = String(data.mimeType ?? "image/jpeg");
+    if (!imageBase64) {
+      throw new HttpsError("invalid-argument", "Falta la imagen.");
+    }
+
+    // Clave del cliente (doc secreto, solo lo lee esta función por Admin SDK).
+    const secretoSnap = await getFirestore().doc("secretos/ia").get();
+    const apiKey = (secretoSnap.data()?.openaiKey as string) ?? "";
+    if (!apiKey) {
+      throw new HttpsError(
+        "failed-precondition",
+        "No hay API key de OpenAI cargada. Cargala en Configuración de IA."
+      );
+    }
+    const cfgSnap = await getFirestore().doc("config/ia").get();
+    const model = (cfgSnap.data()?.modelo as string) || "gpt-4o";
+
+    const dataUrl = imageBase64.startsWith("data:")
+      ? imageBase64
+      : `data:${mimeType};base64,${imageBase64}`;
+
+    let content: string;
+    try {
+      const resp = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Extraés datos de comprobantes y devolvés SOLO JSON válido.",
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: PROMPT_FACTURA },
+                { type: "image_url", image_url: { url: dataUrl } },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 1500,
+          temperature: 0,
+        },
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          timeout: 90000,
+        }
+      );
+      content = resp.data?.choices?.[0]?.message?.content ?? "";
+    } catch (e) {
+      const err = e as { response?: { status?: number; data?: unknown }; message?: string };
+      console.error("OpenAI falló:", err.response?.status, JSON.stringify(err.response?.data) || err.message);
+      const status = err.response?.status;
+      if (status === 401) {
+        throw new HttpsError("permission-denied", "La API key de OpenAI es inválida o expiró.");
+      }
+      if (status === 429) {
+        throw new HttpsError("resource-exhausted", "OpenAI sin crédito o con límite de uso. Revisá tu cuenta.");
+      }
+      throw new HttpsError("internal", "No se pudo leer la factura con la IA.");
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new HttpsError("internal", "La IA no devolvió datos legibles. Probá con otra foto.");
+    }
+    return parsed;
+  }
+);
+
+// ==================== IA: análisis de ventas + recomendación de compra ==========
+// El servidor calcula los NÚMEROS duros (ventas por producto en el período,
+// stock, ingresos) de forma exacta y determinística; la IA aporta el ANÁLISIS y
+// las RECOMENDACIONES de compra. Así los datos no se inventan y el costo de IA es
+// bajo (se manda un resumen compacto, no los remitos crudos).
+export const analizarVentas = onCall(
+  { timeoutSeconds: 120, memory: "512MiB" },
+  async (request: CallableRequest) => {
+    await assertSuperadmin(request);
+
+    const dias = Math.min(365, Math.max(7, Number(request.data?.dias) || 30));
+    const desde = Date.now() - dias * 24 * 60 * 60 * 1000;
+    const db = getFirestore();
+
+    // Ventas del período (remitos no anulados).
+    const remSnap = await db
+      .collection("remitos")
+      .where("fecha", ">=", desde)
+      .get();
+    const agg = new Map<string, { nombre: string; unidades: number; ingresos: number }>();
+    remSnap.forEach((doc) => {
+      const r = doc.data() as {
+        anulado?: boolean;
+        items?: { productId: string; nombre: string; cantidad: number; precioVenta: number }[];
+      };
+      if (r.anulado) return;
+      for (const it of r.items ?? []) {
+        const cur = agg.get(it.productId) ?? { nombre: it.nombre, unidades: 0, ingresos: 0 };
+        cur.unidades += Number(it.cantidad) || 0;
+        cur.ingresos += (Number(it.cantidad) || 0) * (Number(it.precioVenta) || 0);
+        cur.nombre = it.nombre || cur.nombre;
+        agg.set(it.productId, cur);
+      }
+    });
+
+    // Stock actual (para cruzar con lo vendido).
+    const prodSnap = await db.collection("products").get();
+    const stockPorId = new Map<string, number>();
+    prodSnap.forEach((d) => stockPorId.set(d.id, (d.data()?.stock as number) ?? 0));
+
+    const filas = Array.from(agg.entries())
+      .map(([id, v]) => ({
+        nombre: v.nombre,
+        vendidas: Math.round(v.unidades),
+        ingresos: Math.round(v.ingresos),
+        stock: stockPorId.get(id) ?? 0,
+      }))
+      .sort((a, b) => b.vendidas - a.vendidas)
+      .slice(0, 40);
+
+    const totalVentas = filas.reduce((s, f) => s + f.ingresos, 0);
+
+    if (filas.length === 0) {
+      return { periodoDias: dias, masVendidos: [], totalVentas: 0, resumen: "No hubo ventas en el período.", recomendaciones: [], observaciones: [] };
+    }
+
+    // IA
+    const secretoSnap = await db.doc("secretos/ia").get();
+    const apiKey = (secretoSnap.data()?.openaiKey as string) ?? "";
+    if (!apiKey) {
+      throw new HttpsError("failed-precondition", "No hay API key de OpenAI cargada. Cargala en Configuración de IA.");
+    }
+    const cfgSnap = await db.doc("config/ia").get();
+    const model = (cfgSnap.data()?.modelo as string) || "gpt-4o";
+
+    const tabla = filas
+      .map((f) => `${f.nombre} | vendidas ${f.vendidas} | stock ${f.stock} | $${f.ingresos}`)
+      .join("\n");
+    const prompt = `Sos analista de una DISTRIBUIDORA mayorista. Te paso las ventas de los últimos ${dias} días por producto (unidades vendidas, stock actual, ingresos en $).
+Analizá y recomendá QUÉ COMPRAR/REPONER a fin de mes, priorizando: productos que se venden mucho y tienen POCO o NEGATIVO stock, y evitando sobre-stock de lo que no rota.
+Datos:
+${tabla}
+
+Devolvé SOLO un JSON con esta forma:
+{
+  "resumen": "2-3 frases sobre cómo vinieron las ventas del período",
+  "recomendaciones": [ { "producto": "nombre", "razon": "por qué", "sugerencia": "acción concreta, ej. reponer" } ],
+  "observaciones": [ "otras señales útiles, ej. productos estancados" ]
+}
+Máximo 8 recomendaciones, las más importantes primero.`;
+
+    let content: string;
+    try {
+      const resp = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model,
+          messages: [
+            { role: "system", content: "Sos analista de retail y devolvés SOLO JSON válido." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 1200,
+          temperature: 0.2,
+        },
+        { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 90000 }
+      );
+      content = resp.data?.choices?.[0]?.message?.content ?? "";
+    } catch (e) {
+      const err = e as { response?: { status?: number }; message?: string };
+      const status = err.response?.status;
+      if (status === 401) throw new HttpsError("permission-denied", "La API key de OpenAI es inválida o expiró.");
+      if (status === 429) throw new HttpsError("resource-exhausted", "OpenAI sin crédito o con límite de uso.");
+      console.error("OpenAI análisis falló:", status, err.message);
+      throw new HttpsError("internal", "No se pudo generar el análisis con la IA.");
+    }
+
+    let ia: { resumen?: string; recomendaciones?: unknown[]; observaciones?: unknown[] } = {};
+    try {
+      ia = JSON.parse(content);
+    } catch {
+      ia = { resumen: content };
+    }
+
+    return {
+      periodoDias: dias,
+      masVendidos: filas.slice(0, 10),
+      totalVentas,
+      resumen: ia.resumen ?? "",
+      recomendaciones: ia.recomendaciones ?? [],
+      observaciones: ia.observaciones ?? [],
+    };
+  }
+);
+
+// ==================== IA: chat (conversar sobre el análisis / negocio) ==========
+// Chat libre con la IA. Se le pasa un `contexto` (ej. el resumen de ventas que ya
+// se calculó en analizarVentas) para que responda sobre el negocio con datos reales.
+export const chatIA = onCall(
+  { timeoutSeconds: 120, memory: "256MiB" },
+  async (request: CallableRequest) => {
+    await assertSuperadmin(request);
+
+    const data = request.data ?? {};
+    const contexto = String(data.contexto ?? "").slice(0, 8000);
+    const mensajes = Array.isArray(data.messages) ? data.messages : [];
+    const conv = mensajes
+      .filter(
+        (m: unknown) =>
+          m &&
+          typeof (m as { content?: unknown }).content === "string" &&
+          ["user", "assistant"].includes((m as { role?: string }).role ?? "")
+      )
+      .slice(-16)
+      .map((m: { role: string; content: string }) => ({
+        role: m.role,
+        content: String(m.content).slice(0, 4000),
+      }));
+    if (conv.length === 0) {
+      throw new HttpsError("invalid-argument", "No hay mensaje para responder.");
+    }
+
+    const db = getFirestore();
+    const secretoSnap = await db.doc("secretos/ia").get();
+    const apiKey = (secretoSnap.data()?.openaiKey as string) ?? "";
+    if (!apiKey) {
+      throw new HttpsError("failed-precondition", "No hay API key de OpenAI cargada.");
+    }
+    const cfgSnap = await db.doc("config/ia").get();
+    const model = (cfgSnap.data()?.modelo as string) || "gpt-4o";
+
+    const system =
+      "Sos el asistente de análisis de una distribuidora mayorista (ALUSO). " +
+      "Respondés en español, claro y concreto, sobre sus ventas, stock y decisiones de compra. " +
+      "Usá los datos del contexto; si algo no está en el contexto, decilo en vez de inventar." +
+      (contexto ? `\n\nCONTEXTO (datos reales del negocio):\n${contexto}` : "");
+
+    let content: string;
+    try {
+      const resp = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model,
+          messages: [{ role: "system", content: system }, ...conv],
+          max_tokens: 900,
+          temperature: 0.4,
+        },
+        { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 90000 }
+      );
+      content = resp.data?.choices?.[0]?.message?.content ?? "";
+    } catch (e) {
+      const err = e as { response?: { status?: number }; message?: string };
+      const status = err.response?.status;
+      if (status === 401) throw new HttpsError("permission-denied", "La API key de OpenAI es inválida o expiró.");
+      if (status === 429) throw new HttpsError("resource-exhausted", "OpenAI sin crédito o con límite de uso.");
+      console.error("OpenAI chat falló:", status, err.message);
+      throw new HttpsError("internal", "No se pudo responder.");
+    }
+
+    return { reply: content };
+  }
+);

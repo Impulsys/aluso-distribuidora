@@ -8,7 +8,7 @@ import {
   anularRemito,
   mensajeVentaError,
 } from "@/lib/ventas";
-import { printRemito } from "@/lib/remito-print";
+import { printRemito, printRemitoTransporte } from "@/lib/remito-print";
 import { printReporteCaja } from "@/lib/reporte-caja-print";
 import {
   subscribeProveedores,
@@ -345,9 +345,16 @@ function Movimientos({
                 <button
                   onClick={() => printRemito(r)}
                   className="text-xs text-primary hover:underline"
-                  title="Imprimir"
+                  title="Imprimir remito (con precios)"
                 >
                   🖨️
+                </button>
+                <button
+                  onClick={() => printRemitoTransporte(r)}
+                  className="text-xs text-primary hover:underline"
+                  title="Remito del camionero (sin precios, x2)"
+                >
+                  🚚
                 </button>
                 {!r.anulado && (
                   <button

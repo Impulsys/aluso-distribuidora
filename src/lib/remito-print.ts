@@ -1,6 +1,6 @@
 // Remito en HOJA A4, listo para imprimir o guardar como PDF con el navegador.
 // (Antes salía en ticket de 80mm porque venía de Los Amigos; ALUSO usa A4.)
-import type { Envio, Remito } from "./types";
+import type { Envio, Presupuesto, Remito } from "./types";
 import { LOGISTICA_POR_EAN, medidasBulto } from "@/data/logistica";
 import { armarPallet, type BultoAColocar } from "./pallet";
 import {
@@ -18,15 +18,10 @@ function itemsHTML(r: Remito): string {
   return r.items
     .map((it) => {
       const cod = it.codigo ? `<span class="cod">${esc(it.codigo)}</span><br>` : "";
-      const b = bultosDe(it.productId, it.cantidad);
-      const bultosTxt =
-        b != null
-          ? `<br><span style="font-size:10px;color:#667">${b} bulto${b === 1 ? "" : "s"}</span>`
-          : "";
       return `
       <tr>
         <td>${cod}${esc(it.nombre)}</td>
-        <td class="num">${it.cantidad}${bultosTxt}</td>
+        <td class="num">${cantBultos(it)}</td>
         <td class="num">${ars(it.precioVenta)}</td>
         <td class="num">${ars(it.precioVenta * it.cantidad)}</td>
       </tr>`;
@@ -56,6 +51,57 @@ function totalesHTML(r: Remito): string {
   </div>`;
 }
 
+/**
+ * PRESUPUESTO: como el remito pero sin descontar stock ni ser comprobante. Lo
+ * evalúa el cliente; cuando vuelve con el N° se convierte en venta. Muestra los
+ * precios (para que el cliente decida) pero deja claro que NO es comprobante.
+ */
+export function presupuestoHTML(p: Presupuesto): string {
+  // itemsHTML/totalesHTML solo usan items/subtotal/descuentos/total, que el
+  // presupuesto tiene con la misma forma que el remito.
+  const r = p as unknown as Remito;
+  const body = `
+  ${a4Toolbar()}
+  <div class="hoja">
+    ${a4Header()}
+
+    <div class="doc-head">
+      <span class="tipo">PRESUPUESTO</span>
+      <div style="text-align:right">
+        <div class="nro">N° ${esc(p.numero)}</div>
+        <div class="fecha">${fechaCorta(p.fecha)} · ${horaCorta(p.fecha)}</div>
+      </div>
+    </div>
+
+    <div class="cliente">
+      <div><span class="lbl">Cliente:</span> ${esc(
+        p.clienteNombre || "Consumidor final"
+      )}</div>
+      <div><span class="lbl">CUIT:</span> ${esc(p.clienteCuit || "—")}</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th class="num">Cant.</th>
+          <th class="num">P. Unitario</th>
+          <th class="num">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>${itemsHTML(r)}</tbody>
+    </table>
+
+    ${totalesHTML(r)}
+
+    <p class="nota">
+      Presupuesto — <b>no es comprobante</b>. Validez 7 días. Sujeto a stock al
+      momento de la compra.
+    </p>
+  </div>`;
+  return a4Shell(`Presupuesto ${p.numero}`, body);
+}
+
 export function remitoHTML(r: Remito): string {
   const body = `
   ${a4Toolbar()}
@@ -75,6 +121,11 @@ export function remitoHTML(r: Remito): string {
         r.clienteNombre || "Consumidor final"
       )}</div>
       <div><span class="lbl">CUIT:</span> ${esc(r.clienteCuit || "—")}</div>
+      ${
+        r.clienteDireccion
+          ? `<div><span class="lbl">Entregar en:</span> ${esc(r.clienteDireccion)}</div>`
+          : ""
+      }
       <div><span class="lbl">Forma de pago:</span> ${esc(
         r.formaPago || "—"
       )}</div>
@@ -92,6 +143,7 @@ export function remitoHTML(r: Remito): string {
       </thead>
       <tbody>${itemsHTML(r)}</tbody>
     </table>
+    ${totalBultosHTML(r.items)}
 
     ${totalesHTML(r)}
 
@@ -124,7 +176,7 @@ export function proformaHTML(r: Remito, area?: string): string {
       <tr>
         <td style="width:34px;text-align:center;color:#889">☐</td>
         <td>${cod}${esc(it.nombre)}</td>
-        <td class="num" style="font-size:15px;font-weight:700">${it.cantidad}</td>
+        <td class="num">${cantBultos(it)}</td>
       </tr>`;
     })
     .join("");
@@ -152,11 +204,12 @@ export function proformaHTML(r: Remito, area?: string): string {
         <tr>
           <th style="width:34px">✓</th>
           <th>Descripción</th>
-          <th class="num">Cantidad</th>
+          <th class="num">Bultos</th>
         </tr>
       </thead>
       <tbody>${items}</tbody>
     </table>
+    ${totalBultosHTML(r.items)}
     <div class="firma">
       <div class="linea">Armó el pedido</div>
       <div class="linea">Controló</div>
@@ -187,7 +240,7 @@ export function proformasControlHTML(remitos: Remito[]): string {
         const cod = it.codigo ? `<span class="cod">${esc(it.codigo)}</span><br>` : "";
         return `<tr><td style="width:34px;text-align:center;color:#889">☐</td><td>${cod}${esc(
           it.nombre
-        )}</td><td class="num" style="font-size:15px;font-weight:700">${it.cantidad}</td></tr>`;
+        )}</td><td class="num">${cantBultos(it)}</td></tr>`;
       })
       .join("");
     return `
@@ -205,9 +258,10 @@ export function proformasControlHTML(remitos: Remito[]): string {
         <div><span class="lbl">Pedido:</span> ${esc(r.numero)}</div>
       </div>
       <table>
-        <thead><tr><th style="width:34px">✓</th><th>Descripción</th><th class="num">Cantidad</th></tr></thead>
+        <thead><tr><th style="width:34px">✓</th><th>Descripción</th><th class="num">Bultos</th></tr></thead>
         <tbody>${items}</tbody>
       </table>
+      ${totalBultosHTML(r.items)}
       <div class="firma"><div class="linea">Armó</div><div class="linea">Controló</div></div>
       <p class="nota">Documento interno de control. No es remito ni factura. Sin valores.</p>
     </div>`;
@@ -223,10 +277,59 @@ export function proformasControlHTML(remitos: Remito[]): string {
 
 /** Bultos de un renglón: cuántas cajas completas son esas unidades. `null` si el
  *  producto no tiene datos de paquetería cargados (no se inventa un número). */
-function bultosDe(productId: string, cantidad: number): number | null {
-  const d = LOGISTICA_POR_EAN[productId];
-  const paq = d?.paqPorBulto || 0;
+// Bultos de un ítem: usa el `paqPorBulto` GUARDADO en el remito (snapshot de la
+// venta); si el remito es viejo y no lo tiene, cae a la tabla de logística.
+function bultosDe(
+  productId: string,
+  cantidad: number,
+  paqGuardado?: number
+): number | null {
+  const paq =
+    paqGuardado && paqGuardado > 0
+      ? paqGuardado
+      : LOGISTICA_POR_EAN[productId]?.paqPorBulto || 0;
   return paq > 0 ? Math.ceil(cantidad / paq) : null;
+}
+
+/**
+ * Celda de cantidad con el BULTO como número PRINCIPAL (grande) y las unidades
+ * abajo, más chico. Es como lo pidió ALUSO: el que arma y el fletero razonan en
+ * bultos, no en unidades sueltas. Si el producto no tiene dato de bulto, muestra
+ * las unidades.
+ */
+function cantBultos(it: {
+  productId: string;
+  cantidad: number;
+  paqPorBulto?: number;
+}): string {
+  const b = bultosDe(it.productId, it.cantidad, it.paqPorBulto);
+  if (b == null) {
+    return `<b style="font-size:15px">${it.cantidad}</b> <span style="font-size:10px;color:#667">u</span>`;
+  }
+  return `<b style="font-size:16px">${b}</b> <span style="font-size:11px">bulto${
+    b === 1 ? "" : "s"
+  }</span><br><span style="font-size:10px;color:#667">${it.cantidad} u</span>`;
+}
+
+/** Total de bultos de un comprobante (suma los bultos de cada renglón). */
+function totalBultos(items: {
+  productId: string;
+  cantidad: number;
+  paqPorBulto?: number;
+}[]): number {
+  return items.reduce((s, it) => {
+    const b = bultosDe(it.productId, it.cantidad, it.paqPorBulto);
+    return s + (b ?? 0);
+  }, 0);
+}
+
+/** Renglón "Total: N bultos" para poner debajo de la tabla. */
+function totalBultosHTML(items: Parameters<typeof totalBultos>[0]): string {
+  const t = totalBultos(items);
+  if (t <= 0) return "";
+  return `<p style="margin-top:6px;text-align:right;font-size:13px"><b>Total: ${t} bulto${
+    t === 1 ? "" : "s"
+  }</b></p>`;
 }
 
 /**
@@ -244,13 +347,11 @@ export function hojaArmadoHTML(envio: Envio, remitos: Remito[]): string {
         const cod = it.codigo
           ? `<span class="cod">${esc(it.codigo)}</span><br>`
           : "";
-        const b = bultosDe(it.productId, it.cantidad);
         return `
         <tr>
           <td style="width:30px;text-align:center;color:#889">☐</td>
           <td>${cod}${esc(it.nombre)}</td>
-          <td class="num" style="font-weight:700">${it.cantidad}</td>
-          <td class="num">${b ?? "—"}</td>
+          <td class="num">${cantBultos(it)}</td>
         </tr>`;
       })
       .join("");
@@ -260,12 +361,12 @@ export function hojaArmadoHTML(envio: Envio, remitos: Remito[]): string {
         <tr>
           <th style="width:30px">✓</th>
           <th>Descripción</th>
-          <th class="num">Unid.</th>
           <th class="num">Bultos</th>
         </tr>
       </thead>
       <tbody>${filas}</tbody>
-    </table>`;
+    </table>
+    ${totalBultosHTML(r.items)}`;
   };
 
   const bloquesPallet = palletizados
@@ -578,4 +679,157 @@ export function printRemito(r: Remito): void {
 /** Igual que printRemito (se mantiene por compatibilidad). */
 export function openRemito(r: Remito): void {
   abrirA4(remitoHTML(r));
+}
+
+// ---- Remito para el CAMIONERO (transporte): SIN valores, se imprimen 2 ----
+// Va sin precios (el transportista no ve importes). Se emiten 2 copias
+// (ORIGINAL para el transporte, DUPLICADO para el cliente/retorno). Base lista
+// para, más adelante, calibrar sobre el formulario preimpreso del transporte.
+function remitoTransporteBloque(r: Remito, etiqueta: string): string {
+  const filas = r.items
+    .map((it) => {
+      const cod = it.codigo ? `<span class="cod">${esc(it.codigo)}</span><br>` : "";
+      return `
+      <tr>
+        <td>${cod}${esc(it.nombre)}</td>
+        <td class="num">${cantBultos(it)}</td>
+      </tr>`;
+    })
+    .join("");
+  return `
+  <div class="hoja">
+    ${a4Header()}
+    <div class="doc-head">
+      <span class="tipo">REMITO · TRANSPORTE</span>
+      <div style="text-align:right">
+        <div class="nro">N° ${esc(r.numero)}</div>
+        <div class="fecha">${fechaCorta(r.fecha)} · ${horaCorta(r.fecha)}</div>
+        <div style="font-size:11px;font-weight:700;color:#0a6480">${esc(etiqueta)}</div>
+      </div>
+    </div>
+    <div class="cliente">
+      <div><span class="lbl">Cliente:</span> ${esc(
+        r.clienteNombre || "Consumidor final"
+      )}</div>
+      <div><span class="lbl">CUIT:</span> ${esc(r.clienteCuit || "—")}</div>
+      <div><span class="lbl">Entregar en:</span> <b>${esc(
+        r.clienteDireccion || "—"
+      )}</b></div>
+      <div><span class="lbl">Comprobante:</span> ${esc(r.numero)}</div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Descripción</th><th class="num">Bultos</th></tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+    ${totalBultosHTML(r.items)}
+    <div class="firma">
+      <div class="linea">Entregó</div>
+      <div class="linea">Recibí conforme</div>
+    </div>
+    <p class="nota">
+      Documento no válido como factura. Comprobante de entrega de mercadería
+      (sin valores).
+    </p>
+  </div>`;
+}
+
+/** Dos copias del remito del transportista, SIN precios, en una sola tanda. */
+export function remitoTransporteHTML(r: Remito): string {
+  const body =
+    a4Toolbar() +
+    remitoTransporteBloque(r, "ORIGINAL") +
+    `<div style="page-break-before:always"></div>` +
+    remitoTransporteBloque(r, "DUPLICADO");
+  return a4Shell(`Remito transporte ${r.numero}`, body);
+}
+
+/** Abre las 2 copias del remito del transportista (sin valores). */
+export function printRemitoTransporte(r: Remito): void {
+  abrirA4(remitoTransporteHTML(r));
+}
+
+/**
+ * TODOS los remitos del transporte de un envío, en una sola tanda (cada remito
+ * con sus 2 copias). Es lo que imprime el depósito para lo que se lleva el flete.
+ */
+export function remitosTransporteEnvioHTML(rs: Remito[]): string {
+  const bloques = rs.flatMap((r) => [
+    remitoTransporteBloque(r, "ORIGINAL"),
+    remitoTransporteBloque(r, "DUPLICADO"),
+  ]);
+  const body =
+    a4Toolbar() +
+    bloques.join('<div style="page-break-before:always"></div>');
+  return a4Shell("Remitos del transporte", body);
+}
+
+export function printRemitosTransporteEnvio(rs: Remito[]): void {
+  abrirA4(remitosTransporteEnvioHTML(rs));
+}
+
+/**
+ * REMITO SOBRE FORMULARIO PREIMPRESO (talonario físico numerado con CAI).
+ * NO imprime membrete ni recuadros: saca SOLO los datos, ubicados en mm para que
+ * caigan sobre los casilleros del formulario preimpreso. Se calibra con las
+ * medidas del papel (Anabela: margen sup/izq 1,3cm, der/inf 0,7cm, renglón 0,8cm).
+ * Estos offsets se ajustan a ojo después de una impresión de prueba.
+ */
+// Posiciones (en mm desde el borde de la hoja). Ajustables tras probar en papel.
+const PRE = {
+  margenIzq: 13, // 1,3 cm
+  fechaTop: 33, // línea "FECHA:"
+  fechaLeft: 120,
+  senorTop: 63, // "Señor/es:"
+  direccionTop: 71, // "Dirección:" / "Localidad:"
+  localidadLeft: 120,
+  cuitClienteTop: 84, // fila IVA · "C.U.I.T.:"
+  cuitClienteLeft: 150,
+  itemsTop: 108, // primer renglón de la tabla CANT/DESCRIPCION
+  itemsCantLeft: 8, // columna CANT.
+  itemsDescLeft: 40, // columna DESCRIPCION
+  renglon: 8, // 0,8 cm entre renglones
+};
+
+export function remitoPreimpresoHTML(r: Remito): string {
+  const campo = (top: number, left: number, texto: string, extra = "") =>
+    `<div style="position:absolute;top:${top}mm;left:${left}mm;${extra}">${esc(
+      texto
+    )}</div>`;
+
+  const filas = r.items
+    .map((it, i) => {
+      const b = bultosDe(it.productId, it.cantidad, it.paqPorBulto);
+      const cant = b != null ? `${b}` : `${it.cantidad}`;
+      const top = PRE.itemsTop + i * PRE.renglon;
+      return (
+        campo(top, PRE.itemsCantLeft, cant, "font-weight:600") +
+        campo(
+          top,
+          PRE.itemsDescLeft,
+          `${it.codigo ? it.codigo + " · " : ""}${it.nombre}`
+        )
+      );
+    })
+    .join("");
+
+  const body = `
+  ${a4Toolbar()}
+  <div class="hoja" style="position:relative;padding:0;box-shadow:none;font-family:Arial,sans-serif;font-size:11px;color:#000;min-height:297mm">
+    ${campo(PRE.fechaTop, PRE.fechaLeft, fechaCorta(r.fecha))}
+    ${campo(PRE.senorTop, PRE.margenIzq, r.clienteNombre || "Consumidor final")}
+    ${campo(PRE.direccionTop, PRE.margenIzq, r.clienteDireccion || "")}
+    ${campo(PRE.cuitClienteTop, PRE.cuitClienteLeft, r.clienteCuit || "")}
+    ${filas}
+  </div>
+  <style>
+    /* En preimpreso NO se imprime nada de fondo: solo el texto cae sobre el papel. */
+    @media print { .hoja { margin: 0 !important; } }
+  </style>`;
+  return a4Shell(`Remito preimpreso ${r.numero}`, body);
+}
+
+export function printRemitoPreimpreso(r: Remito): void {
+  abrirA4(remitoPreimpresoHTML(r));
 }

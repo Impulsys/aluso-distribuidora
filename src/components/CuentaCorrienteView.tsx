@@ -116,14 +116,18 @@ export default function CuentaCorrienteView({
                     <div className="flex items-center gap-4 text-right">
                       <div>
                         <p className="text-[10px] uppercase text-brand-dark/45">
-                          Deuda
+                          {deuda < 0 ? "Saldo a favor" : "Deuda"}
                         </p>
                         <p
                           className={`font-bold ${
                             deuda > 0 ? "text-rose-700" : "text-emerald-700"
                           }`}
                         >
-                          {deuda > 0 ? formatARS(deuda) : "Al día"}
+                          {deuda > 0
+                            ? formatARS(deuda)
+                            : deuda < 0
+                            ? formatARS(-deuda)
+                            : "Al día"}
                         </p>
                       </div>
                       <span className="text-brand-dark/40">

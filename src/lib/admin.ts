@@ -118,6 +118,8 @@ export type ProductOverride = Partial<
     | "codigo"
     | "ean"
     | "eliminado"
+    | "unidadesPorBulto"
+    | "bultosPorPalet"
   >
 >;
 

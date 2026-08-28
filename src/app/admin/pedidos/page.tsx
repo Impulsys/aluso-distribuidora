@@ -16,9 +16,18 @@ import {
   mensajeVentaError,
 } from "@/lib/ventas";
 import { useProducts } from "@/hooks/useProducts";
-import { remitoHTML } from "@/lib/remito-print";
+import { remitoHTML, presupuestoHTML } from "@/lib/remito-print";
+import {
+  crearPresupuesto,
+  buscarPresupuestoPorNumero,
+  marcarPresupuestoConvertido,
+} from "@/lib/presupuestos";
 import { printFactura, openFactura } from "@/lib/factura-print";
-import { emitirFacturaAfip, mensajeFacturaError } from "@/lib/factura-afip";
+import {
+  emitirFacturaAfip,
+  emitirNotaAfip,
+  mensajeFacturaError,
+} from "@/lib/factura-afip";
 import CajaView from "@/components/CajaView";
 import RegistroHistorico from "@/components/RegistroHistorico";
 import { useAuth } from "@/context/AuthContext";
@@ -132,6 +141,20 @@ export default function AdminVentasPage() {
 }
 
 // ==================== NUEVA VENTA (Punto de venta) ====================
+/**
+ * Unidades por bulto de un producto: primero la config MANUAL del producto
+ * (unidadesPorBulto, editable en Productos), y si no hay, la tabla de logística.
+ * 1 = se vende por unidad.
+ */
+function paqDeProducto(p: {
+  unidadesPorBulto?: number;
+  ean?: string;
+  id: string;
+}): number {
+  if (p.unidadesPorBulto && p.unidadesPorBulto > 0) return p.unidadesPorBulto;
+  return LOGISTICA_POR_EAN[p.ean ?? p.id]?.paqPorBulto || 1;
+}
+
 interface POSLine extends RemitoItem {
   stock: number;
   precioLista: number; // precio actual en la lista (para detectar cambios)
@@ -143,6 +166,11 @@ interface POSLine extends RemitoItem {
    * Si el producto no tiene el dato, es 1 (se vende por unidad).
    */
   paqPorBulto: number;
+  /**
+   * Si viene de un presupuesto cargado, el precio YA es el neto pactado: no se
+   * le vuelve a aplicar la lista del cliente (evita doble markup al convertir).
+   */
+  precioFijo?: boolean;
 }
 
 function NuevaVentaView({
@@ -170,6 +198,10 @@ function NuevaVentaView({
   // Condiciones de descuento que el operador confirma al cerrar la venta.
   const [retiraDeposito, setRetiraDeposito] = useState(false);
   const [porVolumen, setPorVolumen] = useState(false);
+  // Aplicar el descuento por pago en efectivo. Por defecto sí (cuando la forma de
+  // pago es efectivo), pero se puede DESTILDAR: hay clientes con lista muy buena
+  // a los que no se les da el 2,5% aunque paguen en efectivo (pedido de Anabela).
+  const [descEfectivo, setDescEfectivo] = useState(true);
   // Descuento adicional a mano (el "+" que pidió Luciano).
   const [descAdicional, setDescAdicional] = useState(0);
   const [descAdicOpen, setDescAdicOpen] = useState(false);
@@ -179,6 +211,16 @@ function NuevaVentaView({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Presupuesto: si está en ON, el botón GENERA un presupuesto (no descuenta
+  // stock) en vez de cerrar la venta. `cargarNum` carga uno por su N° para
+  // convertirlo en venta.
+  const [modoPresupuesto, setModoPresupuesto] = useState(false);
+  const [cargarNum, setCargarNum] = useState("");
+  // Si la venta abierta salió de cargar un presupuesto, guardamos su id para
+  // marcarlo "convertido" cuando se cierre la venta.
+  const [presupuestoCargadoId, setPresupuestoCargadoId] = useState<string | null>(
+    null
+  );
 
   // La pestaña muestra cuántos ítems hay en la venta abierta (la vista queda
   // montada pero oculta al cambiar de solapa).
@@ -238,7 +280,11 @@ function NuevaVentaView({
     if (!t) return [];
     return productos
       .filter(
-        (p) => p.activo && (coincide(p.nombre, t) || (p.ean ?? "").includes(t))
+        (p) =>
+          p.activo &&
+          (coincide(p.nombre, t) ||
+            (p.ean ?? "").includes(t) ||
+            coincide(p.codigo ?? "", t))
       )
       .slice(0, 8);
   }, [productos, q]);
@@ -247,7 +293,7 @@ function NuevaVentaView({
     const p = productos.find((x) => x.id === id);
     if (!p) return;
     // Cuántas unidades trae el bulto (para vender por bulto cerrado).
-    const paq = LOGISTICA_POR_EAN[p.ean ?? p.id]?.paqPorBulto || 1;
+    const paq = paqDeProducto(p);
     if (lines.some((l) => l.productId === id)) {
       // Sumar de a UN bulto (paq unidades).
       setLines((prev) =>
@@ -304,7 +350,11 @@ function NuevaVentaView({
   const markupCli = clienteSel?.markupLista;
   const aplicaLista = markupCli != null && markupCli !== MARKUP_DISTRIBUIDOR;
   const precioNeto = (l: POSLine) =>
-    aplicaLista ? precioParaLista(l.precioVenta, markupCli) : l.precioVenta;
+    l.precioFijo
+      ? l.precioVenta // precio pactado en un presupuesto: no re-aplicar lista
+      : aplicaLista
+      ? precioParaLista(l.precioVenta, markupCli)
+      : l.precioVenta;
 
   const subtotal = lines.reduce((s, l) => s + precioNeto(l) * l.cantidad, 0);
   const totalItems = lines.reduce((s, l) => s + l.cantidad, 0);
@@ -324,12 +374,18 @@ function NuevaVentaView({
     return e;
   }, [clienteSel, descAdicional]);
 
+  // Forma de pago SOLO para el cálculo del descuento: si se pagó en efectivo pero
+  // se destildó el descuento, se calcula como si NO fuera efectivo (así no aplica
+  // el 2,5%). La forma de pago REAL que se guarda en el remito no cambia.
+  const fpDesc =
+    formaPago === "efectivo" && !descEfectivo ? "transferencia" : formaPago;
+
   // Descuentos por condición + extras, en vivo, con la config editable.
   const ventaConDesc = useMemo(
     () =>
       descuentosVenta(
         subtotal,
-        { formaPago, retiraEnDeposito: retiraDeposito, porVolumen },
+        { formaPago: fpDesc, retiraEnDeposito: retiraDeposito, porVolumen },
         {
           descuentoEfectivoPct: cfgPrecios.descuentoEfectivoPct,
           descuentoRetiroPct: cfgPrecios.descuentoRetiroPct,
@@ -339,7 +395,7 @@ function NuevaVentaView({
         },
         extrasDesc
       ),
-    [subtotal, formaPago, retiraDeposito, porVolumen, cfgPrecios, extrasDesc]
+    [subtotal, fpDesc, retiraDeposito, porVolumen, cfgPrecios, extrasDesc]
   );
   const total = ventaConDesc.total;
 
@@ -368,6 +424,7 @@ function NuevaVentaView({
       cantidad: Math.max(1, Math.floor(Number(l.cantidad) || 0)),
       precioVenta: Math.max(0, precioNeto(l) || 0),
       costoUnitario: l.costoUnitario,
+      paqPorBulto: l.paqPorBulto || 1,
     }));
     const totalCalc = items.reduce((s, it) => s + it.precioVenta * it.cantidad, 0);
     if (items.length === 0 || totalCalc <= 0) {
@@ -395,6 +452,7 @@ function NuevaVentaView({
         clienteId: clienteSel.id,
         clienteNombre: clienteSel.nombre,
         clienteCuit: clienteSel.cuit,
+        clienteDireccion: clienteSel.direccionEntrega,
         // Vendedor al que se le atribuye la venta (para la comisión). Si no se
         // elige, queda el que la cargó.
         vendedorUid: vend?.uid,
@@ -403,7 +461,90 @@ function NuevaVentaView({
         // Los descuentos que ve el operador son los que se guardan e imprimen.
         descuentos: descuentosVenta(
           totalCalc,
-          { formaPago, retiraEnDeposito: retiraDeposito, porVolumen },
+          { formaPago: fpDesc, retiraEnDeposito: retiraDeposito, porVolumen },
+          {
+            descuentoEfectivoPct: cfgPrecios.descuentoEfectivoPct,
+            descuentoRetiroPct: cfgPrecios.descuentoRetiroPct,
+            descuentoVolumenPct: cfgPrecios.descuentoVolumenPct,
+            volumenMinBultos: cfgPrecios.volumenMinBultos,
+            acumulaSumando: cfgPrecios.acumulaSumando,
+          },
+          extrasDesc
+        ).descuentos,
+        createdBy: user?.uid,
+        // Entrega directa de fábrica: no descuenta stock (no sale del depósito).
+        sinStock: clienteSel.entregaDirectaFabrica === true,
+      });
+      if (printWin) {
+        printWin.document.write(remitoHTML(r));
+        printWin.document.close();
+        printWin.focus();
+      }
+      // Si esta venta salió de un presupuesto, lo marcamos convertido.
+      if (presupuestoCargadoId) {
+        marcarPresupuestoConvertido(presupuestoCargadoId, r.id).catch(() => {});
+        setPresupuestoCargadoId(null);
+      }
+      setMsg(
+        clienteSel.entregaDirectaFabrica
+          ? `Remito ${r.numero} generado. Entrega directa de fábrica — NO se descontó stock.`
+          : `Remito ${r.numero} generado. Stock descontado.`
+      );
+      setLines([]);
+      setClienteId("");
+      setVendedorId("");
+      setDescAdicional(0);
+      setDescAdicOpen(false);
+      setFormaPago("efectivo");
+      setRetiraDeposito(false);
+      setPorVolumen(false);
+      setDescEfectivo(true);
+    } catch (e) {
+      console.error(e);
+      if (printWin) printWin.close();
+      setError(mensajeVentaError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Genera un PRESUPUESTO (no descuenta stock). Mismo carrito y precios netos.
+  const generarPresupuesto = async () => {
+    setError(null);
+    setMsg(null);
+    if (!clienteSel) {
+      setError("Elegí el cliente del presupuesto.");
+      return;
+    }
+    const items: RemitoItem[] = lines.map((l) => ({
+      productId: l.productId,
+      codigo: l.codigo,
+      nombre: l.nombre,
+      cantidad: Math.max(1, Math.floor(Number(l.cantidad) || 0)),
+      precioVenta: Math.max(0, precioNeto(l) || 0),
+      costoUnitario: l.costoUnitario,
+      paqPorBulto: l.paqPorBulto || 1,
+    }));
+    const totalCalc = items.reduce((s, it) => s + it.precioVenta * it.cantidad, 0);
+    if (items.length === 0 || totalCalc <= 0) {
+      setError("Agregá al menos un producto con cantidad y precio válidos.");
+      return;
+    }
+    setBusy(true);
+    const printWin = window.open("", "_blank", "width=900,height=1000");
+    try {
+      const vend = vendedores.find((v) => v.uid === vendedorId);
+      const p = await crearPresupuesto({
+        items,
+        clienteId: clienteSel.id,
+        clienteNombre: clienteSel.nombre,
+        clienteCuit: clienteSel.cuit,
+        vendedorUid: vend?.uid,
+        vendedorNombre: vend?.displayName,
+        formaPago,
+        descuentos: descuentosVenta(
+          totalCalc,
+          { formaPago: fpDesc, retiraEnDeposito: retiraDeposito, porVolumen },
           {
             descuentoEfectivoPct: cfgPrecios.descuentoEfectivoPct,
             descuentoRetiroPct: cfgPrecios.descuentoRetiroPct,
@@ -416,11 +557,13 @@ function NuevaVentaView({
         createdBy: user?.uid,
       });
       if (printWin) {
-        printWin.document.write(remitoHTML(r));
+        printWin.document.write(presupuestoHTML(p));
         printWin.document.close();
         printWin.focus();
       }
-      setMsg(`Remito ${r.numero} generado. Stock descontado.`);
+      setMsg(
+        `Presupuesto ${p.numero} generado (no descuenta stock). Cuando el cliente vuelva, cargalo por su N°.`
+      );
       setLines([]);
       setClienteId("");
       setVendedorId("");
@@ -429,10 +572,65 @@ function NuevaVentaView({
       setFormaPago("efectivo");
       setRetiraDeposito(false);
       setPorVolumen(false);
+      setDescEfectivo(true);
+      setModoPresupuesto(false);
     } catch (e) {
       console.error(e);
       if (printWin) printWin.close();
-      setError(mensajeVentaError(e));
+      setError("No se pudo generar el presupuesto.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Carga un presupuesto por su N° en el carrito, para convertirlo en venta.
+  const cargarPresupuesto = async () => {
+    setError(null);
+    setMsg(null);
+    const numero = cargarNum.trim();
+    if (!numero) return;
+    if (lines.length > 0 && !confirm("Esto reemplaza el carrito actual. ¿Seguir?"))
+      return;
+    setBusy(true);
+    try {
+      const p = await buscarPresupuestoPorNumero(numero);
+      if (!p) {
+        setError(`No se encontró el presupuesto N° ${numero}.`);
+        return;
+      }
+      const nuevas: POSLine[] = p.items.map((it) => {
+        const prod = productos.find((x) => x.id === it.productId);
+        const paq = prod ? paqDeProducto(prod) : it.paqPorBulto || 1;
+        return {
+          productId: it.productId,
+          codigo: it.codigo,
+          nombre: it.nombre,
+          cantidad: it.cantidad,
+          precioVenta: it.precioVenta, // neto pactado
+          precioFijo: true, // no re-aplicar la lista al convertir
+          costoUnitario: prod ? costs[prod.id] ?? it.costoUnitario : it.costoUnitario,
+          stock: prod?.stock ?? 0,
+          precioLista: prod?.precioVenta ?? it.precioVenta,
+          imagen: prod?.imagen,
+          paqPorBulto: paq,
+        };
+      });
+      setLines(nuevas);
+      if (p.clienteId && clientes.some((c) => c.id === p.clienteId)) {
+        setClienteId(p.clienteId);
+      }
+      if (p.vendedorUid) setVendedorId(p.vendedorUid);
+      if (p.formaPago) setFormaPago(p.formaPago);
+      setPresupuestoCargadoId(p.estado === "convertido" ? null : p.id);
+      setCargarNum("");
+      setMsg(
+        `Presupuesto ${p.numero} cargado${
+          p.estado === "convertido" ? " (ojo: ya estaba convertido)" : ""
+        }. Revisá y cerrá la venta.`
+      );
+    } catch (e) {
+      console.error(e);
+      setError("No se pudo cargar el presupuesto.");
     } finally {
       setBusy(false);
     }
@@ -488,16 +686,24 @@ function NuevaVentaView({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-brand-dark">
+                        {p.codigo && (
+                          <span className="mr-1 rounded bg-primary-light px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                            {p.codigo}
+                          </span>
+                        )}
                         {p.nombre}
                       </span>
                       <span className="text-xs text-brand-dark/50">
                         {(() => {
-                          const paq =
-                            LOGISTICA_POR_EAN[p.ean ?? p.id]?.paqPorBulto || 1;
-                          if (p.precioVenta <= 0) return `Stock ${p.stock} · sin precio`;
+                          const paq = paqDeProducto(p);
+                          const stk =
+                            paq > 1
+                              ? `Stock ${Math.floor((p.stock || 0) / paq)} bultos`
+                              : `Stock ${p.stock} u`;
+                          if (p.precioVenta <= 0) return `${stk} · sin precio`;
                           return paq > 1
-                            ? `${formatARS(p.precioVenta * paq)} /bulto · ${paq} u · ${formatARS(p.precioVenta)} c/u · Stock ${p.stock}`
-                            : `${formatARS(p.precioVenta)} · Stock ${p.stock}`;
+                            ? `${formatARS(p.precioVenta * paq)} /bulto · ${paq} u · ${formatARS(p.precioVenta)} c/u · ${stk}`
+                            : `${formatARS(p.precioVenta)} · ${stk}`;
                         })()}
                       </span>
                     </span>
@@ -534,10 +740,18 @@ function NuevaVentaView({
                       />
                     </span>
                     <p className="min-w-0 flex-1 text-sm font-medium text-brand-dark">
+                      {l.codigo && (
+                        <span className="mr-1 rounded bg-primary-light px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                          {l.codigo}
+                        </span>
+                      )}
                       {l.nombre}
                       {l.cantidad > l.stock && (
                         <span className="ml-1 text-[10px] font-bold text-rose-600">
-                          ⚠ stock {l.stock}
+                          ⚠ stock{" "}
+                          {(l.paqPorBulto || 1) > 1
+                            ? `${Math.floor(l.stock / (l.paqPorBulto || 1))} bultos`
+                            : `${l.stock} u`}
                         </span>
                       )}
                     </p>
@@ -705,7 +919,13 @@ function NuevaVentaView({
           </div>
           <select
             value={clienteId}
-            onChange={(e) => setClienteId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setClienteId(id);
+              // Autocompletar el vendedor ASIGNADO al cliente (queda cambiable).
+              const c = clientes.find((x) => x.id === id);
+              if (c?.vendedorId) setVendedorId(c.vendedorId);
+            }}
             className={inputCls}
           >
             <option value="">— Elegí el cliente —</option>
@@ -729,6 +949,11 @@ function NuevaVentaView({
                   : ""}
               </p>
             )}
+          {clienteSel?.entregaDirectaFabrica && (
+            <p className="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+              🏭 Entrega directa de fábrica — esta venta NO descuenta stock.
+            </p>
+          )}
 
           <label className="mb-1 mt-3 block text-[11px] font-bold uppercase text-brand-dark/55">
             Vendedor <span className="font-normal normal-case text-brand-dark/40">(para la comisión)</span>
@@ -776,14 +1001,16 @@ function NuevaVentaView({
             <label className="flex items-center gap-2 text-sm text-brand-dark/80">
               <input
                 type="checkbox"
-                checked={formaPago === "efectivo"}
-                readOnly
-                disabled
+                checked={formaPago === "efectivo" && descEfectivo}
+                disabled={formaPago !== "efectivo"}
+                onChange={(e) => setDescEfectivo(e.target.checked)}
                 className="h-4 w-4"
               />
               Pago en efectivo ({cfgPrecios.descuentoEfectivoPct}%)
               <span className="text-xs text-brand-dark/40">
-                — según la forma de pago
+                {formaPago !== "efectivo"
+                  ? "— poné efectivo para aplicarlo"
+                  : "— destildá si este cliente no lleva descuento"}
               </span>
             </label>
             <label className="flex items-center gap-2 text-sm text-brand-dark/80">
@@ -859,12 +1086,51 @@ function NuevaVentaView({
             </p>
           )}
 
+          {/* Cargar un presupuesto por su N° para convertirlo en venta */}
+          <div className="mt-3 flex gap-2">
+            <input
+              value={cargarNum}
+              onChange={(e) => setCargarNum(e.target.value)}
+              placeholder="Cargar presupuesto N° (ej. P-000001)"
+              className="flex-1 rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+            <button
+              onClick={cargarPresupuesto}
+              disabled={busy || !cargarNum.trim()}
+              className="rounded-lg border border-primary px-3 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-white disabled:opacity-50"
+            >
+              Cargar
+            </button>
+          </div>
+
+          {/* Check: generar presupuesto en vez de remito (no descuenta stock) */}
+          <label className="mt-3 flex items-center gap-2 text-sm text-brand-dark">
+            <input
+              type="checkbox"
+              checked={modoPresupuesto}
+              onChange={(e) => setModoPresupuesto(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Generar presupuesto{" "}
+            <span className="text-xs text-brand-dark/45">
+              (no descuenta stock)
+            </span>
+          </label>
+
           <button
-            onClick={generar}
+            onClick={modoPresupuesto ? generarPresupuesto : generar}
             disabled={busy || lines.length === 0}
-            className="mt-3 w-full rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-60"
+            className={`mt-2 w-full rounded-lg px-5 py-3 font-semibold text-white shadow disabled:opacity-60 ${
+              modoPresupuesto
+                ? "bg-amber-600 hover:bg-amber-700"
+                : "bg-emerald-600 hover:bg-emerald-700"
+            }`}
           >
-            {busy ? "Generando…" : "🚚 Generar remito"}
+            {busy
+              ? "Generando…"
+              : modoPresupuesto
+              ? "📄 Generar presupuesto"
+              : "🚚 Generar remito"}
           </button>
           {lines.length > 0 && (
             <button
@@ -874,6 +1140,7 @@ function NuevaVentaView({
                 setVendedorId("");
                 setDescAdicional(0);
                 setDescAdicOpen(false);
+                setPresupuestoCargadoId(null);
               }}
               className="mt-2 w-full rounded-lg border border-brand-border px-4 py-2 text-sm font-medium hover:bg-rose-50 hover:text-rose-700"
             >
@@ -1199,6 +1466,12 @@ function FacturarView() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes" | "todo">("mes");
+  // Nota de crédito/débito a emitir sobre una factura.
+  const [notaCfg, setNotaCfg] = useState<{
+    factura: Factura;
+    clase: "credito" | "debito";
+    anular: boolean;
+  } | null>(null);
 
   // Facturas del período elegido (se acumulan y se filtran por día/semana/mes).
   const facturasFiltradas = useMemo(() => {
@@ -1535,7 +1808,10 @@ function FacturarView() {
               >
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">
-                    Factura {f.tipo} · {f.numero || f.remitoNumero}
+                    {f.esNota
+                      ? `${f.clase === "debito" ? "Nota de débito" : "Nota de crédito"} ${f.tipo}`
+                      : `Factura ${f.tipo}`}{" "}
+                    · {f.numero || f.remitoNumero}
                     <span
                       className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                         f.estado === "emitida"
@@ -1545,6 +1821,11 @@ function FacturarView() {
                     >
                       {f.estado === "emitida" ? "AFIP" : "interna"}
                     </span>
+                    {f.anulada && (
+                      <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-800">
+                        Anulada
+                      </span>
+                    )}
                   </p>
                   <span className="font-bold text-primary">
                     {formatARS(f.total)}
@@ -1573,12 +1854,180 @@ function FacturarView() {
                     >
                       🖨️ Imprimir
                     </button>
+                    {/* Solo sobre facturas emitidas (no sobre notas ni anuladas) */}
+                    {!f.esNota && f.estado === "emitida" && !f.anulada && (
+                      <>
+                        <button
+                          onClick={() =>
+                            setNotaCfg({ factura: f, clase: "credito", anular: true })
+                          }
+                          title="Anular con Nota de Crédito por el total"
+                          className="rounded-lg border border-rose-300 px-3 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                        >
+                          🚫 Anular
+                        </button>
+                        <button
+                          onClick={() =>
+                            setNotaCfg({ factura: f, clase: "credito", anular: false })
+                          }
+                          title="Nota de crédito parcial"
+                          className="rounded-lg border border-brand-border px-3 py-1 text-xs font-medium hover:bg-primary-light"
+                        >
+                          NC
+                        </button>
+                        <button
+                          onClick={() =>
+                            setNotaCfg({ factura: f, clase: "debito", anular: false })
+                          }
+                          title="Nota de débito (cargo extra)"
+                          className="rounded-lg border border-brand-border px-3 py-1 text-xs font-medium hover:bg-primary-light"
+                        >
+                          ND
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </article>
             ))}
           </div>
         )}
+      </div>
+
+      {notaCfg && (
+        <NotaModal
+          cfg={notaCfg}
+          onClose={() => setNotaCfg(null)}
+          onDone={(nota) => {
+            setNotaCfg(null);
+            openFactura(nota).catch((e) => console.error(e));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ====== Modal: emitir Nota de Crédito / Débito sobre una factura ======
+function NotaModal({
+  cfg,
+  onClose,
+  onDone,
+}: {
+  cfg: { factura: Factura; clase: "credito" | "debito"; anular: boolean };
+  onClose: () => void;
+  onDone: (nota: Factura) => void;
+}) {
+  const { factura, clase, anular } = cfg;
+  const [monto, setMonto] = useState(anular ? factura.total : 0);
+  const [motivo, setMotivo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const titulo = anular
+    ? "Anular factura (Nota de Crédito por el total)"
+    : clase === "credito"
+    ? "Nota de crédito"
+    : "Nota de débito";
+  const excedeNC =
+    clase === "credito" && monto > factura.total + 0.01;
+
+  const emitir = async () => {
+    if (busy) return;
+    const total = Math.round((Number(monto) || 0) * 100) / 100;
+    if (total <= 0) {
+      setErr("Poné un importe válido.");
+      return;
+    }
+    if (excedeNC) {
+      setErr("La nota de crédito no puede superar el total de la factura.");
+      return;
+    }
+    if (
+      !confirm(
+        `Se va a emitir en AFIP una ${titulo.toLowerCase()} por ${formatARS(total)} sobre la factura ${factura.numero}. Esto es un comprobante fiscal REAL. ¿Confirmás?`
+      )
+    )
+      return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const nota = await emitirNotaAfip({
+        facturaId: factura.id,
+        clase,
+        total: anular ? undefined : total,
+        motivo: motivo.trim() || undefined,
+      });
+      onDone(nota);
+    } catch (e) {
+      setErr(mensajeFacturaError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl">
+        <h3 className="font-serif text-lg text-brand-dark">{titulo}</h3>
+        <p className="mb-3 text-xs text-brand-dark/55">
+          Sobre la factura <b>{factura.numero}</b> ({factura.tipo}) ·{" "}
+          {formatARS(factura.total)}.
+          {clase === "credito"
+            ? " Le devuelve/baja al cliente."
+            : " Le suma un cargo al cliente."}
+        </p>
+
+        <label className="block text-sm">
+          <span className="font-medium text-brand-dark">Importe</span>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            value={monto || ""}
+            disabled={anular}
+            onChange={(e) => setMonto(Number(e.target.value) || 0)}
+            className="mt-1 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+          />
+          {anular && (
+            <span className="mt-1 block text-[11px] text-brand-dark/45">
+              Anular emite la nota por el total de la factura.
+            </span>
+          )}
+        </label>
+
+        <label className="mt-3 block text-sm">
+          <span className="font-medium text-brand-dark">Motivo (opcional)</span>
+          <input
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ej. devolución de mercadería"
+            className="mt-1 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+          />
+        </label>
+
+        {err && (
+          <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {err}
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg border border-brand-border px-4 py-2 text-sm"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={emitir}
+            disabled={busy || excedeNC}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {busy ? "Emitiendo en AFIP…" : "Emitir en AFIP"}
+          </button>
+        </div>
       </div>
     </div>
   );

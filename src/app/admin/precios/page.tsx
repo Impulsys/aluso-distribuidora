@@ -8,12 +8,45 @@ import {
   type PreciosConfig,
   type ListaPrecio,
 } from "@/lib/preciosConfig";
-import { MARKUP_DISTRIBUIDOR } from "@/lib/precios";
+import { MARKUP_DISTRIBUIDOR, precioParaLista } from "@/lib/precios";
+import { useProducts } from "@/hooks/useProducts";
 
 export default function AdminPreciosPage() {
   const [cfg, setCfg] = useState<PreciosConfig>(DEFAULT_PRECIOS_CONFIG);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
+  const productos = useProducts();
+
+  // Descarga las listas de precios en Excel (CSV que abre Excel): una columna
+  // por lista. Es lo que los vendedores usan para cotizar.
+  const descargarExcel = () => {
+    const listas = cfg.listas;
+    const sep = ";";
+    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+    const num = (n: number) => n.toFixed(2).replace(".", ",");
+    const cabecera = ["Código", "Producto", ...listas.map((l) => `${l.nombre} (${l.markup}%)`)]
+      .map(esc)
+      .join(sep);
+    const filas = productos
+      .filter((p) => (p.precioVenta ?? 0) > 0)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .map((p) =>
+        [
+          esc(p.codigo ?? ""),
+          esc(p.nombre),
+          ...listas.map((l) => num(precioParaLista(p.precioVenta, l.markup))),
+        ].join(sep)
+      );
+    const csv = "﻿" + [cabecera, ...filas].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const hoy = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `listas-precios-aluso-${hoy}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     const unsub = subscribePreciosConfig((c) => {
@@ -141,7 +174,18 @@ export default function AdminPreciosPage() {
           >
             Guardar listas
           </button>
+          <button
+            onClick={descargarExcel}
+            title="Descarga un Excel con todos los productos y el precio de cada lista"
+            className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+          >
+            📊 Descargar Excel
+          </button>
         </div>
+        <p className="mt-2 text-[11px] text-brand-dark/50">
+          El Excel trae cada producto con el precio de todas las listas — listo
+          para mandarles a los vendedores.
+        </p>
       </section>
 
       {/* ===== DESCUENTOS ===== */}

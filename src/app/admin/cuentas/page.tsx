@@ -18,6 +18,12 @@ import {
   saldoCompra,
 } from "@/lib/cuentas";
 import { createExpense } from "@/lib/cashflow";
+import { incrementStock, setProductCost } from "@/lib/admin";
+import { useProducts } from "@/hooks/useProducts";
+import { LOGISTICA_POR_EAN } from "@/data/logistica";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+import { subscribeIaConfig, DEFAULT_IA_CONFIG } from "@/lib/iaConfig";
 import { DENOMINACIONES, totalArqueo } from "@/lib/caja";
 import { formatARS, tsFromISO } from "@/lib/format";
 import {
@@ -78,6 +84,24 @@ export default function AdminCuentasPage() {
   const [cMontoB, setCMontoB] = useState(0);
   const [cProvB, setCProvB] = useState(""); // lo NO facturado suele ir a otra razón social
   const [cBusy, setCBusy] = useState(false);
+  // Mercadería que trajo el camión. Al registrar la compra, cada renglón SUMA
+  // stock automático (bultos × unidades por bulto), así no hay que ir a Productos
+  // uno por uno. `bultos` es lo que se carga; las unidades se calculan.
+  const [recibido, setRecibido] = useState<
+    {
+      productId: string;
+      nombre: string;
+      ean?: string;
+      bultos: number;
+      costoUnitario?: number; // costo leído de la factura (para actualizar)
+    }[]
+  >([]);
+  const [rBusca, setRBusca] = useState(""); // buscador de productos para agregar
+  // IA: leer factura por foto
+  const [iaCfg, setIaCfg] = useState(DEFAULT_IA_CONFIG);
+  const [iaBusy, setIaBusy] = useState(false);
+  const [iaMsg, setIaMsg] = useState<string | null>(null);
+  const [actualizarCostos, setActualizarCostos] = useState(true);
 
   // Form: nuevo pago
   const [gProv, setGProv] = useState("");
@@ -120,6 +144,159 @@ export default function AdminCuentasPage() {
     () => purchases.filter((p) => p.proveedorId === gProv),
     [purchases, gProv]
   );
+
+  // Catálogo (para la mercadería recibida que suma stock).
+  const productos = useProducts();
+  const paqDe = (ean?: string, id?: string) =>
+    LOGISTICA_POR_EAN[ean ?? id ?? ""]?.paqPorBulto || 1;
+
+  // Resultados del buscador de productos (excluye lo ya agregado).
+  const rResultados = useMemo(() => {
+    const t = rBusca.trim().toLowerCase();
+    if (!t) return [];
+    const yaId = new Set(recibido.map((r) => r.productId));
+    return productos
+      .filter((p) => !yaId.has(p.id))
+      .filter(
+        (p) =>
+          p.nombre.toLowerCase().includes(t) ||
+          (p.codigo ?? "").toLowerCase().includes(t) ||
+          (p.ean ?? "").toLowerCase().includes(t)
+      )
+      .slice(0, 6);
+  }, [rBusca, productos, recibido]);
+
+  const agregarRecibido = (p: (typeof productos)[number]) => {
+    setRecibido((rs) =>
+      rs.some((r) => r.productId === p.id)
+        ? rs
+        : [...rs, { productId: p.id, nombre: p.nombre, ean: p.ean, bultos: 1 }]
+    );
+    setRBusca("");
+  };
+  const setBultos = (id: string, bultos: number) =>
+    setRecibido((rs) =>
+      rs.map((r) =>
+        r.productId === id ? { ...r, bultos: Math.max(0, bultos) } : r
+      )
+    );
+  const quitarRecibido = (id: string) =>
+    setRecibido((rs) => rs.filter((r) => r.productId !== id));
+
+  useEffect(() => subscribeIaConfig(setIaCfg), []);
+
+  // Matchea un ítem leído de la factura con un producto del catálogo:
+  // por código interno, por EAN, o por nombre (coincidencia de palabras).
+  const matchProducto = (item: { descripcion?: string; codigo?: string }) => {
+    const cod = (item.codigo ?? "").trim().toLowerCase();
+    if (cod) {
+      const porCod = productos.find(
+        (p) => (p.codigo ?? "").toLowerCase() === cod || (p.ean ?? "") === cod
+      );
+      if (porCod) return porCod;
+    }
+    const desc = (item.descripcion ?? "").toLowerCase();
+    if (desc.length >= 4) {
+      const palabras = desc.split(/\s+/).filter((w) => w.length >= 4);
+      return productos.find((p) => {
+        const n = p.nombre.toLowerCase();
+        return palabras.filter((w) => n.includes(w)).length >= 2;
+      });
+    }
+    return undefined;
+  };
+
+  // Lee la factura del proveedor por foto (IA) y precarga el formulario.
+  const leerFacturaIA = async (file: File) => {
+    setIaMsg(null);
+    setIaBusy(true);
+    try {
+      const dataUrl: string = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result));
+        fr.onerror = () => rej(fr.error);
+        fr.readAsDataURL(file);
+      });
+      const call = httpsCallable(functions, "leerFacturaProveedor");
+      const resp = await call({ imageBase64: dataUrl, mimeType: file.type });
+      const d = (resp.data ?? {}) as {
+        proveedor?: string;
+        cuit?: string;
+        fecha?: string;
+        numero?: string;
+        tipo?: string;
+        total?: number;
+        items?: {
+          descripcion?: string;
+          codigo?: string;
+          cantidad?: number;
+          costoUnitario?: number;
+        }[];
+      };
+
+      // Cabecera
+      if (d.fecha && /^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) setCFecha(d.fecha);
+      const cuit = (d.cuit ?? "").replace(/\D/g, "");
+      const prov =
+        (cuit && proveedores.find((p) => (p.cuit ?? "").replace(/\D/g, "") === cuit)) ||
+        (d.proveedor &&
+          proveedores.find((p) =>
+            p.nombre.toLowerCase().includes(d.proveedor!.toLowerCase().slice(0, 6))
+          ));
+      if (prov) setCProv(prov.id);
+      const total = Number(d.total) || 0;
+      if ((d.tipo ?? "").toUpperCase() === "A") {
+        if (d.numero) setCNumFacturaA(d.numero);
+        if (total) setCMontoA(total);
+      } else {
+        if (d.numero) setCNumRemitoB(d.numero);
+        if (total) setCMontoB(total);
+      }
+
+      // Ítems → mercadería recibida (matcheando con el catálogo)
+      const items = d.items ?? [];
+      const nuevos: typeof recibido = [];
+      let sinMatch = 0;
+      for (const it of items) {
+        const p = matchProducto(it);
+        if (!p) {
+          sinMatch++;
+          continue;
+        }
+        nuevos.push({
+          productId: p.id,
+          nombre: p.nombre,
+          ean: p.ean,
+          bultos: Math.max(1, Math.round(Number(it.cantidad) || 1)),
+          costoUnitario: Number(it.costoUnitario) || undefined,
+        });
+      }
+      // Merge sin duplicar
+      setRecibido((rs) => {
+        const ya = new Set(rs.map((r) => r.productId));
+        return [...rs, ...nuevos.filter((n) => !ya.has(n.productId))];
+      });
+
+      setIaMsg(
+        `Leído${prov ? ` · proveedor: ${prov.nombre}` : " (proveedor no reconocido, elegilo)"} · ` +
+          `${nuevos.length} ítem(s) matcheados${sinMatch ? `, ${sinMatch} sin match (cargalos a mano)` : ""}. ` +
+          `⚠️ Revisá cantidades (en BULTOS), montos y proveedor antes de registrar.`
+      );
+    } catch (e) {
+      console.error(e);
+      const m = (e as { message?: string }).message ?? "";
+      setIaMsg(
+        "No se pudo leer la factura." +
+          (m.includes("API key") || m.includes("inválida")
+            ? " Revisá la API key en Configuración de IA."
+            : m.includes("crédito") || m.includes("límite")
+            ? " Tu cuenta de OpenAI está sin crédito o con límite."
+            : "")
+      );
+    } finally {
+      setIaBusy(false);
+    }
+  };
 
   const handleAddProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +370,24 @@ export default function AdminCuentasPage() {
           createdBy: user?.uid,
         });
       }
+      // Mercadería del camión → suma stock automático (bultos × u/bulto).
+      // Va después de registrar la deuda: si la compra falló, no tocamos stock.
+      const numeroRef = cNumFacturaA.trim() || cNumRemitoB.trim();
+      const motivo = `Recepción · ${prov.nombre}${numeroRef ? ` · ${numeroRef}` : ""}`;
+      let sumados = 0;
+      let costosActualizados = 0;
+      for (const r of recibido) {
+        if (r.bultos <= 0) continue;
+        const unidades = r.bultos * paqDe(r.ean, r.productId);
+        await incrementStock(r.productId, unidades, motivo);
+        sumados++;
+        // Actualizar el precio de costo con el de la factura (si vino de la IA).
+        if (actualizarCostos && r.costoUnitario && r.costoUnitario > 0) {
+          await setProductCost(r.productId, r.costoUnitario).catch(() => {});
+          costosActualizados++;
+        }
+      }
+
       // Reset (mantiene el proveedor para cargar varias compras seguidas).
       setCNumFacturaA("");
       setCMontoA(0);
@@ -200,7 +395,18 @@ export default function AdminCuentasPage() {
       setCNumRemitoB("");
       setCMontoB(0);
       setCProvB("");
-      setCreado(prov.nombre);
+      setRecibido([]);
+      setRBusca("");
+      setIaMsg(null);
+      setCreado(
+        prov.nombre +
+          (sumados
+            ? ` · ${sumados} producto${sumados === 1 ? "" : "s"} sumado${sumados === 1 ? "" : "s"} al stock`
+            : "") +
+          (costosActualizados
+            ? ` · ${costosActualizados} costo${costosActualizados === 1 ? "" : "s"} actualizado${costosActualizados === 1 ? "" : "s"}`
+            : "")
+      );
     } catch (err) {
       console.error(err);
       setError("No se pudo registrar la compra.");
@@ -469,6 +675,42 @@ export default function AdminCuentasPage() {
             Cargá la factura o el remito que te dejó el proveedor. Queda como
             deuda en su cuenta corriente.
           </p>
+
+          {/* IA: leer la factura por foto y precargar todo */}
+          {iaCfg.habilitada && (
+            <div className="mb-3 rounded-lg border border-primary/30 bg-primary-light/30 p-3">
+              <label
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white ${
+                  iaBusy ? "bg-primary/60" : "bg-primary hover:bg-primary-dark"
+                }`}
+              >
+                {iaBusy ? "Leyendo la factura…" : "📸 Leer factura por foto (IA)"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  disabled={iaBusy}
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) leerFacturaIA(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <p className="mt-1 text-[10px] text-brand-dark/55">
+                Sacá o subí la foto de la factura del proveedor: la IA precarga
+                proveedor, fecha, número, monto y la mercadería. Revisá antes de
+                registrar.
+              </p>
+              {iaMsg && (
+                <p className="mt-2 rounded bg-white px-2 py-1.5 text-[11px] text-brand-dark">
+                  {iaMsg}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -607,6 +849,101 @@ export default function AdminCuentasPage() {
                 La deuda va a la cuenta que elijas acá. Si lo facturado y lo no
                 facturado son de razones sociales distintas, elegí una en cada uno.
               </p>
+            </div>
+
+            {/* Mercadería del camión → suma stock automático */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+              <p className="mb-1 text-[11px] font-semibold text-emerald-900">
+                📦 Mercadería recibida (opcional · suma stock)
+              </p>
+              <p className="mb-2 text-[10px] text-brand-dark/55">
+                Cargá lo que trajo el camión en <b>bultos</b>. Al registrar la
+                compra, el stock sube solo (no hace falta ir a Productos).
+              </p>
+
+              <div className="relative">
+                <input
+                  value={rBusca}
+                  onChange={(e) => setRBusca(e.target.value)}
+                  placeholder="Buscar producto por nombre o código…"
+                  className="w-full rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                />
+                {rResultados.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-brand-border bg-white shadow-lg">
+                    {rResultados.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => agregarRecibido(p)}
+                        className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-primary-light"
+                      >
+                        <span className="truncate text-brand-dark">{p.nombre}</span>
+                        <span className="shrink-0 text-[10px] text-brand-dark/45">
+                          {paqDe(p.ean, p.id)} u/bulto · stock {p.stock}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {recibido.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {recibido.map((r) => {
+                    const paq = paqDe(r.ean, r.productId);
+                    return (
+                      <li
+                        key={r.productId}
+                        className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs"
+                      >
+                        <span className="flex-1 truncate text-brand-dark">
+                          {r.nombre}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={r.bultos || ""}
+                          onChange={(e) =>
+                            setBultos(r.productId, Number(e.target.value) || 0)
+                          }
+                          className="w-16 rounded border border-brand-border px-1.5 py-1 text-center text-xs tabular-nums"
+                        />
+                        <span className="w-24 shrink-0 text-[10px] text-brand-dark/55">
+                          bultos · = {r.bultos * paq} u
+                        </span>
+                        {r.costoUnitario ? (
+                          <span className="w-20 shrink-0 text-right text-[10px] text-emerald-700">
+                            costo {formatARS(r.costoUnitario)}
+                          </span>
+                        ) : (
+                          <span className="w-20 shrink-0" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => quitarRecibido(r.productId)}
+                          className="shrink-0 text-brand-dark/40 hover:text-red-600"
+                          title="Quitar"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {recibido.some((r) => r.costoUnitario) && (
+                <label className="mt-2 flex items-center gap-2 text-[11px] text-brand-dark">
+                  <input
+                    type="checkbox"
+                    checked={actualizarCostos}
+                    onChange={(e) => setActualizarCostos(e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Actualizar el precio de costo de los productos con el de la
+                  factura
+                </label>
+              )}
             </div>
 
           </div>

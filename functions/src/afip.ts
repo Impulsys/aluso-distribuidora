@@ -130,6 +130,11 @@ export interface CaeParams {
   docNro: number;
   condicionIvaReceptorId: number; // 1=RI, 4=Exento, 5=CF, 6=Monotributo
   fechaStr: string; // YYYYMMDD
+  /**
+   * Comprobantes asociados (obligatorio en Notas de Crédito/Débito): apuntan a la
+   * factura original que la nota revierte o ajusta.
+   */
+  cbtesAsoc?: { tipo: number; ptoVenta: number; numero: number }[];
 }
 
 export interface CaeResult {
@@ -184,6 +189,16 @@ export async function requestCAE(p: CaeParams): Promise<CaeResult> {
         Id: i.Id,
         BaseImp: i.BaseImp,
         Importe: i.Importe,
+      })),
+    };
+  }
+  // Nota de Crédito/Débito: referencia obligatoria a la factura original.
+  if (p.cbtesAsoc && p.cbtesAsoc.length > 0) {
+    detalle.CbtesAsoc = {
+      CbteAsoc: p.cbtesAsoc.map((c) => ({
+        Tipo: c.tipo,
+        PtoVta: c.ptoVenta,
+        Nro: c.numero,
       })),
     };
   }

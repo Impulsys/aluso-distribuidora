@@ -65,10 +65,14 @@ export async function anularRemito(
     if (orderRef) await tx.get(orderRef);
 
     // ---- ESCRITURAS ----
-    items.forEach((it, i) => {
-      const actual = (productSnaps[i].data()?.stock as number) ?? 0;
-      tx.set(productRefs[i], { stock: actual + it.cantidad }, { merge: true });
-    });
+    // Si la venta era "entrega directa de fábrica" no descontó stock, así que
+    // tampoco se lo devolvemos al anular (sino sumaría stock que nunca salió).
+    if (!data.sinStock) {
+      items.forEach((it, i) => {
+        const actual = (productSnaps[i].data()?.stock as number) ?? 0;
+        tx.set(productRefs[i], { stock: actual + it.cantidad }, { merge: true });
+      });
+    }
 
     tx.set(
       remitoRef,
@@ -116,24 +120,175 @@ export async function updateRemitoMeta(
   logActivity("Editó datos de venta", { entidad: "remito", entidadId: id });
 }
 
+/**
+ * DEVOLUCIÓN parcial de un remito (ej. llegó un bulto menos al cliente).
+ * Atómico: DEVUELVE el stock del producto (salvo entrega de fábrica, que nunca
+ * lo descontó) y registra la devolución en el remito, lo que BAJA la deuda del
+ * cliente por su monto (ver totalNetoRemito en cobros.ts). `cantidad` en unidades.
+ * No permite devolver más de lo que había en el remito.
+ */
+export async function registrarDevolucion(
+  remito: Remito,
+  productId: string,
+  cantidadUnidades: number,
+  por?: string
+): Promise<void> {
+  const cant = Math.floor(Number(cantidadUnidades) || 0);
+  if (cant <= 0) throw new Error("CANTIDAD_INVALIDA");
+  const remitoRef = doc(db, "remitos", remito.id);
+  const productRef = doc(db, "products", productId);
+
+  await runTransaction(db, async (tx) => {
+    const rSnap = await tx.get(remitoRef);
+    if (!rSnap.exists()) throw new Error("REMITO_NO_EXISTE");
+    const data = rSnap.data() as Remito;
+    if (data.anulado) throw new Error("REMITO_ANULADO");
+    const item = (data.items ?? []).find((i) => i.productId === productId);
+    if (!item) throw new Error("ITEM_NO_ESTA_EN_REMITO");
+    const yaDevuelto = (data.devoluciones ?? [])
+      .filter((d) => d.productId === productId)
+      .reduce((s, d) => s + d.cantidad, 0);
+    if (yaDevuelto + cant > item.cantidad) {
+      throw new Error("DEVUELVE_MAS_DE_LO_VENDIDO");
+    }
+    const pSnap = await tx.get(productRef); // lectura antes de escribir
+    const monto = Math.round(cant * item.precioVenta * 100) / 100;
+    const nueva = {
+      productId,
+      nombre: item.nombre,
+      cantidad: cant,
+      monto,
+      fecha: Date.now(),
+      por: por ?? null,
+    };
+    tx.set(
+      remitoRef,
+      { devoluciones: [...(data.devoluciones ?? []), nueva] },
+      { merge: true }
+    );
+    // Devuelve stock solo si la venta lo había descontado (no en entrega fábrica).
+    if (!data.sinStock) {
+      const actual = (pSnap.data()?.stock as number) ?? 0;
+      tx.set(productRef, { stock: actual + cant }, { merge: true });
+    }
+  });
+
+  logActivity("Registró devolución", {
+    detalle: `${remito.numero} · devolución`,
+    entidad: "remito",
+    entidadId: remito.id,
+  });
+}
+
+/**
+ * Edita los ÍTEMS de un remito (cantidades / sacar productos) SIN anular y
+ * rehacer. Atómico: ajusta el stock por la diferencia (devuelve lo que sacaste,
+ * descuenta lo que agregaste — salvo entrega de fábrica), y recalcula el total y
+ * los descuentos. No se puede editar un remito YA FACTURADO (para eso va una nota
+ * de crédito) ni uno anulado.
+ * `nuevosItems` = la lista final de ítems (con su cantidad en UNIDADES).
+ */
+export async function editarItemsRemito(
+  remito: Remito,
+  nuevosItems: RemitoItem[]
+): Promise<void> {
+  const remitoRef = doc(db, "remitos", remito.id);
+  // Ids de todos los productos involucrados (viejos + nuevos), sin repetir.
+  const ids = new Set<string>();
+  (remito.items ?? []).forEach((it) => ids.add(it.productId));
+  nuevosItems.forEach((it) => ids.add(it.productId));
+  const idList = [...ids];
+  const productRefs = idList.map((id) => doc(db, "products", id));
+
+  await runTransaction(db, async (tx) => {
+    const rSnap = await tx.get(remitoRef);
+    if (!rSnap.exists()) throw new Error("REMITO_NO_EXISTE");
+    const data = rSnap.data() as Remito;
+    if (data.anulado) throw new Error("REMITO_ANULADO");
+    if (data.facturaId) throw new Error("REMITO_YA_FACTURADO");
+
+    const snaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
+
+    // Cantidades viejas y nuevas por producto (en unidades).
+    const viejo = new Map<string, number>();
+    (data.items ?? []).forEach((it) =>
+      viejo.set(it.productId, (viejo.get(it.productId) ?? 0) + it.cantidad)
+    );
+    const nuevo = new Map<string, number>();
+    nuevosItems.forEach((it) =>
+      nuevo.set(it.productId, (nuevo.get(it.productId) ?? 0) + it.cantidad)
+    );
+
+    // Recalcular total y descuentos sobre el nuevo subtotal.
+    const subtotal = nuevosItems.reduce(
+      (s, it) => s + it.precioVenta * it.cantidad,
+      0
+    );
+    let running = subtotal;
+    const descuentos = (data.descuentos ?? []).map((d) => {
+      const after = running * (1 - (d.pct || 0) / 100);
+      const monto = Math.round((after - running) * 100) / 100;
+      running = after;
+      return { concepto: d.concepto, pct: d.pct, monto };
+    });
+    const descTotal = descuentos.reduce((s, d) => s + d.monto, 0);
+    const total = Math.round((subtotal + descTotal + Number.EPSILON) * 100) / 100;
+
+    // Escrituras: ítems + totales.
+    tx.set(
+      remitoRef,
+      {
+        items: nuevosItems,
+        subtotal: Math.round(subtotal * 100) / 100,
+        descuentos,
+        total,
+      },
+      { merge: true }
+    );
+
+    // Ajuste de stock por la diferencia (salvo entrega de fábrica).
+    if (!data.sinStock) {
+      idList.forEach((id, i) => {
+        const delta = (nuevo.get(id) ?? 0) - (viejo.get(id) ?? 0); // + = se agregó
+        if (delta === 0) return;
+        const actual = (snaps[i].data()?.stock as number) ?? 0;
+        tx.set(productRefs[i], { stock: actual - delta }, { merge: true });
+      });
+    }
+  });
+
+  logActivity("Editó ítems de venta", {
+    detalle: `${remito.numero}`,
+    entidad: "remito",
+    entidadId: remito.id,
+  });
+}
+
 interface RemitoMeta {
   orderId?: string;
   origin?: Remito["origin"];
   clienteId?: string;
   clienteNombre?: string;
   clienteCuit?: string;
+  clienteDireccion?: string;
   vendedorUid?: string;
   vendedorNombre?: string;
   formaPago?: FormaPago;
   /** Descuentos por condición ya calculados al cerrar la venta. */
   descuentos?: Remito["descuentos"];
   createdBy?: string;
+  /**
+   * Entrega directa de fábrica: la venta se factura pero NO sale del depósito de
+   * ALUSO, así que NO descuenta stock. Se guarda en el remito para que anular
+   * tampoco lo devuelva.
+   */
+  sinStock?: boolean;
 }
 
 /**
  * Crea el remito + descuenta stock + asigna nº de guía + (opcional) marca el
  * pedido como entregado, TODO en una transacción atómica:
- *  - valida que haya stock suficiente (no permite negativo),
+ *  - permite stock NEGATIVO (backorder): la venta nunca se bloquea por faltante,
  *  - el nº de guía solo se consume si la operación completa OK,
  *  - si hay orderId, aborta si el pedido ya tiene remito (evita doble remito).
  */
@@ -154,6 +309,7 @@ async function persistRemito(
     clienteId: meta.clienteId ?? null,
     clienteNombre: meta.clienteNombre ?? null,
     clienteCuit: meta.clienteCuit ?? null,
+    clienteDireccion: meta.clienteDireccion ?? null,
     vendedorUid: meta.vendedorUid ?? null,
     vendedorNombre: meta.vendedorNombre ?? null,
     formaPago: meta.formaPago ?? "efectivo",
@@ -162,6 +318,7 @@ async function persistRemito(
     descuentos,
     total,
     createdBy: meta.createdBy ?? null,
+    sinStock: meta.sinStock ?? false,
     createdAt: now,
     fecha: now,
   };
@@ -184,11 +341,10 @@ async function persistRemito(
     const stocks = productSnaps.map(
       (snap) => (snap.data()?.stock as number) ?? 0
     );
-    items.forEach((it, i) => {
-      if (stocks[i] < it.cantidad) {
-        throw new Error(`STOCK_INSUFICIENTE|${it.nombre}|${stocks[i]}`);
-      }
-    });
+    // BACKORDER: se permite vender aunque no haya stock (queda NEGATIVO).
+    // El faltante se ve en rojo en Productos y aparece en la solapa "Pedido al
+    // proveedor" para reponer; cuando llega la compra, el stock se corrige solo.
+    // (Antes esto tiraba STOCK_INSUFICIENTE y bloqueaba la venta.)
 
     const seq = ((counterSnap.data()?.remitoSeq as number) ?? 0) + 1;
     const num = `R-${String(seq).padStart(6, "0")}`;
@@ -196,9 +352,13 @@ async function persistRemito(
     // ---- ESCRITURAS ----
     tx.set(counterRef, { remitoSeq: seq }, { merge: true });
     tx.set(remitoRef, { numero: num, ...base });
-    items.forEach((it, i) => {
-      tx.set(productRefs[i], { stock: stocks[i] - it.cantidad }, { merge: true });
-    });
+    // Entrega directa de fábrica: NO descontar stock (la mercadería no sale de
+    // nuestro depósito). La venta y la deuda del cliente se registran igual.
+    if (!meta.sinStock) {
+      items.forEach((it, i) => {
+        tx.set(productRefs[i], { stock: stocks[i] - it.cantidad }, { merge: true });
+      });
+    }
     if (orderRef) {
       tx.set(
         orderRef,
@@ -269,22 +429,26 @@ export async function crearRemitoDirecto(input: {
   clienteId?: string;
   clienteNombre?: string;
   clienteCuit?: string;
+  clienteDireccion?: string;
   vendedorUid?: string;
   vendedorNombre?: string;
   formaPago?: FormaPago;
   descuentos?: Remito["descuentos"];
   createdBy?: string;
+  sinStock?: boolean;
 }): Promise<Remito> {
   return persistRemito(input.items, {
     origin: "vendedor",
     clienteId: input.clienteId,
     clienteNombre: input.clienteNombre,
     clienteCuit: input.clienteCuit,
+    clienteDireccion: input.clienteDireccion,
     vendedorUid: input.vendedorUid,
     vendedorNombre: input.vendedorNombre,
     formaPago: input.formaPago,
     descuentos: input.descuentos,
     createdBy: input.createdBy,
+    sinStock: input.sinStock,
   });
 }
 

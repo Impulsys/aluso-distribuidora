@@ -33,3 +33,20 @@ export function mensajeFacturaError(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? "";
   return msg || "No se pudo emitir la factura. Reintentá en unos minutos.";
 }
+
+// ===== Notas de Crédito / Débito =====
+export interface EmitirNotaInput {
+  facturaId: string;
+  clase: "credito" | "debito";
+  /** Ausente en crédito = anula el total de la factura. */
+  total?: number;
+  motivo?: string;
+}
+
+const fnNota = httpsCallable<EmitirNotaInput, Factura>(functions, "emitirNotaAfip");
+
+/** Emite una Nota de Crédito o Débito asociada a una factura (con CAE + QR). */
+export async function emitirNotaAfip(input: EmitirNotaInput): Promise<Factura> {
+  const res = await fnNota(input);
+  return res.data;
+}

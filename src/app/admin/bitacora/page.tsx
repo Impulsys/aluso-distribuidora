@@ -14,6 +14,7 @@ const ROLE_CHIP: Record<Role, string> = {
   socio: "bg-amber-100 text-amber-800",
   superadmin: "bg-emerald-100 text-emerald-800",
   contador: "bg-violet-100 text-violet-800",
+  deposito: "bg-teal-100 text-teal-800",
 };
 
 function fechaHora(ts: number): { fecha: string; hora: string } {
@@ -28,10 +29,16 @@ function fechaHora(ts: number): { fecha: string; hora: string } {
   };
 }
 
+const TANDA = 50; // cuántos movimientos se pintan por tanda ("Ver más")
+
 export default function BitacoraPage() {
   const [entries, setEntries] = useState<BitacoraEntry[]>([]);
   const [dia, setDia] = useState(""); // YYYY-MM-DD; vacío = recientes
   const [q, setQ] = useState("");
+  // Cuántos movimientos se muestran. Se pinta de a tandas para que la lista no
+  // dibuje los 400 registros de golpe (eso hacía que la pestaña tardara ~375ms
+  // en aparecer). Con 50 el render es instantáneo y el resto se carga a pedido.
+  const [limite, setLimite] = useState(TANDA);
 
   useEffect(() => {
     if (!dia) {
@@ -53,6 +60,16 @@ export default function BitacoraPage() {
         (e.detalle ?? "").toLowerCase().includes(t)
     );
   }, [entries, q]);
+
+  // Al cambiar de día o de búsqueda, volver a arrancar desde la primera tanda.
+  useEffect(() => {
+    setLimite(TANDA);
+  }, [dia, q]);
+
+  const mostradas = useMemo(
+    () => visible.slice(0, limite),
+    [visible, limite]
+  );
 
   return (
     <div>
@@ -106,7 +123,7 @@ export default function BitacoraPage() {
           </p>
         ) : (
           <ul className="divide-y divide-brand-border">
-            {visible.map((e) => {
+            {mostradas.map((e) => {
               const { fecha, hora } = fechaHora(e.ts);
               return (
                 <li
@@ -150,6 +167,17 @@ export default function BitacoraPage() {
               );
             })}
           </ul>
+        )}
+
+        {visible.length > limite && (
+          <div className="border-t border-brand-border px-4 py-3 text-center">
+            <button
+              onClick={() => setLimite((l) => l + TANDA)}
+              className="rounded-lg bg-primary-light px-4 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-white"
+            >
+              Ver más · mostrando {mostradas.length} de {visible.length}
+            </button>
+          </div>
         )}
       </div>
     </div>

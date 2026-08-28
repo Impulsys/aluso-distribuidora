@@ -27,6 +27,15 @@ export default function Header() {
     }
   }, [loading, user, pathname, router]);
 
+  // El depósito ídem: entra directo a su área /deposito (envíos + armado, sin
+  // precios). No pasa por la portada ni el catálogo.
+  useEffect(() => {
+    if (loading || user?.role !== "deposito") return;
+    if (["/", "/login", "/catalogo"].includes(pathname)) {
+      router.replace("/deposito");
+    }
+  }, [loading, user, pathname, router]);
+
   // Bloquear scroll del body cuando el menú móvil está abierto
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
@@ -38,12 +47,15 @@ export default function Header() {
 
   const navLinks = (
     <>
-      <Link
-        href="/catalogo"
-        className="rounded px-3 py-2 hover:bg-primary-dark"
-      >
-        Catálogo
-      </Link>
+      {/* El depósito no vende: no ve el catálogo, solo su área. */}
+      {user?.role !== "deposito" && (
+        <Link
+          href="/catalogo"
+          className="rounded px-3 py-2 hover:bg-primary-dark"
+        >
+          Catálogo
+        </Link>
+      )}
       {can.venderConPanel(user?.role) && (
         <Link
           href="/vendedor"
@@ -74,6 +86,14 @@ export default function Header() {
           className="rounded px-3 py-2 hover:bg-primary-dark"
         >
           Contaduría
+        </Link>
+      )}
+      {user?.role === "deposito" && (
+        <Link
+          href="/deposito"
+          className="rounded px-3 py-2 hover:bg-primary-dark"
+        >
+          Depósito
         </Link>
       )}
     </>

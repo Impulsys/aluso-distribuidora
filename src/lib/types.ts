@@ -1,6 +1,12 @@
 ﻿// ===== Tipos del dominio — ALUSO DISTRIBUIDORA =====
 
-export type Role = "cliente" | "vendedor" | "socio" | "superadmin" | "contador";
+export type Role =
+  | "cliente"
+  | "vendedor"
+  | "socio"
+  | "superadmin"
+  | "contador"
+  | "deposito";
 
 export const ROLE_LABELS: Record<Role, string> = {
   cliente: "Cliente",
@@ -8,6 +14,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   socio: "Socio administrador",
   superadmin: "Superadmin",
   contador: "Contador",
+  deposito: "Depósito",
 };
 
 export interface AppUser {
@@ -113,6 +120,14 @@ export interface Cliente {
    */
   markupLista?: number;
   descuentoExtraPct?: number;
+  /** Notas libres del cliente (horarios de entrega, quién recibe, etc.). */
+  observaciones?: string;
+  /**
+   * Entrega directa de fábrica: el pedido de este cliente se despacha desde la
+   * fábrica, no desde el depósito de ALUSO. Al facturarle, la venta NO descuenta
+   * stock (pero sí cuenta como venta y deuda). Ver ventas.ts (sinStock).
+   */
+  entregaDirectaFabrica?: boolean;
   createdAt: number;
 }
 
@@ -140,6 +155,13 @@ export interface Product {
   destacado?: boolean; // switch en Admin → aparece en el banner superior
   precioOferta?: number; // si > 0 y < precioVenta → muestra "OFERTA"
   eliminado?: boolean; // borrado lógico desde Admin (se oculta del catálogo y del admin)
+  /**
+   * Unidades por bulto configuradas A MANO (pisan la tabla `logistica.ts`).
+   * Si es 0/ausente, se usa el dato de LOGISTICA_POR_EAN (o 1 si no hay).
+   */
+  unidadesPorBulto?: number;
+  /** Bultos que entran en un palet (para $ x palet y armado). 0/ausente = sin dato. */
+  bultosPorPalet?: number;
 }
 
 export interface CartItem {
@@ -197,6 +219,39 @@ export interface RemitoItem {
   cantidad: number;
   precioVenta: number; // ARS por unidad al momento de la venta
   costoUnitario: number; // ARS por unidad (snapshot para COGS)
+  /**
+   * Unidades por bulto al momento de la venta (snapshot). Se guarda acá para que
+   * los documentos calculen los BULTOS sin depender de la tabla de logística ni
+   * del id del producto (los productos cargados a mano no matcheaban). 1 o ausente
+   * = se vende por unidad.
+   */
+  paqPorBulto?: number;
+}
+
+/**
+ * PRESUPUESTO: una venta que el cliente todavía está EVALUANDO. No mueve stock
+ * ni es comprobante. Guarda el carrito con los precios NETOS del cliente (igual
+ * que el remito). Cuando el cliente vuelve con el N°, se carga en el POS y se
+ * convierte en venta (remito) y, si corresponde, factura.
+ */
+export interface Presupuesto {
+  id: string;
+  numero: string; // ej "P-000001"
+  clienteId?: string;
+  clienteNombre?: string;
+  clienteCuit?: string;
+  vendedorUid?: string;
+  vendedorNombre?: string;
+  formaPago?: FormaPago;
+  items: RemitoItem[]; // precios NETOS del cliente (como el remito)
+  subtotal?: number;
+  descuentos?: { concepto: string; pct: number; monto: number }[];
+  total: number;
+  estado: "pendiente" | "convertido"; // convertido = ya se hizo la venta
+  remitoId?: string; // remito generado al convertir
+  createdBy?: string;
+  createdAt: number;
+  fecha: number;
 }
 
 export interface Remito {
@@ -207,6 +262,9 @@ export interface Remito {
   clienteId?: string; // cliente del CRM
   clienteNombre?: string;
   clienteCuit?: string;
+  /** Dirección de entrega (snapshot del cliente): va en el remito del transporte
+   *  para que el fletero sepa a dónde llevarlo. */
+  clienteDireccion?: string;
   /** Vendedor al que se le atribuye la venta (para comisiones). */
   vendedorUid?: string;
   vendedorNombre?: string;
@@ -221,6 +279,22 @@ export interface Remito {
   anulado?: boolean; // venta anulada (devolvió stock); no cuenta en reportes/caja
   anuladoPor?: string;
   anuladoAt?: number;
+  /** Entrega directa de fábrica: esta venta NO descontó stock (no salió del
+   *  depósito). Anular tampoco lo devuelve. Ver ventas.ts. */
+  sinStock?: boolean;
+  /**
+   * Devoluciones parciales del remito (ej. llegó un bulto menos). Cada una
+   * DEVUELVE stock (salvo entrega de fábrica) y BAJA la deuda del cliente por su
+   * monto. `cantidad` en UNIDADES. Ver registrarDevolucion en ventas.ts.
+   */
+  devoluciones?: {
+    productId: string;
+    nombre: string;
+    cantidad: number; // unidades devueltas
+    monto: number; // ARS que se le descuenta al cliente
+    fecha: number;
+    por?: string;
+  }[];
   /** Envío al que está asignado (módulo Logística de envíos). */
   envioId?: string;
   /** Estado de despacho, independiente del estado de la venta. */
@@ -265,10 +339,22 @@ export interface Factura {
   caeVto?: string | null; // YYYYMMDD (formato AFIP)
   qrUrl?: string | null; // URL del QR oficial (RG 4291)
   verification?: "verified" | "mismatch" | "pending" | null;
-  estado: "interna" | "emitida";
+  estado: "interna" | "emitida" | "emitiendo";
   createdBy?: string;
   createdAt: number;
   fecha: number;
+  // ===== Notas de Crédito / Débito =====
+  /** Si es una nota (crédito o débito), no una factura. */
+  esNota?: boolean;
+  clase?: "credito" | "debito";
+  cbteTipo?: number; // tipo AFIP (3=NC A, 8=NC B, 2=ND A, 7=ND B)
+  facturaAsociadaId?: string; // factura que la nota revierte/ajusta
+  facturaNumero?: string;
+  motivo?: string | null;
+  // ===== En una factura: notas emitidas sobre ella =====
+  anulada?: boolean; // se le hizo una nota de crédito por el total
+  notaCreditoId?: string;
+  notaDebitoId?: string;
 }
 
 // ===== Módulo Logística de envíos =====

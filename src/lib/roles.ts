@@ -7,6 +7,10 @@ import type { Role } from "./types";
 const RANK: Record<Role, number> = {
   cliente: 0,
   contador: 0,
+  // "deposito" también queda FUERA de la jerarquía lineal (rango 0): solo entra
+  // a su área /deposito (envíos + remitos sin precios). Se controla con listas
+  // de roles explícitas, nunca con `min`.
+  deposito: 0,
   vendedor: 1,
   socio: 2,
   superadmin: 3,

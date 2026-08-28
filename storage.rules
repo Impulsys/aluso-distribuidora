@@ -9,6 +9,13 @@ service firebase.storage {
                    && request.resource.size < 8 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
+    // Documentación complementaria (cualquier archivo: fotos, audio, PDF, etc.).
+    // Lectura y escritura solo para usuarios logueados. Hasta 50 MB por archivo.
+    match /documentacion/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 50 * 1024 * 1024;
+    }
     // Todo lo demás: bloqueado.
     match /{allPaths=**} {
       allow read, write: if false;

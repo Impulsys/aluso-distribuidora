@@ -64,6 +64,8 @@ export default function ReportesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dayOpen, setDayOpen] = useState<number | null>(null);
+  // Mes elegido para el reporte mensual (para comparar meses).
+  const [mesSel, setMesSel] = useState(new Date().getMonth());
 
   // Suscripciones tiempo real
   useEffect(() => {
@@ -167,6 +169,68 @@ export default function ReportesPage() {
       cantVentas: remitosAnio.length,
     };
   }, [remitos, expenses, year]);
+
+  // ====== Reporte de UN MES elegible (para comparar meses) ======
+  const reporteMes = useMemo(() => {
+    const mStart = new Date(year, mesSel, 1).getTime();
+    const mEnd = new Date(year, mesSel + 1, 1).getTime();
+    const ventasR = remitos.filter(
+      (r) => !r.anulado && r.fecha >= mStart && r.fecha < mEnd
+    );
+    const gastosE = expenses.filter((e) => e.fecha >= mStart && e.fecha < mEnd);
+    const ventas = ventasR.reduce((s, r) => s + r.total, 0);
+    const gastos = gastosE.reduce((s, e) => s + (e.monto || 0), 0);
+    return { ventas, gastos, margen: ventas - gastos, ventasR, gastosE };
+  }, [remitos, expenses, year, mesSel]);
+
+  const descargarMesExcel = () => {
+    const sep = ";";
+    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+    const num = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
+    const rows: string[] = [];
+    rows.push(esc(`Reporte ${MONTH_NAMES[mesSel]} ${year}`));
+    rows.push("");
+    rows.push(["Comprobante", "Fecha", "Cliente", "Total"].map(esc).join(sep));
+    reporteMes.ventasR
+      .slice()
+      .sort((a, b) => a.fecha - b.fecha)
+      .forEach((r) =>
+        rows.push(
+          [
+            esc(r.numero || ""),
+            esc(new Date(r.fecha).toLocaleDateString("es-AR")),
+            esc(r.clienteNombre || ""),
+            num(r.total),
+          ].join(sep)
+        )
+      );
+    rows.push("");
+    rows.push(["Gasto", "Fecha", "Monto"].map(esc).join(sep));
+    reporteMes.gastosE
+      .slice()
+      .sort((a, b) => a.fecha - b.fecha)
+      .forEach((e) =>
+        rows.push(
+          [
+            esc(e.detalle || String(e.tipo) || "Gasto"),
+            esc(new Date(e.fecha).toLocaleDateString("es-AR")),
+            num(e.monto || 0),
+          ].join(sep)
+        )
+      );
+    rows.push("");
+    rows.push([esc("TOTAL VENTAS"), "", "", num(reporteMes.ventas)].join(sep));
+    rows.push([esc("TOTAL GASTOS"), "", "", num(reporteMes.gastos)].join(sep));
+    rows.push([esc("MARGEN"), "", "", num(reporteMes.margen)].join(sep));
+    const csv = "﻿" + rows.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-${MONTH_NAMES[mesSel].toLowerCase()}-${year}-aluso.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Respeta config para socios: ocultar info sensible si superadmin lo bloqueó
   const isSuperadmin = user?.role === "superadmin";
@@ -281,6 +345,62 @@ export default function ReportesPage() {
                 tone="rose"
                 isNegative
               />
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ============ REPORTE POR MES (comparar meses) ============ */}
+      {!loading && (
+        <section className="mb-6 rounded-2xl border border-brand-border bg-surface p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-serif text-xl text-brand-dark">
+              Reporte por mes
+            </h2>
+            <div className="flex items-center gap-2">
+              <select
+                value={mesSel}
+                onChange={(e) => setMesSel(Number(e.target.value))}
+                className="rounded-lg border border-brand-border bg-white px-3 py-1.5 text-sm outline-none focus:border-primary"
+              >
+                {MONTH_NAMES.map((m, i) => (
+                  <option key={i} value={i}>
+                    {m} {year}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={descargarMesExcel}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+              >
+                📊 Excel
+              </button>
+            </div>
+          </div>
+          <p className="mb-3 text-xs text-brand-dark/55">
+            Elegí un mes para ver su total y compararlo con otro. Cambiá el año
+            con las flechas de abajo.
+          </p>
+          <div
+            className={`grid gap-3 ${
+              showGastos ? "sm:grid-cols-3" : "grid-cols-1"
+            }`}
+          >
+            <KpiCard label="Ventas del mes" value={reporteMes.ventas} tone="emerald" />
+            {showGastos && (
+              <>
+                <KpiCard
+                  label="Gastos del mes"
+                  value={reporteMes.gastos}
+                  tone="rose"
+                  isNegative
+                />
+                <KpiCard
+                  label="Margen del mes"
+                  value={reporteMes.margen}
+                  tone={reporteMes.margen >= 0 ? "emerald" : "rose"}
+                />
+              </>
             )}
           </div>
         </section>

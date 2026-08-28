@@ -70,7 +70,11 @@ export function facturaHTML(
     ${a4Header()}
 
     <div class="doc-head">
-      <span class="tipo">FACTURA ${esc(f.tipo)}</span>
+      <span class="tipo">${
+        f.esNota
+          ? `${f.clase === "debito" ? "NOTA DE DÉBITO" : "NOTA DE CRÉDITO"} ${esc(f.tipo)}`
+          : `FACTURA ${esc(f.tipo)}`
+      }</span>
       <div style="text-align:right">
         <div class="nro">${nro}</div>
         <div class="fecha">${fechaCorta(f.fecha)}</div>
@@ -80,7 +84,13 @@ export function facturaHTML(
     <div class="cliente">
       <div><span class="lbl">Cliente:</span> ${cliente}</div>
       <div><span class="lbl">CUIT:</span> ${cuit}</div>
-      <div><span class="lbl">Remito:</span> ${esc(f.remitoNumero)}</div>
+      ${
+        f.esNota
+          ? `<div><span class="lbl">Factura asociada:</span> ${esc(f.facturaNumero || "—")}</div>${
+              f.motivo ? `<div><span class="lbl">Motivo:</span> ${esc(f.motivo)}</div>` : ""
+            }`
+          : `<div><span class="lbl">Remito:</span> ${esc(f.remitoNumero)}</div>`
+      }
       <div><span class="lbl">Condición:</span> ${
         f.consumidorFinal ? "Consumidor Final" : "Responsable Inscripto"
       }</div>

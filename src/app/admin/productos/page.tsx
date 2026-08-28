@@ -20,6 +20,15 @@ import { MARCAS, type Marca, type Product } from "@/lib/types";
 const paqDe = (ean?: string) => LOGISTICA_POR_EAN[ean ?? ""]?.paqPorBulto || 1;
 
 /**
+ * Unidades por bulto EFECTIVAS: la config manual del producto pisa la tabla
+ * logística. Ídem bultos por palet (solo config manual, no hay tabla).
+ */
+const uxbDe = (p: Product) =>
+  p.unidadesPorBulto && p.unidadesPorBulto > 0 ? p.unidadesPorBulto : paqDe(p.ean);
+const bxpDe = (p: Product) =>
+  p.bultosPorPalet && p.bultosPorPalet > 0 ? p.bultosPorPalet : 0;
+
+/**
  * Campo de stock que se carga POR BULTO cuando el producto tiene el dato. Se
  * ingresa la cantidad de bultos y el sistema guarda las unidades (bultos ×
  * unidades del bulto), mostrando el equivalente. Preserva las unidades sueltas
@@ -30,13 +39,16 @@ function StockPorBulto({
   stock,
   setStock,
   inputCls,
+  paq: paqProp,
 }: {
   ean?: string;
   stock: number;
   setStock: (n: number) => void;
   inputCls: string;
+  /** Unidades por bulto efectivas (config manual). Si no viene, usa la tabla. */
+  paq?: number;
 }) {
-  const paq = paqDe(ean);
+  const paq = paqProp && paqProp > 0 ? paqProp : paqDe(ean);
   if (paq <= 1) {
     return (
       <Field label="Stock (unidades)">
@@ -109,7 +121,11 @@ export default function AdminProductosPage() {
       productos.filter((p) => {
         const t = q.trim();
         if (!t) return true;
-        return coincide(p.nombre, t) || coincide(p.ean ?? "", t);
+        return (
+          coincide(p.nombre, t) ||
+          coincide(p.ean ?? "", t) ||
+          coincide(p.codigo ?? "", t)
+        );
       }),
     [productos, q]
   );
@@ -498,18 +514,24 @@ function ProductRow({
         </span>
         <span
           className={`hidden text-right md:block ${
-            p.stock === 0
+            p.stock < 0
+              ? "font-bold text-red-600"
+              : p.stock === 0
               ? "text-rose-600"
               : p.stock < 10
               ? "text-amber-700"
               : "text-brand-dark/70"
           }`}
         >
-          {p.stock}
-          {paqDe(p.ean) > 1 && (
-            <span className="block text-[10px] text-brand-dark/45">
-              {Math.floor((p.stock || 0) / paqDe(p.ean))} bultos
-            </span>
+          {uxbDe(p) > 1 ? (
+            <>
+              {Math.floor((p.stock || 0) / uxbDe(p))}
+              <span className="block text-[10px] text-brand-dark/45">
+                bultos
+              </span>
+            </>
+          ) : (
+            p.stock
           )}
         </span>
         <span className="hidden text-right text-brand-dark/70 md:block">
@@ -596,6 +618,10 @@ function EditForm({
   const [precioOferta, setPrecioOferta] = useState(p.precioOferta ?? 0);
   const [activo, setActivo] = useState(p.activo);
   const [descripcion, setDescripcion] = useState(p.descripcion ?? "");
+  const [unidadesPorBulto, setUnidadesPorBulto] = useState(
+    p.unidadesPorBulto ?? 0
+  );
+  const [bultosPorPalet, setBultosPorPalet] = useState(p.bultosPorPalet ?? 0);
   const [error, setError] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
 
@@ -629,8 +655,10 @@ function EditForm({
     const st = Number(stock) || 0;
     const po = Number(precioOferta) || 0;
 
-    if (pv < 0 || pc < 0 || st < 0 || po < 0) {
-      setError("Los valores no pueden ser negativos.");
+    // El stock SÍ puede ser negativo (backorder: vendido sin stock). Los
+    // precios no.
+    if (pv < 0 || pc < 0 || po < 0) {
+      setError("Los precios no pueden ser negativos.");
       return;
     }
     if (po > 0 && pv > 0 && po >= pv) {
@@ -663,6 +691,8 @@ function EditForm({
       precioOferta: po,
       activo,
       descripcion: descripcion.trim(),
+      unidadesPorBulto: Number(unidadesPorBulto) || 0,
+      bultosPorPalet: Number(bultosPorPalet) || 0,
     };
     // El stock se escribe SOLO si el usuario lo tocó. Si no, al guardar el form
     // (abierto hace rato) se pisaba el stock actual y "resucitaban" unidades ya
@@ -671,6 +701,14 @@ function EditForm({
 
     onSave(patch);
   };
+
+  // Desagregación de precios (live): $ unidad → $ x bulto → $ x palet.
+  const uxbEff =
+    Number(unidadesPorBulto) > 0 ? Number(unidadesPorBulto) : paqDe(ean);
+  const bxpEff = Number(bultosPorPalet) || 0;
+  const pvNum = Number(precioVenta) || 0;
+  const precioBulto = pvNum * uxbEff;
+  const precioPalet = bxpEff > 0 ? precioBulto * bxpEff : 0;
 
   return (
     <form
@@ -788,8 +826,57 @@ function EditForm({
         ean={ean}
         stock={stock}
         setStock={setStock}
+        paq={uxbEff}
         inputCls="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
       />
+      <Field label="Unidades por bulto">
+        <input
+          type="number"
+          min={0}
+          value={unidadesPorBulto || ""}
+          onChange={(e) => setUnidadesPorBulto(Number(e.target.value) || 0)}
+          placeholder={`${paqDe(ean)} (según tabla)`}
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+        />
+      </Field>
+      <Field label="Bultos por palet">
+        <input
+          type="number"
+          min={0}
+          value={bultosPorPalet || ""}
+          onChange={(e) => setBultosPorPalet(Number(e.target.value) || 0)}
+          placeholder="0 = sin dato"
+          className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+        />
+      </Field>
+      <div className="sm:col-span-2 lg:col-span-3">
+        <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-primary-light/40 px-3 py-2 text-sm">
+          <span>
+            <span className="text-brand-dark/55">$ unidad:</span>{" "}
+            <b className="text-brand-dark">{formatARS(pvNum)}</b>
+          </span>
+          <span>
+            <span className="text-brand-dark/55">$ x bulto:</span>{" "}
+            <b className="text-brand-dark">{formatARS(precioBulto)}</b>{" "}
+            <span className="text-[11px] text-brand-dark/45">
+              ({uxbEff} u)
+            </span>
+          </span>
+          <span>
+            <span className="text-brand-dark/55">$ x palet:</span>{" "}
+            {precioPalet > 0 ? (
+              <>
+                <b className="text-brand-dark">{formatARS(precioPalet)}</b>{" "}
+                <span className="text-[11px] text-brand-dark/45">
+                  ({bxpEff} bultos)
+                </span>
+              </>
+            ) : (
+              <span className="text-brand-dark/45">— (cargá bultos/palet)</span>
+            )}
+          </span>
+        </div>
+      </div>
       <Field label="Precio de OFERTA (0 = sin oferta)">
         <input
           type="number"

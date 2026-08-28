@@ -21,6 +21,18 @@ function esVentaViva(r: Remito): boolean {
   return !r.anulado;
 }
 
+/**
+ * ¿El pedido ya se ENTREGÓ? La deuda del cliente arranca cuando se entrega, no
+ * cuando se hace el remito (pedido de Anabela).
+ *  - Venta directa del local (sin envío asignado): se entrega en el momento → sí.
+ *  - Venta con flete: cuenta recién cuando el envío se marca "entregado".
+ * `estadoLogistica` ausente = venta directa; "entregado" = despachado y entregado.
+ * Cualquier otro estado (pendiente/asignado/preparación/listo) = todavía no.
+ */
+export function esEntregado(r: Remito): boolean {
+  return r.estadoLogistica == null || r.estadoLogistica === "entregado";
+}
+
 /** Un remito pesa como deuda si es venta viva y NO está cobrado. */
 export function esDeuda(r: Remito): boolean {
   return esVentaViva(r) && !r.cobrado;
@@ -44,6 +56,12 @@ function r2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/** Total del remito NETO de devoluciones: lo que realmente debe el cliente. */
+export function totalNetoRemito(r: Remito): number {
+  const devuelto = (r.devoluciones ?? []).reduce((s, d) => s + (d.monto || 0), 0);
+  return r2(Math.max(0, r.total - devuelto));
+}
+
 /**
  * Deuda por cliente a partir de los remitos. Agrupa por `clienteId` (o, si el
  * remito viejo no tiene id, por nombre normalizado). Devuelve solo clientes con
@@ -58,6 +76,9 @@ export function deudaPorCliente(
 
   for (const r of remitos) {
     if (!esVentaViva(r)) continue;
+    // La deuda cuenta desde la ENTREGA: un pedido con flete que todavía no se
+    // entregó no pesa como deuda hasta que se marca el envío como entregado.
+    if (!esEntregado(r)) continue;
     // Clave: id del CRM si lo hay; si no, el nombre (remitos previos al CRM).
     const key = r.clienteId || `nombre:${(r.clienteNombre || "").trim().toLowerCase()}`;
     if (key === "nombre:") continue; // venta sin cliente identificable: no es cta cte
@@ -77,9 +98,10 @@ export function deudaPorCliente(
         pendientes: 0,
       } as SaldoCliente);
 
-    cur.vendido = r2(cur.vendido + r.total);
+    const totalRemito = totalNetoRemito(r); // descuenta devoluciones
+    cur.vendido = r2(cur.vendido + totalRemito);
     if (r.cobrado) {
-      cur.cobrado = r2(cur.cobrado + r.total);
+      cur.cobrado = r2(cur.cobrado + totalRemito);
     } else {
       cur.pendientes += 1;
       if (cur.masViejoPendiente == null || r.fecha < cur.masViejoPendiente) {

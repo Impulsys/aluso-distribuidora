@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { subscribeRemitosRange, updateRemitoMeta } from "@/lib/ventas";
+import {
+  subscribeRemitosRange,
+  updateRemitoMeta,
+  registrarDevolucion,
+  editarItemsRemito,
+} from "@/lib/ventas";
+import type { RemitoItem } from "@/lib/types";
+import { totalNetoRemito } from "@/lib/cobros";
+import { LOGISTICA_POR_EAN } from "@/data/logistica";
 import {
   subscribeSupplierPaymentsRange,
   subscribeProveedores,
@@ -10,7 +18,12 @@ import { subscribeExpensesRange } from "@/lib/cashflow";
 import { getAllUsers } from "@/lib/admin";
 import { subscribeCierres, type DailyCashInitial } from "@/lib/cash-initial";
 import { DENOMINACIONES, totalArqueo } from "@/lib/caja";
-import { openRemito, printRemito } from "@/lib/remito-print";
+import {
+  openRemito,
+  printRemito,
+  printRemitoTransporte,
+  printRemitoPreimpreso,
+} from "@/lib/remito-print";
 import { formatARS, formatDate, formatGasto, tsFromISO } from "@/lib/format";
 import {
   EXPENSE_LABELS,
@@ -73,6 +86,7 @@ export default function RegistroHistorico() {
   const [abierto, setAbierto] = useState<number | null>(null);
   const [mesesAtras, setMesesAtras] = useState(3);
   const [editVenta, setEditVenta] = useState<Remito | null>(null);
+  const [devVenta, setDevVenta] = useState<Remito | null>(null);
 
   useEffect(() => {
     getAllUsers()
@@ -259,6 +273,11 @@ export default function RegistroHistorico() {
                                   }`}
                                 >
                                   {formatARS(r.total)}
+                                  {r.devoluciones && r.devoluciones.length > 0 && (
+                                    <span className="block text-[10px] font-normal text-amber-700">
+                                      ↩️ neto {formatARS(totalNetoRemito(r))}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-1.5 text-right">
                                   <button
@@ -276,12 +295,35 @@ export default function RegistroHistorico() {
                                       ✎
                                     </button>
                                   )}
+                                  {!r.anulado && (
+                                    <button
+                                      onClick={() => setDevVenta(r)}
+                                      title="Registrar devolución (volvió un bulto)"
+                                      className="ml-1 rounded-full px-2 py-1 text-xs hover:bg-amber-100"
+                                    >
+                                      ↩️
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => printRemito(r)}
-                                    title="Imprimir"
+                                    title="Imprimir remito (con precios)"
                                     className="ml-1 rounded-full px-2 py-1 text-xs hover:bg-primary-light"
                                   >
                                     🖨️
+                                  </button>
+                                  <button
+                                    onClick={() => printRemitoTransporte(r)}
+                                    title="Remito del camionero (sin precios, x2)"
+                                    className="ml-1 rounded-full px-2 py-1 text-xs hover:bg-primary-light"
+                                  >
+                                    🚚
+                                  </button>
+                                  <button
+                                    onClick={() => printRemitoPreimpreso(r)}
+                                    title="Imprimir SOBRE el formulario preimpreso (talonario numerado)"
+                                    className="ml-1 rounded-full px-2 py-1 text-xs hover:bg-primary-light"
+                                  >
+                                    📄
                                   </button>
                                 </td>
                               </tr>
@@ -378,6 +420,133 @@ export default function RegistroHistorico() {
           }}
         />
       )}
+
+      {devVenta && (
+        <DevolucionModal
+          venta={devVenta}
+          onCancel={() => setDevVenta(null)}
+          onDone={() => setDevVenta(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ====== Modal: registrar una DEVOLUCIÓN parcial de un remito ======
+// Devuelve stock (salvo entrega de fábrica) y baja la deuda del cliente.
+function DevolucionModal({
+  venta,
+  onCancel,
+  onDone,
+}: {
+  venta: Remito;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const [productId, setProductId] = useState(venta.items[0]?.productId ?? "");
+  const [bultos, setBultos] = useState(1);
+  const [busy, setBusy] = useState(false);
+
+  const item = venta.items.find((i) => i.productId === productId);
+  const paq =
+    item &&
+    (item.paqPorBulto && item.paqPorBulto > 0
+      ? item.paqPorBulto
+      : LOGISTICA_POR_EAN[item.productId]?.paqPorBulto || 1);
+  const paqN = paq || 1;
+  const yaDevuelto = (venta.devoluciones ?? [])
+    .filter((d) => d.productId === productId)
+    .reduce((s, d) => s + d.cantidad, 0);
+  const maxUnidades = (item?.cantidad ?? 0) - yaDevuelto;
+  const unidades = bultos * paqN;
+  const monto = (item?.precioVenta ?? 0) * unidades;
+  const excede = unidades > maxUnidades;
+
+  const confirmar = async () => {
+    if (!item || unidades <= 0 || excede) return;
+    setBusy(true);
+    try {
+      await registrarDevolucion(venta, productId, unidades);
+      onDone();
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo registrar la devolución.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl">
+        <h3 className="font-serif text-lg text-brand-dark">
+          Devolución · {venta.numero}
+        </h3>
+        <p className="mb-3 text-xs text-brand-dark/55">
+          Elegí el producto y cuántos <b>bultos</b> volvieron. Se suma ese stock
+          de vuelta{venta.sinStock ? " (esta venta no descontó stock, así que solo baja la deuda)" : ""} y se le baja la deuda al cliente.
+        </p>
+
+        <label className="block text-sm">
+          <span className="font-medium text-brand-dark">Producto</span>
+          <select
+            value={productId}
+            onChange={(e) => {
+              setProductId(e.target.value);
+              setBultos(1);
+            }}
+            className="mt-1 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+          >
+            {venta.items.map((it) => (
+              <option key={it.productId} value={it.productId}>
+                {it.codigo ? `${it.codigo} · ` : ""}
+                {it.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mt-3 block text-sm">
+          <span className="font-medium text-brand-dark">Bultos que volvieron</span>
+          <input
+            type="number"
+            min={1}
+            value={bultos || ""}
+            onChange={(e) => setBultos(Math.max(0, Number(e.target.value) || 0))}
+            className="mt-1 w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm"
+          />
+          <span className="mt-1 block text-[11px] text-brand-dark/55">
+            {paqN} u/bulto · = {unidades} unidades · máximo{" "}
+            {Math.floor(maxUnidades / paqN)} bultos ({maxUnidades} u)
+          </span>
+        </label>
+
+        {excede && (
+          <p className="mt-2 text-xs font-semibold text-rose-600">
+            No podés devolver más de lo que había en el remito.
+          </p>
+        )}
+
+        <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Se le descuenta al cliente: <b>{formatARS(monto)}</b>
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-brand-border px-4 py-2 text-sm"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={busy || excede || unidades <= 0}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {busy ? "Registrando…" : "Registrar devolución"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -407,28 +576,66 @@ function EditarVentaModal({
   );
   const [fecha, setFecha] = useState(isoDe(venta.fecha));
   const [busy, setBusy] = useState(false);
+  // Edición de ítems: solo si la venta NO está facturada ni anulada.
+  const editable = !venta.facturaId && !venta.anulado;
+  const [items, setItems] = useState<RemitoItem[]>(
+    venta.items.map((it) => ({ ...it }))
+  );
+  const paqDe = (it: RemitoItem) =>
+    it.paqPorBulto && it.paqPorBulto > 0
+      ? it.paqPorBulto
+      : LOGISTICA_POR_EAN[it.productId]?.paqPorBulto || 1;
 
   const inputCls =
     "w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-primary";
   const labelCls =
     "mb-1 block text-[11px] font-bold uppercase tracking-wider text-brand-dark/55";
 
+  const setBultos = (productId: string, bultos: number) =>
+    setItems((its) =>
+      its.map((it) =>
+        it.productId === productId
+          ? { ...it, cantidad: Math.max(0, Math.round(bultos)) * paqDe(it) }
+          : it
+      )
+    );
+  const quitar = (productId: string) =>
+    setItems((its) => its.filter((it) => it.productId !== productId));
+
+  const itemsCambiaron =
+    JSON.stringify(items.map((i) => [i.productId, i.cantidad])) !==
+    JSON.stringify(venta.items.map((i) => [i.productId, i.cantidad]));
+
   const guardar = async () => {
+    const finales = items.filter((it) => it.cantidad > 0);
+    if (editable && finales.length === 0) {
+      alert("La venta tiene que quedar con al menos un producto.");
+      return;
+    }
     setBusy(true);
-    await onSave({ clienteNombre: cliente, formaPago, fecha: tsFromISO(fecha) });
-    setBusy(false);
+    try {
+      if (editable && itemsCambiaron) {
+        await editarItemsRemito(venta, finales);
+      }
+      await onSave({ clienteNombre: cliente, formaPago, fecha: tsFromISO(fecha) });
+    } catch {
+      alert("No se pudo guardar. Revisá e intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-2xl bg-white shadow-2xl">
         <div className="border-b border-brand-border p-5">
           <h2 className="font-serif text-xl text-brand-dark">
             Editar venta {venta.numero}
           </h2>
           <p className="mt-0.5 text-xs text-brand-dark/55">
-            Solo datos. Para cambiar productos/cantidades, anulá la venta y
-            volvé a hacerla.
+            {editable
+              ? "Podés cambiar cantidades (en bultos) y sacar productos. El stock y el total se ajustan solos."
+              : "Esta venta está facturada o anulada: solo se pueden editar los datos, no los productos."}
           </p>
         </div>
         <div className="space-y-3 p-5">
@@ -464,6 +671,54 @@ function EditarVentaModal({
               />
             </div>
           </div>
+
+          {editable && (
+            <div>
+              <label className={labelCls}>Productos (cantidad en bultos)</label>
+              <ul className="space-y-1">
+                {items.map((it) => {
+                  const paq = paqDe(it);
+                  const bultos = Math.round(it.cantidad / paq);
+                  return (
+                    <li
+                      key={it.productId}
+                      className="flex items-center gap-2 rounded-lg border border-brand-border bg-white px-2 py-1.5 text-xs"
+                    >
+                      <span className="flex-1 truncate">
+                        {it.codigo ? `${it.codigo} · ` : ""}
+                        {it.nombre}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={bultos || ""}
+                        onChange={(e) =>
+                          setBultos(it.productId, Number(e.target.value) || 0)
+                        }
+                        className="w-16 rounded border border-brand-border px-1.5 py-1 text-center tabular-nums"
+                      />
+                      <span className="w-20 shrink-0 text-[10px] text-brand-dark/55">
+                        = {it.cantidad} u
+                      </span>
+                      <button
+                        onClick={() => quitar(it.productId)}
+                        title="Sacar del remito"
+                        className="shrink-0 text-brand-dark/40 hover:text-rose-600"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {itemsCambiaron && (
+                <p className="mt-1.5 text-[11px] font-semibold text-amber-700">
+                  ⚠ Cambiaste productos: al guardar se ajusta el stock y el total.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <button
               onClick={onCancel}

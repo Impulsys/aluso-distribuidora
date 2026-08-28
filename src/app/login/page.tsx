@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { usernameToEmail } from "@/lib/userAdmin";
+import type { Role } from "@/lib/types";
+
+/** A dónde va cada rol al entrar: el depo y el contador tienen su área propia. */
+function homeParaRol(role?: Role): string {
+  if (role === "deposito") return "/deposito";
+  if (role === "contador") return "/contador";
+  return "/";
+}
 
 // Acá había un "MODO DEMO": una lista de usuarios de prueba con sus contraseñas
 // (superadmin@aluso.test / SuperAdmin123!, etc.) y un desplegable en el login
@@ -27,19 +35,23 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
+  // La app es estática: el HTML pinta al instante pero el JS que hace andar el
+  // botón "despierta" (hidrata) una fracción después. Hasta que `hydrated` sea
+  // true, el botón queda deshabilitado para que el PRIMER click nunca se pierda.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
+  // Ya logueado (o recién logueado): lo mandamos a SU área según el rol. Se hace
+  // acá, en el origen, para no depender de rebotes en el header. El depósito y el
+  // contador caen directo en su pantalla; el resto, a la portada.
+  useEffect(() => {
+    if (user) router.replace(homeParaRol(user.role));
+  }, [user, router]);
 
   if (user) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <p className="text-lg">
-          Ya ingresaste como <b>{user.displayName}</b>.
-        </p>
-        <Link
-          href="/"
-          className="mt-4 inline-block rounded bg-primary px-4 py-2 font-medium text-white"
-        >
-          Ir al catálogo
-        </Link>
+        <p className="text-lg">Entrando…</p>
       </div>
     );
   }
@@ -51,7 +63,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await signInEmail(usernameToEmail(email), password);
-      router.push("/");
+      // El redirect por rol lo hace el useEffect de arriba cuando `user` resuelve.
     } catch {
       setError("Usuario o contraseña incorrectos.");
     } finally {
@@ -70,7 +82,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await signUpEmail(nombre, email.trim(), password);
-      router.push("/");
+      // Redirect por rol vía el useEffect (un alta nueva es cliente → portada).
     } catch (err) {
       const code = (err as { code?: string }).code;
       if (code === "auth/email-already-in-use") {
@@ -168,7 +180,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !hydrated}
               className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
             >
               {busy ? "Ingresando…" : "Ingresar"}
@@ -221,7 +233,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !hydrated}
               className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
             >
               {busy ? "Creando cuenta…" : "Crear cuenta"}

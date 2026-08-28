@@ -26,6 +26,8 @@ export interface NewClienteInput {
   /** Condición comercial: lista de precios y descuento fijo del cliente. */
   markupLista?: number;
   descuentoExtraPct?: number;
+  observaciones?: string;
+  entregaDirectaFabrica?: boolean;
 }
 
 // Firestore rechaza undefined → lo quitamos antes de escribir.

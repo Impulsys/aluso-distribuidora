@@ -1,7 +1,11 @@
 // Inicialización de Firebase (cliente). Config por variables de entorno.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
@@ -20,8 +24,20 @@ export const auth = getAuth(app);
 // ignoreUndefinedProperties: red de seguridad. Sin esto, un solo campo opcional
 // en `undefined` (ej. un producto sin código interno) hacía que Firestore
 // RECHAZARA la escritura y la venta no se pudiera cerrar.
+//
+// localCache (IndexedDB, multi-pestaña): la clave para que el panel "ande rápido".
+// Sin esto, CADA vez que se cambia de pestaña se re-suscribe a Firestore desde la
+// red en frío y el área de contenido queda en blanco hasta que llega el primer
+// snapshot (~150-300ms en datacenter, mucho más en la conexión real del cliente):
+// eso es el "parpadeo/refresco" que se ve al navegar. Con caché persistente, al
+// re-suscribir los onSnapshot entregan los datos AL INSTANTE desde IndexedDB y
+// después el servidor confirma en segundo plano. persistentMultipleTabManager
+// evita que dos pestañas del panel se peleen por el lock de IndexedDB.
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
 });
 export const storage = getStorage(app);
 export const functions = getFunctions(app); // región default us-central1

@@ -10,9 +10,11 @@ import {
   type NewClienteInput,
 } from "@/lib/clientes";
 import { coincide } from "@/lib/search";
+import { getAllUsers } from "@/lib/admin";
 import { LISTAS_PRECIO } from "@/lib/precios";
 import {
   CONDICION_IVA_LABELS,
+  type AppUser,
   type Cliente,
   type CondicionIva,
 } from "@/lib/types";
@@ -28,6 +30,8 @@ const VACIO: NewClienteInput = {
   domicilioFiscal: "",
   markupLista: 28,
   descuentoExtraPct: 0,
+  observaciones: "",
+  entregaDirectaFabrica: false,
 };
 
 export default function ClientesPage() {
@@ -38,8 +42,14 @@ export default function ClientesPage() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [ok, setOk] = useState("");
+  const [vendedores, setVendedores] = useState<AppUser[]>([]);
 
   useEffect(() => subscribeClientes(setClientes), []);
+  useEffect(() => {
+    getAllUsers()
+      .then((us) => setVendedores(us.filter((u) => u.role === "vendedor")))
+      .catch(() => {});
+  }, []);
 
   const set = <K extends keyof NewClienteInput>(k: K, v: NewClienteInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -71,8 +81,12 @@ export default function ClientesPage() {
       telefono: c.telefono ?? "",
       direccionEntrega: c.direccionEntrega ?? "",
       domicilioFiscal: c.domicilioFiscal ?? "",
+      vendedorId: c.vendedorId ?? "",
+      vendedorNombre: c.vendedorNombre ?? "",
       markupLista: c.markupLista ?? 28,
       descuentoExtraPct: c.descuentoExtraPct ?? 0,
+      observaciones: c.observaciones ?? "",
+      entregaDirectaFabrica: c.entregaDirectaFabrica ?? false,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -90,8 +104,10 @@ export default function ClientesPage() {
       } else {
         await createCliente({
           ...form,
-          vendedorId: user?.uid,
-          vendedorNombre: user?.displayName,
+          // Vendedor ASIGNADO al cliente (elegido en la ficha); si no se eligió,
+          // queda quien lo cargó. Este vendedor se autocompleta después en Ventas.
+          vendedorId: form.vendedorId || user?.uid,
+          vendedorNombre: form.vendedorNombre || user?.displayName,
         });
         setOk("Cliente creado ✓");
       }
@@ -218,6 +234,34 @@ export default function ClientesPage() {
             </span>
           </label>
           <label className="block text-sm">
+            <span className="font-medium text-brand-dark">
+              Vendedor asignado
+            </span>
+            <select
+              value={form.vendedorId ?? ""}
+              onChange={(e) => {
+                const v = vendedores.find((x) => x.uid === e.target.value);
+                setForm((f) => ({
+                  ...f,
+                  vendedorId: v?.uid ?? "",
+                  vendedorNombre: v?.displayName ?? "",
+                }));
+              }}
+              className={inputCls}
+            >
+              <option value="">— Sin asignar —</option>
+              {vendedores.map((v) => (
+                <option key={v.uid} value={v.uid}>
+                  {v.displayName}
+                </option>
+              ))}
+            </select>
+            <span className="mt-0.5 block text-[11px] text-brand-dark/45">
+              Se autocompleta al elegir este cliente en la venta (se puede
+              cambiar ahí).
+            </span>
+          </label>
+          <label className="block text-sm">
             <span className="font-medium text-brand-dark">Teléfono</span>
             <input
               value={form.telefono}
@@ -250,6 +294,34 @@ export default function ClientesPage() {
               onChange={(e) => set("domicilioFiscal", e.target.value)}
               className={inputCls}
             />
+          </label>
+          <label className="block text-sm sm:col-span-2">
+            <span className="font-medium text-brand-dark">Observaciones</span>
+            <textarea
+              value={form.observaciones ?? ""}
+              onChange={(e) => set("observaciones", e.target.value)}
+              rows={2}
+              placeholder="Notas del cliente: horarios de entrega, quién recibe, etc."
+              className={inputCls}
+            />
+          </label>
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={form.entregaDirectaFabrica ?? false}
+              onChange={(e) => set("entregaDirectaFabrica", e.target.checked)}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              <span className="font-medium text-brand-dark">
+                🏭 Entrega directa de fábrica
+              </span>
+              <span className="block text-[11px] text-brand-dark/45">
+                El pedido se despacha desde la fábrica, no desde el depósito. Al
+                facturarle, la venta <b>no descuenta stock</b> (pero sí cuenta como
+                venta y deuda del cliente).
+              </span>
+            </span>
           </label>
         </div>
 

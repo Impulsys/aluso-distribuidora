@@ -27,6 +27,7 @@ const ROLES: Role[] = [
   "socio",
   "superadmin",
   "contador",
+  "deposito",
 ];
 
 const ROLE_STYLES: Record<Role, string> = {
@@ -35,6 +36,7 @@ const ROLE_STYLES: Record<Role, string> = {
   socio: "bg-amber-100 text-amber-800",
   superadmin: "bg-rose-100 text-rose-800",
   contador: "bg-violet-100 text-violet-800",
+  deposito: "bg-teal-100 text-teal-800",
 };
 
 /** Saca el mensaje legible de un error de Cloud Function (HttpsError). */
